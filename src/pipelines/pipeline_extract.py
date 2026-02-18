@@ -57,10 +57,12 @@ def retry_on_failure(max_retries: int = 5, delay: float = 1.0):
 def parse_args():
     """명령줄 인자 파싱"""
     parser = argparse.ArgumentParser(description="Extract vulnerability knowledge using LLM")
-    parser.add_argument("--input_file_name", type=str, required=True, 
+    parser.add_argument("--input_file_name", type=str, required=False, 
                        help="Input JSON file name (in data/train/)")
-    parser.add_argument("--output_file_name", type=str, required=True,
+    parser.add_argument("--output_file_name", type=str, required=False,
                        help="Output JSON file name (in data/knowledge/)")
+    parser.add_argument("--batch", action="store_true",
+                       help="Process all files in data/train/")
     parser.add_argument("--model_name", type=str, required=True,
                        help="LLM model name (e.g., gpt-4o-mini, gpt-4o, gpt-4-turbo)")
     parser.add_argument(
@@ -188,7 +190,7 @@ def parse_vulnerability_knowledge(llm_output: str) -> Dict[str, Any]:
         raise
 
 
-def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, Any]]) -> None:
+def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, Any]], custom_output_file=None) -> None:
     """
     단일 CVE 항목에 대해 지식 추출
     """
@@ -266,9 +268,11 @@ def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, An
 
         # Thread-safe output
         with output_lock:
+            # 배치 모드일 경우 각 파일마다 별도 처리하거나 리스트에 추가
             output_data.append(output_dict)
             with file_lock:
-                output_path = Path("data/knowledge") / args.output_file_name
+                actual_output_name = custom_output_file or args.output_file_name
+                output_path = Path("data/knowledge") / actual_output_name
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(output_path, "w", encoding="utf-8") as f:
                     json.dump(output_data, f, indent=4, ensure_ascii=False)
@@ -280,13 +284,58 @@ def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, An
         return
 
 
-def process_item(args, item: Dict[str, Any], output_data: List[Dict[str, Any]], resume_set: set):
+def process_item(args, item: Dict[str, Any], output_data: List[Dict[str, Any]], resume_set: set, custom_output_file=None):
     """개별 아이템 처리"""
     if item["id"] not in resume_set:
-        extract_knowledge(args, item, output_data)
+        extract_knowledge(args, item, output_data, custom_output_file)
     else:
         print(f"⊙ Skipping {item['cve_id']} (already processed)")
 
+
+def run_batch_pipeline(args):
+    """데이터 디렉토리 전체를 처리하는 배치 파이프라인"""
+    input_dir = Path("data/train")
+    if not input_dir.exists():
+        print(f"Error: Input directory not found: {input_dir}")
+        return
+
+    json_files = list(input_dir.glob("*.json"))
+    print(f"Found {len(json_files)} files in {input_dir}")
+
+    # 모든 아이템을 하나의 리스트로 통합하여 병렬 처리
+    all_items = []
+    file_map = {} # item_id -> output_filename
+
+    for f_path in json_files:
+        try:
+            with open(f_path, "r", encoding="utf-8") as f:
+                items = json.load(f)
+                out_name = f_path.name.replace(".json", "_knowledge.json")
+                for item in items:
+                    all_items.append(item)
+                    file_map[item["id"]] = out_name
+        except Exception as e:
+            print(f"Failed to load {f_path}: {e}")
+
+    if not all_items:
+        print("No items to process.")
+        return
+
+    # Resume 처리를 위한 전체 지식 파일 확인 (선택 사항 - 여기선 각 파일별로 체크하는 게 복잡하므로 단순화)
+    # 실제로는 개별 output 파일 존재 여부를 체크하는 로직이 더 안전함
+    output_data_placeholder = []
+    resume_set = set()
+
+    print(f"Processing {len(all_items)} items across {len(json_files)} files...")
+    with ThreadPoolExecutor(max_workers=args.thread_pool_size) as executor:
+        list(tqdm(
+            executor.map(
+                lambda item: process_item(args, item, [], set(), custom_output_file=file_map[item["id"]]),
+                all_items
+            ),
+            total=len(all_items),
+            desc="Batch Knowledge Extraction"
+        ))
 
 def extract_knowledge_pipeline(args):
     """메인 파이프라인"""
@@ -300,6 +349,14 @@ def extract_knowledge_pipeline(args):
         print(f"Failed to initialize LLM client: {e}")
         sys.exit(1)
     
+    if args.batch:
+        run_batch_pipeline(args)
+        return
+
+    if not args.input_file_name or not args.output_file_name:
+        print("Error: --input_file_name and --output_file_name are required unless --batch is used.")
+        sys.exit(1)
+
     # 입력 데이터 로드
     input_path = Path("data/train") / args.input_file_name
     if not input_path.exists():
