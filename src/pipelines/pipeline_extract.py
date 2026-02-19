@@ -3,14 +3,15 @@ Knowledge Extraction Pipeline
 RawDiffDTO JSON → LLM 분석 → VulnerabilityKnowledgeDTO JSON
 
 Usage:
-    python src/piplines/pipeline_extract.py \
+    python src/pipelines/pipeline_extract.py \
         --input_file_name CVE-2021-3904.json \
-        --output_file_name CVE-2021-3904_knowledge.json \
-        --model_name gpt-4o-mini \
-        --model_settings "temperature=0.2;max_tokens=4096" \
+        --output_file_name CVE-2021-3904_knowledge.json \       # 기본값 - input file에 +_knowledge.json 붙여서 저장 
+        --model_name gpt-4o-mini \                              # 이미 llm_client에서 정의된 모델이 mini
+        --model_settings "temperature=0.2;max_tokens=4096" \    # 여기도 llm_client에 기본값 존재 
         --thread_pool_size 5 \
         --retry_time 3 \
-        --resume
+        --resume \                                               # 이미 처리된 데이터 건너뛰기 
+        --batch                                                  # 전체 데이터 처리
 """
 import json
 import os
