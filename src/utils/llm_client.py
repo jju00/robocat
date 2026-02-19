@@ -100,7 +100,7 @@ class OpenAIClient(BaseLLMClient):
         # 기본 설정
         default_settings = {
             "temperature": 0.2,            # 창의성
-            "max_tokens": 16500,           # 최대 토큰 수 
+            "max_tokens": 16384,           # 최대 토큰 수 
         }
         default_settings.update(settings)
         
