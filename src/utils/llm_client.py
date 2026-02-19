@@ -41,15 +41,11 @@ def parse_kv_string_to_dict(kv_string: Optional[str]) -> Dict[str, Any]:
     return result
 
 
-def generate_simple_prompt(user_message: str, system_message: str = "") -> List[Dict[str, str]]:
+def generate_simple_prompt(user_message: str) -> List[Dict[str, str]]:
     """
     간단한 프롬프트 생성 (OpenAI 메시지 형식)
     """
-    messages = []           # 현재는 비워둠. 딕셔너리 형태의 system msg로 role과 content 지정해줄 것
-    if system_message:
-        messages.append({"role": "system", "content": system_message})
-    messages.append({"role": "user", "content": user_message})
-    return messages
+    return [{"role": "user", "content": user_message}]
 
 
 def extract_LLM_response_by_prefix(response: str, prefix: str) -> str:
@@ -103,8 +99,8 @@ class OpenAIClient(BaseLLMClient):
         
         # 기본 설정
         default_settings = {
-            "temperature": 0.2,           # 창의성
-            "max_tokens": 4096,           # 최대 토큰 수 
+            "temperature": 0.2,            # 창의성
+            "max_tokens": 16500,           # 최대 토큰 수 
         }
         default_settings.update(settings)
         
