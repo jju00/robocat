@@ -23,11 +23,6 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Output
-output/
-data/knowledge/*.json
-!data/knowledge/.gitkeep
-
 # Cache
 *.cache
 .pytest_cache/
