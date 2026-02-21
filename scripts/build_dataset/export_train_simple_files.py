@@ -4,7 +4,6 @@ import sqlite3
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import difflib
 import ast
 from tqdm import tqdm
 import os
@@ -98,26 +97,48 @@ def looks_like_code(text: str, min_lines: int = 3, min_chars: int = 20) -> bool:
         return False
     return True
 
-def compute_modified_lines(before_code: str, after_code: str, drop_ws_only: bool = True) -> Tuple[List[str], List[str]]:
-    before_lines = before_code.splitlines()
-    after_lines = after_code.splitlines()
-    sm = difflib.SequenceMatcher(a=before_lines, b=after_lines, autojunk=False)
+def parse_diff_parsed(
+    diff_parsed_str: Optional[str],
+    start_line: int = 0,
+    end_line: int = 0,
+    drop_ws_only: bool = True,
+) -> Tuple[List[str], List[str]]:
+    """
+    DB의 diff_parsed 필드를 파싱하여 (added, deleted) 라인 리스트를 반환한다.
+    형식: {'added': [(lineno, code), ...], 'deleted': [(lineno, code), ...]}
+    start_line/end_line > 0 이면 해당 메서드 범위의 라인만 필터링한다.
+    """
+    if not diff_parsed_str:
+        return [], []
+    try:
+        obj = ast.literal_eval(str(diff_parsed_str))
+        if not isinstance(obj, dict):
+            return [], []
 
-    added: List[str] = []
-    deleted: List[str] = []
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == "insert":
-            added.extend(after_lines[j1:j2])
-        elif tag == "delete":
-            deleted.extend(before_lines[i1:i2])
-        elif tag == "replace":
-            deleted.extend(before_lines[i1:i2])
-            added.extend(after_lines[j1:j2])
+        def extract(entries: list) -> List[str]:
+            result: List[str] = []
+            for item in entries:
+                if not isinstance(item, (list, tuple)) or len(item) < 2:
+                    continue
+                try:
+                    lineno = int(item[0])
+                except (ValueError, TypeError):
+                    lineno = -1
+                code = str(item[1])
+                # 메서드 라인 범위 필터 (범위 미지정 시 전체 포함)
+                if start_line > 0 and end_line > 0:
+                    if not (start_line <= lineno <= end_line):
+                        continue
+                if drop_ws_only and not code.strip():
+                    continue
+                result.append(code)
+            return result
 
-    if drop_ws_only:
-        added = [ln for ln in added if ln.strip() != ""]
-        deleted = [ln for ln in deleted if ln.strip() != ""]
-    return added, deleted
+        added   = extract(obj.get("added",   []))
+        deleted = extract(obj.get("deleted", []))
+        return added, deleted
+    except Exception:
+        return [], []
 
 def atomic_write(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,6 +171,7 @@ def main():
         fx.cve_id      AS cve_id,
         cv.description AS cve_description,
         fc.diff        AS patch,
+        fc.diff_parsed AS diff_parsed,
         fc.code_before AS file_code_before,
         fc.code_after  AS file_code_after,
         mc.name        AS method_name,
@@ -207,7 +229,12 @@ def main():
                 skipped += 1
                 continue
 
-        added, deleted = compute_modified_lines(before_code, after_code, drop_ws_only=args.drop_ws_only)
+        added, deleted = parse_diff_parsed(
+            row["diff_parsed"],
+            start_line=start_line,
+            end_line=end_line,
+            drop_ws_only=args.drop_ws_only,
+        )
         if not added and not deleted:
             skipped += 1
             continue
