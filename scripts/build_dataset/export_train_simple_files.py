@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -101,12 +102,15 @@ def parse_diff_parsed(
     diff_parsed_str: Optional[str],
     start_line: int = 0,
     end_line: int = 0,
+    after_start_line: int = 0,
+    after_end_line: int = 0,
     drop_ws_only: bool = True,
 ) -> Tuple[List[str], List[str]]:
     """
     DB의 diff_parsed 필드를 파싱하여 (added, deleted) 라인 리스트를 반환한다.
     형식: {'added': [(lineno, code), ...], 'deleted': [(lineno, code), ...]}
-    start_line/end_line > 0 이면 해당 메서드 범위의 라인만 필터링한다.
+    - deleted 라인: before 파일 기준 start_line~end_line 으로 필터링
+    - added   라인: after  파일 기준 after_start_line~after_end_line 으로 필터링
     """
     if not diff_parsed_str:
         return [], []
@@ -115,7 +119,7 @@ def parse_diff_parsed(
         if not isinstance(obj, dict):
             return [], []
 
-        def extract(entries: list) -> List[str]:
+        def extract(entries: list, lo: int, hi: int) -> List[str]:
             result: List[str] = []
             for item in entries:
                 if not isinstance(item, (list, tuple)) or len(item) < 2:
@@ -125,20 +129,72 @@ def parse_diff_parsed(
                 except (ValueError, TypeError):
                     lineno = -1
                 code = str(item[1])
-                # 메서드 라인 범위 필터 (범위 미지정 시 전체 포함)
-                if start_line > 0 and end_line > 0:
-                    if not (start_line <= lineno <= end_line):
+                if lo > 0 and hi > 0:
+                    if not (lo <= lineno <= hi):
                         continue
                 if drop_ws_only and not code.strip():
                     continue
                 result.append(code)
             return result
 
-        added   = extract(obj.get("added",   []))
-        deleted = extract(obj.get("deleted", []))
+        # added는 after 범위로, deleted는 before 범위로 각각 필터링
+        a_lo = after_start_line if after_start_line > 0 else start_line
+        a_hi = after_end_line   if after_end_line   > 0 else end_line
+        added   = extract(obj.get("added",   []), a_lo, a_hi)
+        deleted = extract(obj.get("deleted", []), start_line, end_line)
         return added, deleted
     except Exception:
         return [], []
+
+_HUNK_RE = re.compile(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
+
+def filter_patch_by_lines(patch: str, start_line: int, end_line: int) -> str:
+    """
+    patch 텍스트에서 start_line~end_line(before 파일 기준)과 겹치는 hunk만 추출한다.
+    hunk 헤더: @@ -old_start,old_count +new_@start,new_count @@
+    """
+    if not patch or start_line <= 0 or end_line <= 0:
+        return patch or ""
+
+    lines = patch.splitlines(keepends=True)
+    file_header: List[str] = []
+    matched_hunks: List[List[str]] = []
+    i = 0
+
+    # --- a/  /  +++ b/  등 파일 헤더 수집
+    while i < len(lines) and not lines[i].startswith("@@"):
+        file_header.append(lines[i])
+        i += 1
+
+    # hunk 단위로 파싱
+    while i < len(lines):
+        m = _HUNK_RE.match(lines[i])
+        if not m:
+            i += 1
+            continue
+
+        old_start = int(m.group(1))
+        old_count = int(m.group(2)) if m.group(2) is not None else 1
+        old_end   = old_start + max(0, old_count - 1)
+
+        hunk: List[str] = [lines[i]]
+        i += 1
+        while i < len(lines) and not lines[i].startswith("@@"):
+            hunk.append(lines[i])
+            i += 1
+
+        # 범위 겹침 확인 (before 파일 기준)
+        if old_start <= end_line and old_end >= start_line:
+            matched_hunks.append(hunk)
+
+    if not matched_hunks:
+        return ""
+
+    result = file_header
+    for hunk in matched_hunks:
+        result.extend(hunk)
+    return "".join(result)
+
 
 def atomic_write(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,27 +224,33 @@ def main():
 
     sql = """
     SELECT
-        fx.cve_id      AS cve_id,
-        cv.description AS cve_description,
-        fc.diff        AS patch,
-        fc.diff_parsed AS diff_parsed,
-        fc.code_before AS file_code_before,
-        fc.code_after  AS file_code_after,
-        mc.name        AS method_name,
-        mc.start_line  AS start_line,
-        mc.end_line    AS end_line
-    FROM method_change mc
+        fx.cve_id         AS cve_id,
+        cv.description    AS cve_description,
+        fc.diff           AS patch,
+        fc.diff_parsed    AS diff_parsed,
+        fc.code_before    AS file_code_before,
+        fc.code_after     AS file_code_after,
+        mc_b.name         AS method_name,
+        mc_b.start_line   AS start_line,
+        mc_b.end_line     AS end_line,
+        mc_a.start_line   AS after_start_line,
+        mc_a.end_line     AS after_end_line
+    FROM method_change mc_b
+    LEFT JOIN method_change mc_a
+      ON  mc_a.file_change_id = mc_b.file_change_id
+      AND mc_a.name = mc_b.name
+      AND (mc_a.before_change = 0 OR mc_a.before_change = 'False')
     JOIN file_change fc
-      ON mc.file_change_id = fc.file_change_id
+      ON mc_b.file_change_id = fc.file_change_id
     JOIN fixes fx
       ON fx.hash = fc.hash
     JOIN cve cv
       ON cv.cve_id = fx.cve_id
     WHERE fc.code_before IS NOT NULL
       AND fc.code_after IS NOT NULL
-      AND mc.start_line IS NOT NULL
-      AND mc.end_line IS NOT NULL
-      AND (mc.before_change = 1 OR mc.before_change = 'True')
+      AND mc_b.start_line IS NOT NULL
+      AND mc_b.end_line IS NOT NULL
+      AND (mc_b.before_change = 1 OR mc_b.before_change = 'True')
     """
     params: List[object] = []
     if args.lang:
@@ -211,13 +273,19 @@ def main():
         cve_id = str(row["cve_id"])
 
         start_line = safe_int(row["start_line"], 0)
-        end_line = safe_int(row["end_line"], 0)
+        end_line   = safe_int(row["end_line"],   0)
         if start_line <= 0 or end_line <= 0 or end_line < start_line:
             skipped += 1
             continue
 
-        before_code = slice_lines(row["file_code_before"], start_line, end_line, expand=args.expand_end)
-        after_code = slice_lines(row["file_code_after"], start_line, end_line, expand=args.expand_end)
+        # after 파일 라인 번호: mc_a(before_change=False) 값 사용, 없으면 before 값으로 fallback
+        after_start = safe_int(row["after_start_line"], 0)
+        after_end   = safe_int(row["after_end_line"],   0)
+        if after_start <= 0 or after_end <= 0 or after_end < after_start:
+            after_start, after_end = start_line, end_line
+
+        before_code = slice_lines(row["file_code_before"], start_line,  end_line,   expand=args.expand_end)
+        after_code  = slice_lines(row["file_code_after"],  after_start, after_end,  expand=args.expand_end)
 
         if not looks_like_code(before_code, min_lines=args.min_code_lines) or not looks_like_code(after_code, min_lines=args.min_code_lines):
             skipped += 1
@@ -233,6 +301,8 @@ def main():
             row["diff_parsed"],
             start_line=start_line,
             end_line=end_line,
+            after_start_line=after_start,
+            after_end_line=after_end,
             drop_ws_only=args.drop_ws_only,
         )
         if not added and not deleted:
@@ -246,11 +316,14 @@ def main():
         # id 순차 부여
         cve_counter[cve_id] = cve_counter.get(cve_id, 0) + 1
 
+        # 해당 함수 범위에 해당하는 patch hunk만 추출
+        func_patch = filter_patch_by_lines(row["patch"] or "", start_line, end_line)
+
         dto = RawDiffDTO(
             cve_id=cve_id,
             code_before_change=before_code,
             code_after_change=after_code,
-            patch=row["patch"] or "",
+            patch=func_patch,
             function_modified_lines=FunctionModifiedLinesDTO(added=added, deleted=deleted),
             cwe=cwes,
             cve_description=normalize_description(row["cve_description"]),
