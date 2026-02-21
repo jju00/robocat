@@ -4,14 +4,11 @@ from pathlib import Path
 from collections import defaultdict
 
 def iter_json_objects(path: Path):
-    # 각 파일은 [ { ... } ] 형태라고 가정
+    # 각 파일은 [ { ... }, { ... }, ... ] 형태 — 모든 항목 반환
     data = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(data, list) and data:
-        # 첫 번째 오브젝트만 사용 (너가 원한 형식이 이거라서)
-        obj = data[0]
-        if isinstance(obj, dict):
-            return obj
-    return None
+    if isinstance(data, list):
+        return [obj for obj in data if isinstance(obj, dict)]
+    return []
 
 def write_json_array_stream(out_path: Path, items):
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,8 +61,7 @@ def main():
 
         def items_gen():
             for p in paths:
-                obj = iter_json_objects(p)
-                if obj is not None:
+                for obj in iter_json_objects(p):
                     yield obj
 
         out_path = out_dir / f"{cwe}.{args.format}"

@@ -142,15 +142,17 @@ def main():
 
     sql = """
     SELECT
-        fx.cve_id AS cve_id,
+        fx.cve_id      AS cve_id,
+        fx.hash        AS commit_hash,
         cv.description AS cve_description,
         fc.programming_language AS programming_language,
-        fc.diff AS patch,
+        fc.filename    AS filename,
+        fc.diff        AS patch,
         fc.code_before AS file_code_before,
-        fc.code_after AS file_code_after,
-        mc.name AS method_name,
-        mc.start_line AS start_line,
-        mc.end_line AS end_line
+        fc.code_after  AS file_code_after,
+        mc.name        AS method_name,
+        mc.start_line  AS start_line,
+        mc.end_line    AS end_line
     FROM method_change mc
     JOIN file_change fc
       ON mc.file_change_id = fc.file_change_id
@@ -173,15 +175,15 @@ def main():
 
     cur = conn.execute(sql, params)
 
-    written = 0
+    # cve_id -> list of method-change items
+    cve_items: Dict[str, List[dict]] = {}
+    # cve_id -> CWE list (첫 번째 등장 시 저장)
+    cve_cwes: Dict[str, List[str]] = {}
+
     skipped = 0
-    current_id = 0
-    seen_cve: set[str] = set()
 
     for row in tqdm(cur, desc="Exporting", unit="rows"):
         cve_id = str(row["cve_id"])
-        if cve_id in seen_cve:
-            continue  # CVE당 1개만
 
         start_line = safe_int(row["start_line"], 0)
         end_line = safe_int(row["end_line"], 0)
@@ -208,27 +210,39 @@ def main():
             continue
 
         cwes = cwe_map.get(cve_id, [])
-        folder = primary_cwe(cwes)
+        if cve_id not in cve_cwes:
+            cve_cwes[cve_id] = cwes
+        if cve_id not in cve_items:
+            cve_items[cve_id] = []
 
-        current_id += 1
-        obj = [{
+        cve_items[cve_id].append({
             "cve_id": cve_id,
+            "commit_hash": str(row["commit_hash"] or ""),
+            "filename": str(row["filename"] or ""),
             "code_before_change": before_code,
             "code_after_change": after_code,
             "patch": row["patch"],
             "function_modified_lines": {"added": added, "deleted": deleted},
             "cwe": cwes,
             "cve_description": normalize_description(row["cve_description"]),
-            "id": current_id
-        }]
-
-        out_path = out_dir / folder / f"{cve_id}.json"
-        atomic_write(out_path, obj)
-        seen_cve.add(cve_id)
-        written += 1
+        })
 
     conn.close()
-    print(f"Done. Written CVE files: {written}, Skipped rows: {skipped}, Out: {out_dir}")
+
+    # 파일 쓰기: CVE별로 모든 method change를 하나의 JSON 배열로 저장
+    total_written = 0
+    for cve_id, items in tqdm(cve_items.items(), desc="Writing files", unit="cve"):
+        # id는 CVE 내에서 1부터 순차 부여
+        for i, item in enumerate(items, 1):
+            item["id"] = i
+
+        cwes = cve_cwes.get(cve_id, [])
+        folder = primary_cwe(cwes)
+        out_path = out_dir / folder / f"{cve_id}.json"
+        atomic_write(out_path, items)
+        total_written += len(items)
+
+    print(f"Done. CVE files written: {len(cve_items)}, Total items: {total_written}, Skipped rows: {skipped}, Out: {out_dir}")
 
 if __name__ == "__main__":
     main()
