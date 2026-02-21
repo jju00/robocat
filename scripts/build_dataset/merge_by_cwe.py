@@ -18,7 +18,7 @@ def write_json_array_stream(out_path: Path, items):
         for item in items:
             if not first:
                 f.write(",\n")
-            f.write(json.dumps(item, ensure_ascii=False))
+            f.write(json.dumps(item, ensure_ascii=False, indent=2))
             first = False
         f.write("\n]\n")
 
