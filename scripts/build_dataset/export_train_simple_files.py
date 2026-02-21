@@ -1,12 +1,17 @@
 import argparse
 import json
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import difflib
 import ast
 from tqdm import tqdm
 import os
+
+# 프로젝트 루트를 path에 추가
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from src.dto.rawdiffdto import RawDiffDTO, FunctionModifiedLinesDTO
 
 BAD_CWE = {"NVD-CWE-Other", "NVD-CWE-noinfo", "CWE-Other", "CWE-noinfo"}
 
@@ -143,10 +148,7 @@ def main():
     sql = """
     SELECT
         fx.cve_id      AS cve_id,
-        fx.hash        AS commit_hash,
         cv.description AS cve_description,
-        fc.programming_language AS programming_language,
-        fc.filename    AS filename,
         fc.diff        AS patch,
         fc.code_before AS file_code_before,
         fc.code_after  AS file_code_after,
@@ -164,6 +166,7 @@ def main():
       AND fc.code_after IS NOT NULL
       AND mc.start_line IS NOT NULL
       AND mc.end_line IS NOT NULL
+      AND (mc.before_change = 1 OR mc.before_change = 'True')
     """
     params: List[object] = []
     if args.lang:
@@ -215,32 +218,34 @@ def main():
         if cve_id not in cve_items:
             cve_items[cve_id] = []
 
-        cve_items[cve_id].append({
-            "cve_id": cve_id,
-            "commit_hash": str(row["commit_hash"] or ""),
-            "filename": str(row["filename"] or ""),
-            "code_before_change": before_code,
-            "code_after_change": after_code,
-            "patch": row["patch"],
-            "function_modified_lines": {"added": added, "deleted": deleted},
-            "cwe": cwes,
-            "cve_description": normalize_description(row["cve_description"]),
-        })
+        dto = RawDiffDTO(
+            cve_id=cve_id,
+            code_before_change=before_code,
+            code_after_change=after_code,
+            patch=row["patch"] or "",
+            function_modified_lines=FunctionModifiedLinesDTO(added=added, deleted=deleted),
+            cwe=cwes,
+            cve_description=normalize_description(row["cve_description"]),
+            id=0,  # 파일 쓰기 단계에서 순차 부여
+        )
+        cve_items[cve_id].append(dto)
 
     conn.close()
 
     # 파일 쓰기: CVE별로 모든 method change를 하나의 JSON 배열로 저장
     total_written = 0
-    for cve_id, items in tqdm(cve_items.items(), desc="Writing files", unit="cve"):
-        # id는 CVE 내에서 1부터 순차 부여
-        for i, item in enumerate(items, 1):
-            item["id"] = i
+    for cve_id, dtos in tqdm(cve_items.items(), desc="Writing files", unit="cve"):
+        # id는 CVE 내에서 1부터 순차 부여 후 직렬화
+        serialized = []
+        for i, dto in enumerate(dtos, 1):
+            dto.id = i
+            serialized.append(dto.model_dump())
 
         cwes = cve_cwes.get(cve_id, [])
         folder = primary_cwe(cwes)
         out_path = out_dir / folder / f"{cve_id}.json"
-        atomic_write(out_path, items)
-        total_written += len(items)
+        atomic_write(out_path, serialized)
+        total_written += len(serialized)
 
     print(f"Done. CVE files written: {len(cve_items)}, Total items: {total_written}, Skipped rows: {skipped}, Out: {out_dir}")
 
