@@ -175,6 +175,7 @@ def main():
 
     written = 0
     skipped = 0
+    current_id = 0
     seen_cve: set[str] = set()
 
     for row in tqdm(cur, desc="Exporting", unit="rows"):
@@ -209,6 +210,7 @@ def main():
         cwes = cwe_map.get(cve_id, [])
         folder = primary_cwe(cwes)
 
+        current_id += 1
         obj = [{
             "cve_id": cve_id,
             "code_before_change": before_code,
@@ -217,7 +219,7 @@ def main():
             "function_modified_lines": {"added": added, "deleted": deleted},
             "cwe": cwes,
             "cve_description": normalize_description(row["cve_description"]),
-            "id": 1
+            "id": current_id
         }]
 
         out_path = out_dir / folder / f"{cve_id}.json"
