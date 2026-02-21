@@ -132,7 +132,7 @@ def main():
     ap.add_argument("--limit_rows", type=int, default=0)
     ap.add_argument("--lang", type=str, default="", help="e.g., PHP, C")
     ap.add_argument("--min_code_lines", type=int, default=3)
-    ap.add_argument("--expand_end", type=int, default=120)
+    ap.add_argument("--expand_end", type=int, default=0)
     ap.add_argument("--drop_ws_only", action="store_true")
     ap.add_argument("--require_name_in_code", action="store_true")
     args = ap.parse_args()
