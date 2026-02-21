@@ -13,7 +13,6 @@ class RawDiffDTO(BaseModel):
     cve_id: str
     code_before_change: str
     code_after_change: str
-    patch: str
 
     function_modified_lines: FunctionModifiedLinesDTO
 

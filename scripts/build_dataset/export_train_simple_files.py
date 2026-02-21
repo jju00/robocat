@@ -1,6 +1,5 @@
 import argparse
 import json
-import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -146,55 +145,6 @@ def parse_diff_parsed(
     except Exception:
         return [], []
 
-_HUNK_RE = re.compile(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
-
-def filter_patch_by_lines(patch: str, start_line: int, end_line: int) -> str:
-    """
-    patch 텍스트에서 start_line~end_line(before 파일 기준)과 겹치는 hunk만 추출한다.
-    hunk 헤더: @@ -old_start,old_count +new_@start,new_count @@
-    """
-    if not patch or start_line <= 0 or end_line <= 0:
-        return patch or ""
-
-    lines = patch.splitlines(keepends=True)
-    file_header: List[str] = []
-    matched_hunks: List[List[str]] = []
-    i = 0
-
-    # --- a/  /  +++ b/  등 파일 헤더 수집
-    while i < len(lines) and not lines[i].startswith("@@"):
-        file_header.append(lines[i])
-        i += 1
-
-    # hunk 단위로 파싱
-    while i < len(lines):
-        m = _HUNK_RE.match(lines[i])
-        if not m:
-            i += 1
-            continue
-
-        old_start = int(m.group(1))
-        old_count = int(m.group(2)) if m.group(2) is not None else 1
-        old_end   = old_start + max(0, old_count - 1)
-
-        hunk: List[str] = [lines[i]]
-        i += 1
-        while i < len(lines) and not lines[i].startswith("@@"):
-            hunk.append(lines[i])
-            i += 1
-
-        # 범위 겹침 확인 (before 파일 기준)
-        if old_start <= end_line and old_end >= start_line:
-            matched_hunks.append(hunk)
-
-    if not matched_hunks:
-        return ""
-
-    result = file_header
-    for hunk in matched_hunks:
-        result.extend(hunk)
-    return "".join(result)
-
 
 def atomic_write(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -226,7 +176,6 @@ def main():
     SELECT
         fx.cve_id         AS cve_id,
         cv.description    AS cve_description,
-        fc.diff           AS patch,
         fc.diff_parsed    AS diff_parsed,
         fc.code_before    AS file_code_before,
         fc.code_after     AS file_code_after,
@@ -316,14 +265,10 @@ def main():
         # id 순차 부여
         cve_counter[cve_id] = cve_counter.get(cve_id, 0) + 1
 
-        # 해당 함수 범위에 해당하는 patch hunk만 추출
-        func_patch = filter_patch_by_lines(row["patch"] or "", start_line, end_line)
-
         dto = RawDiffDTO(
             cve_id=cve_id,
             code_before_change=before_code,
             code_after_change=after_code,
-            patch=func_patch,
             function_modified_lines=FunctionModifiedLinesDTO(added=added, deleted=deleted),
             cwe=cwes,
             cve_description=normalize_description(row["cve_description"]),
