@@ -178,12 +178,12 @@ def main():
 
     cur = conn.execute(sql, params)
 
-    # cve_id -> list of method-change items
-    cve_items: Dict[str, List[dict]] = {}
-    # cve_id -> CWE list (첫 번째 등장 시 저장)
+    # 메모리에는 카운터/CWE 정보만 보관 (정수 + 짧은 문자열 → 수 MB 이하)
+    cve_counter: Dict[str, int] = {}   # cve_id -> 현재까지 쓴 항목 수
     cve_cwes: Dict[str, List[str]] = {}
 
     skipped = 0
+    total_written = 0
 
     for row in tqdm(cur, desc="Exporting", unit="rows"):
         cve_id = str(row["cve_id"])
@@ -215,8 +215,9 @@ def main():
         cwes = cwe_map.get(cve_id, [])
         if cve_id not in cve_cwes:
             cve_cwes[cve_id] = cwes
-        if cve_id not in cve_items:
-            cve_items[cve_id] = []
+
+        # id 순차 부여
+        cve_counter[cve_id] = cve_counter.get(cve_id, 0) + 1
 
         dto = RawDiffDTO(
             cve_id=cve_id,
@@ -226,28 +227,36 @@ def main():
             function_modified_lines=FunctionModifiedLinesDTO(added=added, deleted=deleted),
             cwe=cwes,
             cve_description=normalize_description(row["cve_description"]),
-            id=0,  # 파일 쓰기 단계에서 순차 부여
+            id=cve_counter[cve_id],
         )
-        cve_items[cve_id].append(dto)
+
+        # 처리 즉시 JSONL로 디스크에 append (메모리에 쌓지 않음)
+        folder = primary_cwe(cwes)
+        jsonl_path = out_dir / folder / f"{cve_id}.jsonl"
+        jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+        with jsonl_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(dto.model_dump(), ensure_ascii=False) + "\n")
+
+        total_written += 1
 
     conn.close()
 
-    # 파일 쓰기: CVE별로 모든 method change를 하나의 JSON 배열로 저장
-    total_written = 0
-    for cve_id, dtos in tqdm(cve_items.items(), desc="Writing files", unit="cve"):
-        # id는 CVE 내에서 1부터 순차 부여 후 직렬화
-        serialized = []
-        for i, dto in enumerate(dtos, 1):
-            dto.id = i
-            serialized.append(dto.model_dump())
-
-        cwes = cve_cwes.get(cve_id, [])
+    # JSONL → JSON 변환 (CVE 1개씩 처리 → 메모리 안전)
+    print(f"\nConverting {len(cve_counter)} CVE JSONL files to JSON...")
+    for cve_id, cwes in tqdm(cve_cwes.items(), desc="Converting to JSON", unit="cve"):
         folder = primary_cwe(cwes)
-        out_path = out_dir / folder / f"{cve_id}.json"
-        atomic_write(out_path, serialized)
-        total_written += len(serialized)
+        jsonl_path = out_dir / folder / f"{cve_id}.jsonl"
+        json_path  = out_dir / folder / f"{cve_id}.json"
 
-    print(f"Done. CVE files written: {len(cve_items)}, Total items: {total_written}, Skipped rows: {skipped}, Out: {out_dir}")
+        items = [
+            json.loads(line)
+            for line in jsonl_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        atomic_write(json_path, items)
+        jsonl_path.unlink()  # 임시 파일 정리
+
+    print(f"Done. CVE files written: {len(cve_counter)}, Total items: {total_written}, Skipped rows: {skipped}, Out: {out_dir}")
 
 if __name__ == "__main__":
     main()
