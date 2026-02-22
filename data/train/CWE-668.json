@@ -1,0 +1,131 @@
+[
+{
+  "cve_id": "CVE-2019-3569",
+  "code_before_change": "function test1Controller($hphpdOutput, $hphpdProcessId, $serverPort) {\n  // Request a page so that the client can debug it.\n  waitForClientToOutput($hphpdOutput, \"Waiting for server response\");\n  $url = \"http://\".php_uname('n').':'.$serverPort.'/test1.php';\n  echo \"Requesting test1.php\\n\";\n  request(php_uname('n'), $serverPort, 'test1.php', 10); // ignore response\n\n  // Let client run until script quits\n  waitForClientToOutput($hphpdOutput, \"quit\");\n}",
+  "code_after_change": "function test1Controller($hphpdOutput, $hphpdProcessId, $serverPort) {\n  // Request a page so that the client can debug it.\n  waitForClientToOutput($hphpdOutput, \"Waiting for server response\");\n  echo \"Requesting test1.php\\n\";\n  request('localhost', $serverPort, 'test1.php', 10); // ignore response\n\n  // Let client run until script quits\n  waitForClientToOutput($hphpdOutput, \"quit\");\n}",
+  "function_modified_lines": {
+    "added": [
+      "  request('localhost', $serverPort, 'test1.php', 10); // ignore response"
+    ],
+    "deleted": [
+      "  $url = \"http://\".php_uname('n').':'.$serverPort.'/test1.php';",
+      "  request(php_uname('n'), $serverPort, 'test1.php', 10); // ignore response"
+    ]
+  },
+  "cwe": [
+    "CWE-668"
+  ],
+  "cve_description": "HHVM, when used with FastCGI, would bind by default to all available interfaces. This behavior could allow a malicious individual unintended direct access to the application, which could result in information disclosure. This issue affects versions 4.3.0, 4.4.0, 4.5.0, 4.6.0, 4.7.0, 4.8.0, versions 3.30.5 and below, and all versions in the 4.0, 4.1, and 4.2 series.",
+  "id": 2026
+},
+{
+  "cve_id": "CVE-2019-3569",
+  "code_before_change": "function BadAuthDigestTestController($serverPort) {\n  $args = array('Authorization' => 'Digest \"username=\"admin\", ' .\n    'realm=\"Restricted area\", nonce=\"564a12f5c065e\", ' .\n    'uri=\"/test_auth_digest.php\", cnonce=\"MjIyMTg2\", nc=00000001, ' .\n    'qop=\"auth\", response=\"6dfbea52fbf13016476c1879e6436004\", ' .\n    'opaque=\"cdce8a5c95a1427d74df7acbf41c9ce0\"');\n  var_dump(request(php_uname('n'), $serverPort, \"test_auth_digest.php\",\n                  [], [], $args));\n}",
+  "code_after_change": "function BadAuthDigestTestController($serverPort) {\n  $args = array('Authorization' => 'Digest \"username=\"admin\", ' .\n    'realm=\"Restricted area\", nonce=\"564a12f5c065e\", ' .\n    'uri=\"/test_auth_digest.php\", cnonce=\"MjIyMTg2\", nc=00000001, ' .\n    'qop=\"auth\", response=\"6dfbea52fbf13016476c1879e6436004\", ' .\n    'opaque=\"cdce8a5c95a1427d74df7acbf41c9ce0\"');\n  var_dump(request('localhost', $serverPort, \"test_auth_digest.php\",\n                  [], [], $args));\n}",
+  "function_modified_lines": {
+    "added": [
+      "  var_dump(request('localhost', $serverPort, \"test_auth_digest.php\","
+    ],
+    "deleted": [
+      "  var_dump(request(php_uname('n'), $serverPort, \"test_auth_digest.php\","
+    ]
+  },
+  "cwe": [
+    "CWE-668"
+  ],
+  "cve_description": "HHVM, when used with FastCGI, would bind by default to all available interfaces. This behavior could allow a malicious individual unintended direct access to the application, which could result in information disclosure. This issue affects versions 4.3.0, 4.4.0, 4.5.0, 4.6.0, 4.7.0, 4.8.0, versions 3.30.5 and below, and all versions in the 4.0, 4.1, and 4.2 series.",
+  "id": 2027
+},
+{
+  "cve_id": "CVE-2019-3569",
+  "code_before_change": "function GoodAuthDigestTestController($serverPort) {\n  $args = array('Authorization' => 'Digest username=\"admin\", ' .\n    'realm=\"Restricted area\", nonce=\"564a12611dae8\", ' .\n    'uri=\"/test_auth_digest.php\", cnonce=\"MjIyMTg1\", nc=00000001, ' .\n    'qop=\"auth\", response=\"e544aaed06917adea3e5c74dd49f0e32\", ' .\n    'opaque=\"cdce8a5c95a1427d74df7acbf41c9ce0\"');\n  var_dump(request(php_uname('n'), $serverPort, \"test_auth_digest.php\",\n                  [], [], $args));\n}",
+  "code_after_change": "function GoodAuthDigestTestController($serverPort) {\n  $args = array('Authorization' => 'Digest username=\"admin\", ' .\n    'realm=\"Restricted area\", nonce=\"564a12611dae8\", ' .\n    'uri=\"/test_auth_digest.php\", cnonce=\"MjIyMTg1\", nc=00000001, ' .\n    'qop=\"auth\", response=\"e544aaed06917adea3e5c74dd49f0e32\", ' .\n    'opaque=\"cdce8a5c95a1427d74df7acbf41c9ce0\"');\n  var_dump(request('localhost', $serverPort, \"test_auth_digest.php\",\n                  [], [], $args));\n}",
+  "function_modified_lines": {
+    "added": [
+      "  var_dump(request('localhost', $serverPort, \"test_auth_digest.php\","
+    ],
+    "deleted": [
+      "  var_dump(request(php_uname('n'), $serverPort, \"test_auth_digest.php\","
+    ]
+  },
+  "cwe": [
+    "CWE-668"
+  ],
+  "cve_description": "HHVM, when used with FastCGI, would bind by default to all available interfaces. This behavior could allow a malicious individual unintended direct access to the application, which could result in information disclosure. This issue affects versions 4.3.0, 4.4.0, 4.5.0, 4.6.0, 4.7.0, 4.8.0, versions 3.30.5 and below, and all versions in the 4.0, 4.1, and 4.2 series.",
+  "id": 2028
+},
+{
+  "cve_id": "CVE-2019-3569",
+  "code_before_change": "function headerTestController($serverPort) {\n  $args = array('Authorization' => 'foo');\n  var_dump(request(php_uname('n'), $serverPort, \"test_headers.php\",\n                  [], ['PROXY' => 'foobar'], $args));\n}",
+  "code_after_change": "function headerTestController($serverPort) {\n  $args = array('Authorization' => 'foo');\n  var_dump(request('localhost', $serverPort, \"test_headers.php\",\n                  [], ['PROXY' => 'foobar'], $args));\n}",
+  "function_modified_lines": {
+    "added": [
+      "  var_dump(request('localhost', $serverPort, \"test_headers.php\","
+    ],
+    "deleted": [
+      "  var_dump(request(php_uname('n'), $serverPort, \"test_headers.php\","
+    ]
+  },
+  "cwe": [
+    "CWE-668"
+  ],
+  "cve_description": "HHVM, when used with FastCGI, would bind by default to all available interfaces. This behavior could allow a malicious individual unintended direct access to the application, which could result in information disclosure. This issue affects versions 4.3.0, 4.4.0, 4.5.0, 4.6.0, 4.7.0, 4.8.0, versions 3.30.5 and below, and all versions in the 4.0, 4.1, and 4.2 series.",
+  "id": 2029
+},
+{
+  "cve_id": "CVE-2019-3569",
+  "code_before_change": "function httpsTestController($serverPort) {\n  $args = array('HTTPS' => '');\n  var_dump(request(php_uname('n'), $serverPort, \"test_https.php\",\n                  [], [], $args));\n}",
+  "code_after_change": "function httpsTestController($serverPort) {\n  $args = array('HTTPS' => '');\n  var_dump(request('localhost', $serverPort, \"test_https.php\",\n                  [], [], $args));\n}",
+  "function_modified_lines": {
+    "added": [
+      "  var_dump(request('localhost', $serverPort, \"test_https.php\","
+    ],
+    "deleted": [
+      "  var_dump(request(php_uname('n'), $serverPort, \"test_https.php\","
+    ]
+  },
+  "cwe": [
+    "CWE-668"
+  ],
+  "cve_description": "HHVM, when used with FastCGI, would bind by default to all available interfaces. This behavior could allow a malicious individual unintended direct access to the application, which could result in information disclosure. This issue affects versions 4.3.0, 4.4.0, 4.5.0, 4.6.0, 4.7.0, 4.8.0, versions 3.30.5 and below, and all versions in the 4.0, 4.1, and 4.2 series.",
+  "id": 2030
+},
+{
+  "cve_id": "CVE-2019-3569",
+  "code_before_change": "function invalidTestController($port) {\n  $host = php_uname('n');\n\n  $filename = __DIR__.'/request-doesnotexist.dat';\n  $file = fopen($filename, 'rb');\n  $req_dat = fread($file, filesize($filename));\n  fclose($file);\n\n  // Repeat the data three times, to make it invalid. This particular bytestream\n  // (and ones like it -- repeat 3 times!) in particular used to tickle a\n  // use-after-free in the FastCGI support.\n  $req_dat = $req_dat . $req_dat . $req_dat;\n\n  $sock = fsockopen($host, $port);\n  fwrite($sock, $req_dat);\n  fclose($sock);\n\n  // Should still be able to recover and respond to a request over the port on a\n  // new TCP connection.\n  echo request($host, $port, 'hello.php');\n  echo \"\\n\";\n}",
+  "code_after_change": "function invalidTestController($port) {\n  $host = 'localhost';\n\n  $filename = __DIR__.'/request-doesnotexist.dat';\n  $file = fopen($filename, 'rb');\n  $req_dat = fread($file, filesize($filename));\n  fclose($file);\n\n  // Repeat the data three times, to make it invalid. This particular bytestream\n  // (and ones like it -- repeat 3 times!) in particular used to tickle a\n  // use-after-free in the FastCGI support.\n  $req_dat = $req_dat . $req_dat . $req_dat;\n\n  $sock = fsockopen($host, $port);\n  fwrite($sock, $req_dat);\n  fclose($sock);\n\n  // Should still be able to recover and respond to a request over the port on a\n  // new TCP connection.\n  echo request($host, $port, 'hello.php');\n  echo \"\\n\";\n}",
+  "function_modified_lines": {
+    "added": [
+      "  $host = 'localhost';"
+    ],
+    "deleted": [
+      "  $host = php_uname('n');"
+    ]
+  },
+  "cwe": [
+    "CWE-668"
+  ],
+  "cve_description": "HHVM, when used with FastCGI, would bind by default to all available interfaces. This behavior could allow a malicious individual unintended direct access to the application, which could result in information disclosure. This issue affects versions 4.3.0, 4.4.0, 4.5.0, 4.6.0, 4.7.0, 4.8.0, versions 3.30.5 and below, and all versions in the 4.0, 4.1, and 4.2 series.",
+  "id": 2031
+},
+{
+  "cve_id": "CVE-2022-24747",
+  "code_before_change": "    public function __construct(\n        CartService $cartService,\n        int $defaultTtl,\n        bool $httpCacheEnabled,\n        MaintenanceModeResolver $maintenanceModeResolver\n    ) {\n        $this->cartService = $cartService;\n        $this->defaultTtl = $defaultTtl;\n        $this->httpCacheEnabled = $httpCacheEnabled;\n        $this->maintenanceResolver = $maintenanceModeResolver;\n    }",
+  "code_after_change": "    public function __construct(\n        CartService $cartService,\n        int $defaultTtl,\n        bool $httpCacheEnabled,\n        MaintenanceModeResolver $maintenanceModeResolver,\n        bool $reverseProxyEnabled\n    ) {\n        $this->cartService = $cartService;\n        $this->defaultTtl = $defaultTtl;\n        $this->httpCacheEnabled = $httpCacheEnabled;\n        $this->maintenanceResolver = $maintenanceModeResolver;\n        $this->reverseProxyEnabled = $reverseProxyEnabled;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        MaintenanceModeResolver $maintenanceModeResolver,",
+      "        bool $reverseProxyEnabled",
+      "        $this->reverseProxyEnabled = $reverseProxyEnabled;"
+    ],
+    "deleted": [
+      "        MaintenanceModeResolver $maintenanceModeResolver"
+    ]
+  },
+  "cwe": [
+    "CWE-668"
+  ],
+  "cve_description": "Shopware is an open commerce platform based on the Symfony php Framework and the Vue javascript framework. Affected versions of shopware do no properly set sensitive HTTP headers to be non-cacheable. If there is an HTTP cache between the server and client then headers may be exposed via HTTP caches. This issue has been resolved in version 6.4.8.2. There are no known workarounds.",
+  "id": 2032
+}
+]

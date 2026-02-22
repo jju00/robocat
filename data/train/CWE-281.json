@@ -1,0 +1,237 @@
+[
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    private function getUserRemover()\n    {\n        return new UserRemover(\n            ProjectManager::instance(),\n            EventManager::instance(),\n            new ArtifactTypeFactory(false),\n            new UserRemoverDao(),\n            UserManager::instance(),\n            new ProjectHistoryDao(),\n            new UGroupManager()\n        );\n    }",
+  "code_after_change": "\n    private function getUserRemover(): UserRemover\n    {\n        return new UserRemover(\n            ProjectManager::instance(),\n            EventManager::instance(),\n            new ArtifactTypeFactory(false),\n            new UserRemoverDao(),\n            UserManager::instance(),\n            new ProjectHistoryDao(),\n            new UGroupManager(),\n            new UserPermissionsDao(),",
+  "function_modified_lines": {
+    "added": [
+      "    private function getUserRemover(): UserRemover",
+      "            new UGroupManager(),",
+      "            new UserPermissionsDao(),"
+    ],
+    "deleted": [
+      "    private function getUserRemover()",
+      "            new UGroupManager()"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 691
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    private function getUserRemover()\n    {\n        return new UserRemover(\n            ProjectManager::instance(),\n            EventManager::instance(),\n            new ArtifactTypeFactory(false),\n            new UserRemoverDao(),\n            UserManager::instance(),\n            new ProjectHistoryDao(),\n            new UGroupManager()\n        );\n    }",
+  "code_after_change": "\n    private function getUserRemover(): UserRemover\n    {\n        return new UserRemover(\n            ProjectManager::instance(),\n            EventManager::instance(),\n            new ArtifactTypeFactory(false),\n            new UserRemoverDao(),\n            UserManager::instance(),\n            new ProjectHistoryDao(),\n            new UGroupManager(),\n            new UserPermissionsDao(),",
+  "function_modified_lines": {
+    "added": [
+      "    private function getUserRemover(): UserRemover",
+      "            new UGroupManager(),",
+      "            new UserPermissionsDao(),"
+    ],
+    "deleted": [
+      "    private function getUserRemover()",
+      "            new UGroupManager()"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 692
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    public static function areRestrictedUsersAllowed()\n    {\n        return self::get(ForgeAccess::CONFIG) === ForgeAccess::RESTRICTED;\n    }",
+  "code_after_change": "    public static function areRestrictedUsersAllowed(): bool\n    {\n        return self::get(ForgeAccess::CONFIG) === ForgeAccess::RESTRICTED;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public static function areRestrictedUsersAllowed(): bool"
+    ],
+    "deleted": [
+      "    public static function areRestrictedUsersAllowed()"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 693
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    private function updateProjectVisibility(PFUser $user, Project $project, HTTPRequest $request)\n    {\n        if ($this->project_visibility_configuration->canUserConfigureProjectVisibility($user, $project)) {\n            if ($project->getAccess() !== $request->get('project_visibility')) {\n                if ($request->get('term_of_service')) {\n                    $this->project_manager->setAccess($project, $request->get('project_visibility'));\n                    $this->project_manager->clear($project->getID());\n                    $this->ugroup_binding->reloadUgroupBindingInProject($project);\n                } else {\n                    $GLOBALS['Response']->addFeedback(Feedback::ERROR, _(\"Please accept term of service\"));\n                }\n            }\n        }\n    }",
+  "code_after_change": "    private function updateProjectVisibility(PFUser $user, Project $project, HTTPRequest $request)\n    {\n        if ($this->project_visibility_configuration->canUserConfigureProjectVisibility($user, $project)) {\n            if ($project->getAccess() !== $request->get('project_visibility')) {\n                if ($request->get('term_of_service')) {\n                    $update_visibility_status = $this->update_visibility_checker->canUpdateVisibilityRegardingRestrictedUsers(\n                        $project,\n                        $request->get('project_visibility'),\n                    );\n\n                    if ($update_visibility_status->canSwitch()) {\n                        $this->project_manager->setAccess($project, $request->get('project_visibility'));\n                        $this->project_manager->clear($project->getID());\n                        $this->ugroup_binding->reloadUgroupBindingInProject($project);\n                    } else {\n                        $GLOBALS['Response']->addFeedback(\n                            Feedback::ERROR,\n                            $update_visibility_status->getReason(),\n                        );\n                    }\n                } else {\n                    $GLOBALS['Response']->addFeedback(Feedback::ERROR, _(\"Please accept term of service\"));\n                }\n            }\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                    $update_visibility_status = $this->update_visibility_checker->canUpdateVisibilityRegardingRestrictedUsers(",
+      "                        $project,",
+      "                        $request->get('project_visibility'),",
+      "                    );",
+      "                    if ($update_visibility_status->canSwitch()) {",
+      "                        $this->project_manager->setAccess($project, $request->get('project_visibility'));",
+      "                        $this->project_manager->clear($project->getID());",
+      "                        $this->ugroup_binding->reloadUgroupBindingInProject($project);",
+      "                    } else {",
+      "                        $GLOBALS['Response']->addFeedback(",
+      "                            Feedback::ERROR,",
+      "                            $update_visibility_status->getReason(),",
+      "                        );",
+      "                    }"
+    ],
+    "deleted": [
+      "                    $this->project_manager->setAccess($project, $request->get('project_visibility'));",
+      "                    $this->project_manager->clear($project->getID());",
+      "                    $this->ugroup_binding->reloadUgroupBindingInProject($project);"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 694
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    public function __construct(\n        BaseLanguage $language,\n        $platform_allows_restricted,\n        $project_visibility,\n        int $number_of_restricted_users_in_project,\n        ProjectVisibilityOptionsForPresenterGenerator $project_visibility_options_generator,\n    ) {\n        $this->platform_allows_restricted       = (bool) $platform_allows_restricted;\n        $this->restricted_warning_message       = $language->getText(\n            'project_admin_editgroupinfo',\n            'restricted_warning'\n        );\n        $this->general_warning_message          = $language->getText(\n            'project_admin_editgroupinfo',\n            'general_warning'\n        );\n        $this->purified_term_of_service_message = Codendi_HTMLPurifier::instance()->purify(\n            $language->getOverridableText('project_admin_editgroupinfo', 'term_of_service'),\n            CODENDI_PURIFIER_LIGHT\n        );\n\n        $this->project_visibility_label = _('Project visibility');\n        $this->accept_tos_message       = _(\"Please accept term of service\");\n\n        $this->options                               = $project_visibility_options_generator->generateVisibilityOptions(\n            $this->platform_allows_restricted,\n            $project_visibility\n        );\n        $this->number_of_restricted_users_in_project = $number_of_restricted_users_in_project;\n    }",
+  "code_after_change": "    public function __construct(\n        BaseLanguage $language,\n        bool $platform_allows_restricted,\n        UpdateVisibilityStatus $private_without_restricted_visibility_switch_status,\n        string $project_visibility,\n        int $number_of_restricted_users_in_project,\n        ProjectVisibilityOptionsForPresenterGenerator $project_visibility_options_generator,\n    ) {\n        $this->platform_allows_restricted       = $platform_allows_restricted;\n        $this->restricted_warning_message       = $language->getText(\n            'project_admin_editgroupinfo',\n            'restricted_warning'\n        );\n        $this->general_warning_message          = $language->getText(\n            'project_admin_editgroupinfo',\n            'general_warning'\n        );\n        $this->purified_term_of_service_message = Codendi_HTMLPurifier::instance()->purify(\n            $language->getOverridableText('project_admin_editgroupinfo', 'term_of_service'),\n            CODENDI_PURIFIER_LIGHT\n        );\n\n        $this->project_visibility_label = _('Project visibility');\n        $this->accept_tos_message       = _(\"Please accept term of service\");\n\n        $this->options = $project_visibility_options_generator->generateVisibilityOptions(\n            $this->platform_allows_restricted,\n            $private_without_restricted_visibility_switch_status,\n            $project_visibility\n        );\n\n        $this->number_of_restricted_users_in_project = $number_of_restricted_users_in_project;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        bool $platform_allows_restricted,",
+      "        UpdateVisibilityStatus $private_without_restricted_visibility_switch_status,",
+      "        string $project_visibility,",
+      "        $this->platform_allows_restricted       = $platform_allows_restricted;",
+      "        $this->options = $project_visibility_options_generator->generateVisibilityOptions(",
+      "            $private_without_restricted_visibility_switch_status,"
+    ],
+    "deleted": [
+      "        $platform_allows_restricted,",
+      "        $project_visibility,",
+      "        $this->platform_allows_restricted       = (bool) $platform_allows_restricted;",
+      "        $this->options                               = $project_visibility_options_generator->generateVisibilityOptions("
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 695
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    public function getAdmins(?UGroupManager $ugm = null)\n    {\n        if (is_null($ugm)) {\n            $ugm = $this->getUGroupManager();\n        }\n        return $ugm->getDynamicUGroupsMembers(ProjectUGroup::PROJECT_ADMIN, $this->getID());\n    }",
+  "code_after_change": "    public function getAdmins(?UGroupManager $ugm = null): array\n    {\n        if (is_null($ugm)) {\n            $ugm = $this->getUGroupManager();\n        }\n        return $ugm->getDynamicUGroupsMembers(ProjectUGroup::PROJECT_ADMIN, $this->getID());\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function getAdmins(?UGroupManager $ugm = null): array"
+    ],
+    "deleted": [
+      "    public function getAdmins(?UGroupManager $ugm = null)"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 696
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    public function __construct(\n        string $project_default_visibility,\n        array $trove_categories,\n        array $field_list,\n        array $company_templates,\n        array $tuleap_templates,\n        array $external_templates,\n    ) {\n        $this->tuleap_templates             = json_encode($tuleap_templates);\n        $this->are_restricted_users_allowed = (bool) ForgeConfig::areRestrictedUsersAllowed();\n        $this->project_default_visibility   = $project_default_visibility;\n        $this->projects_must_be_approved    = (bool) ForgeConfig::get(\n            ProjectManager::CONFIG_PROJECT_APPROVAL,\n            true\n        );\n        $this->trove_categories             = json_encode($trove_categories, JSON_THROW_ON_ERROR);\n        $this->is_description_mandatory     = ProjectDescriptionUsageRetriever::isDescriptionMandatory();\n        $this->field_list                   = json_encode($field_list);\n        $this->company_templates            = json_encode($company_templates);\n        $this->company_name                 = ForgeConfig::get('sys_org_name');\n        $this->can_user_choose_privacy      = (bool) ForgeConfig::get(\n            ProjectManager::SYS_USER_CAN_CHOOSE_PROJECT_PRIVACY\n        );\n        $this->external_templates           = json_encode($external_templates);\n    }",
+  "code_after_change": "    public function __construct(\n        string $project_default_visibility,\n        array $trove_categories,\n        array $field_list,\n        array $company_templates,\n        array $tuleap_templates,\n        array $external_templates,\n    ) {\n        $this->tuleap_templates             = json_encode($tuleap_templates);\n        $this->are_restricted_users_allowed = ForgeConfig::areRestrictedUsersAllowed();\n        $this->project_default_visibility   = $project_default_visibility;\n        $this->projects_must_be_approved    = (bool) ForgeConfig::get(\n            ProjectManager::CONFIG_PROJECT_APPROVAL,\n            true\n        );\n        $this->trove_categories             = json_encode($trove_categories, JSON_THROW_ON_ERROR);\n        $this->is_description_mandatory     = ProjectDescriptionUsageRetriever::isDescriptionMandatory();\n        $this->field_list                   = json_encode($field_list);\n        $this->company_templates            = json_encode($company_templates);\n        $this->company_name                 = ForgeConfig::get('sys_org_name');\n        $this->can_user_choose_privacy      = (bool) ForgeConfig::get(\n            ProjectManager::SYS_USER_CAN_CHOOSE_PROJECT_PRIVACY\n        );\n        $this->external_templates           = json_encode($external_templates);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $this->are_restricted_users_allowed = ForgeConfig::areRestrictedUsersAllowed();"
+    ],
+    "deleted": [
+      "        $this->are_restricted_users_allowed = (bool) ForgeConfig::areRestrictedUsersAllowed();"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 697
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    private function getUserRemover()\n    {\n        return new UserRemover(\n            ProjectManager::instance(),\n            $this->getEventManager(),\n            new ArtifactTypeFactory(false),\n            new UserRemoverDao(),\n            UserManager::instance(),\n            new ProjectHistoryDao(),\n            new UGroupManager()\n        );\n    }",
+  "code_after_change": "            ProjectManager::instance(),\n            $this->getEventManager(),\n            new ArtifactTypeFactory(false),\n            new UserRemoverDao(),\n            UserManager::instance(),\n            new ProjectHistoryDao(),\n            new UGroupManager(),\n            new UserPermissionsDao(),\n        );\n    }\n}",
+  "function_modified_lines": {
+    "added": [
+      "            new UGroupManager(),",
+      "            new UserPermissionsDao(),"
+    ],
+    "deleted": [
+      "    private function getUserRemover()",
+      "            new UGroupManager()"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 698
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    public function removeUserFromProject($project_id, $user_id, $admin_action = true)\n    {\n        $project = $this->getProject($project_id);\n\n        if (! $this->dao->removeUserFromProject($project_id, $user_id)) {\n            $GLOBALS['Response']->addFeedback(\n                Feedback::ERROR,\n                $GLOBALS['Language']->getText('project_admin_index', 'user_not_removed')\n            );\n\n            return false;\n        }\n\n        $this->event_manager->processEvent('project_admin_remove_user', [\n            'group_id' => $project_id,\n            'user_id'  => $user_id,\n        ]);\n\n        $this->removeUserFromTrackerV3($project_id, $user_id);\n\n        if (! $this->removeUserFromProjectUgroups($project, $user_id)) {\n            $GLOBALS['Response']->addFeedback('error', $GLOBALS['Language']->getText('project_admin_index', 'del_user_from_ug_fail'));\n        }\n\n        $user_name = $this->getUserName($user_id);\n\n        $this->displayFeedback($project, $user_name, $admin_action);\n\n        $this->project_history_dao->groupAddHistory(\n            'removed_user',\n            $user_name . \" ($user_id)\",\n            $project_id\n        );\n\n        return true;\n    }",
+  "code_after_change": "    public function removeUserFromProject($project_id, $user_id, $admin_action = true)\n    {\n        $project = $this->getProject($project_id);\n\n        if (! $this->dao->removeNonAdminUserFromProject($project_id, $user_id)) {\n            $GLOBALS['Response']->addFeedback(\n                Feedback::ERROR,\n                $GLOBALS['Language']->getText('project_admin_index', 'user_not_removed')\n            );\n\n            return false;\n        }\n\n        $this->event_manager->processEvent('project_admin_remove_user', [\n            'group_id' => $project_id,\n            'user_id'  => $user_id,\n        ]);\n\n        $this->removeUserFromTrackerV3($project_id, $user_id);\n\n        if (! $this->removeUserFromProjectUgroups($project, $user_id)) {\n            $GLOBALS['Response']->addFeedback('error', $GLOBALS['Language']->getText('project_admin_index', 'del_user_from_ug_fail'));\n        }\n\n        $user_name = $this->getUserName($user_id);\n\n        $this->displayFeedback($project, $user_name, $admin_action);\n\n        $this->project_history_dao->groupAddHistory(\n            'removed_user',\n            $user_name . \" ($user_id)\",\n            $project_id\n        );\n\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        if (! $this->dao->removeNonAdminUserFromProject($project_id, $user_id)) {"
+    ],
+    "deleted": [
+      "        if (! $this->dao->removeUserFromProject($project_id, $user_id)) {"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 699
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "    public function removeUserFromProject($project_id, $user_id)\n    {\n        $project_id = $this->da->escapeInt($project_id);\n        $user_id    = $this->da->escapeInt($user_id);\n        $admin_flag = $this->da->quoteSmart('A');\n\n        $sql = \"DELETE FROM user_group\n                WHERE group_id = $project_id\n                  AND user_id = $user_id\n                  AND admin_flags <> $admin_flag\";\n\n        return $this->update($sql);\n    }",
+  "code_after_change": "    public function removeNonAdminUserFromProject($project_id, $user_id): bool\n    {\n        $project_id = $this->da->escapeInt($project_id);\n        $user_id    = $this->da->escapeInt($user_id);\n        $admin_flag = $this->da->quoteSmart('A');\n\n        $sql = \"DELETE FROM user_group\n                WHERE group_id = $project_id\n                  AND user_id = $user_id\n                  AND admin_flags <> $admin_flag\";\n\n        return $this->update($sql);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function removeNonAdminUserFromProject($project_id, $user_id): bool"
+    ],
+    "deleted": [
+      "    public function removeUserFromProject($project_id, $user_id)"
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 700
+},
+{
+  "cve_id": "CVE-2023-35938",
+  "code_before_change": "        $ugroup_with_restricted->shouldReceive('removeUser')->with(\n            $restricted_user_in_ugroup_only,\n            \\Mockery::on(\n                function (PFUser $user) {\n                    return (int) $user->getId() === 0;\n                }",
+  "code_after_change": "        $ugroup_with_restricted         = $this->createMock(ProjectUGroup::class);\n        $ugroup_with_restricted->method('getMembers')->willReturn([$restricted_user_in_ugroup_only, $member]);\n        $ugroup_with_restricted->expects(self::once())->method('removeUser')->with(\n            $restricted_user_in_ugroup_only,\n            self::callback(\n                function (PFUser $user) {",
+  "function_modified_lines": {
+    "added": [
+      "        $ugroup_with_restricted         = $this->createMock(ProjectUGroup::class);",
+      "        $ugroup_with_restricted->method('getMembers')->willReturn([$restricted_user_in_ugroup_only, $member]);",
+      "        $ugroup_with_restricted->expects(self::once())->method('removeUser')->with(",
+      "            $restricted_user_in_ugroup_only,",
+      "            self::callback(",
+      "                function (PFUser $user) {"
+    ],
+    "deleted": [
+      "        $ugroup_with_restricted->shouldReceive('removeUser')->with(",
+      "            \\Mockery::on("
+    ]
+  },
+  "cwe": [
+    "CWE-281"
+  ],
+  "cve_description": " Tuleap is a Free & Open Source Suite to improve management of software developments and collaboration. When switching from a project visibility that allows restricted users to `Private without restricted`, restricted users that are project administrators keep this access right. Restricted users that were project administrators before the visibility switch keep the possibility to access the project and do some administration actions. This issue has been resolved in Tuleap version 14.9.99.63. Users are advised to upgrade. There are no known workarounds for this issue.",
+  "id": 701
+}
+]
