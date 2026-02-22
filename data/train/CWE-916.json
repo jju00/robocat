@@ -1,0 +1,45 @@
+[
+{
+  "cve_id": "CVE-2022-1235",
+  "code_before_change": "                $cfgSite->setSetting( 'db', $key, $value);\n            }\n            $cfgSite->setSetting( 'site', 'secrethash', substr(md5(time() . \":\" . mt_rand()),0,10));\n            return true;\n        } else {\n            return $Errors;\n        }\n    }",
+  "code_after_change": "                $cfgSite->setSetting( 'db', $key, $value);\n            }\n            $cfgSite->setSetting( 'site', 'secrethash', erLhcoreClassChat::generateHash(80));\n            return true;\n        } else {\n            return $Errors;\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $cfgSite->setSetting( 'site', 'secrethash', erLhcoreClassChat::generateHash(80));"
+    ],
+    "deleted": [
+      "            $cfgSite->setSetting( 'site', 'secrethash', substr(md5(time() . \":\" . mt_rand()),0,10));"
+    ]
+  },
+  "cwe": [
+    "CWE-916"
+  ],
+  "cve_description": "Weak secrethash can be brute-forced in GitHub repository livehelperchat/livehelperchat prior to 3.96.",
+  "id": 6957
+},
+{
+  "cve_id": "CVE-2023-27580",
+  "code_before_change": "    public function hash(string $password)\n    {\n        if ((defined('PASSWORD_ARGON2I') && $this->config->hashAlgorithm === PASSWORD_ARGON2I)\n            || (defined('PASSWORD_ARGON2ID') && $this->config->hashAlgorithm === PASSWORD_ARGON2ID)\n        ) {\n            $hashOptions = [\n                'memory_cost' => $this->config->hashMemoryCost,\n                'time_cost'   => $this->config->hashTimeCost,\n                'threads'     => $this->config->hashThreads,\n            ];\n        } else {\n            $hashOptions = [\n                'cost' => $this->config->hashCost,\n            ];\n        }\n\n        return password_hash(\n            base64_encode(\n                hash('sha384', $password, true)\n            ),\n            $this->config->hashAlgorithm,\n            $hashOptions\n        );\n    }",
+  "code_after_change": "    public function hash(string $password)\n    {\n        return password_hash($password, $this->config->hashAlgorithm, $this->getHashOptions());\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        return password_hash($password, $this->config->hashAlgorithm, $this->getHashOptions());",
+      "    }"
+    ],
+    "deleted": [
+      "        if ((defined('PASSWORD_ARGON2I') && $this->config->hashAlgorithm === PASSWORD_ARGON2I)",
+      "            $hashOptions = [",
+      "        } else {",
+      "            $hashOptions = [",
+      "                'cost' => $this->config->hashCost,",
+      "            ];",
+      "            $hashOptions"
+    ]
+  },
+  "cwe": [
+    "CWE-916"
+  ],
+  "cve_description": "CodeIgniter Shield provides authentication and authorization for the CodeIgniter 4 PHP framework. An improper implementation was found in the password storage process. All hashed passwords stored in Shield v1.0.0-beta.3 or earlier are easier to crack than expected due to the vulnerability. Therefore, they should be removed as soon as possible. If an attacker gets (1) the user's hashed password by Shield, and (2) the hashed password (SHA-384 hash without salt) from somewhere, the attacker may easily crack the user's password. Upgrade to Shield v1.0.0-beta.4 or later to fix this issue. After upgrading, all users’ hashed passwords should be updated (saved to the database). There are no known workarounds.",
+  "id": 6958
+}
+]

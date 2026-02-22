@@ -1,0 +1,47 @@
+[
+{
+  "cve_id": "CVE-2022-0174",
+  "code_before_change": "\tpublic function update($user, $notrigger = 0)\n\t{\n\t\tglobal $langs, $conf;\n\n\t\t$error = 0;\n\n\t\t// Clean parameters\n\t\t$this->address = ($this->address > 0 ? $this->address : $this->address);\n\t\t$this->zip = ($this->zip > 0 ? $this->zip : $this->zip);\n\t\t$this->town = ($this->town > 0 ? $this->town : $this->town);\n\t\t$this->country_id = ($this->country_id > 0 ? $this->country_id : $this->country_id);\n\t\t$this->country = ($this->country ? $this->country : $this->country);\n\n\t\t$this->db->begin();\n\n\t\t$sql = \"UPDATE \".MAIN_DB_PREFIX.\"don SET \";\n\t\t$sql .= \"amount = \".price2num($this->amount);\n\t\t$sql .= \",fk_payment = \".($this->modepaymentid ? $this->modepaymentid : \"null\");",
+  "code_after_change": "\tpublic function update($user, $notrigger = 0)\n\t{\n\t\tglobal $langs, $conf;\n\n\t\t$error = 0;\n\n\t\t// Clean parameters\n\t\t$this->address = ($this->address > 0 ? $this->address : $this->address);\n\t\t$this->zip = ($this->zip > 0 ? $this->zip : $this->zip);\n\t\t$this->town = ($this->town > 0 ? $this->town : $this->town);\n\t\t$this->country_id = ($this->country_id > 0 ? $this->country_id : $this->country_id);\n\t\t$this->country = ($this->country ? $this->country : $this->country);\n\t\t$this->amount = price2num($this->amount);\n\n\t\t// Check parameters\n\t\tif ($this->amount < 0) {\n\t\t\t$this->error = $langs->trans('FieldCannotBeNegative', $langs->transnoentitiesnoconv(\"Amount\"));\n\t\t\treturn -1;\n\t\t}\n\n\t\t$this->db->begin();\n\n\t\t$sql = \"UPDATE \".MAIN_DB_PREFIX.\"don SET\";\n\t\t$sql .= \" amount = \".((float) $this->amount);",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$this->amount = price2num($this->amount);",
+      "\t\t// Check parameters",
+      "\t\tif ($this->amount < 0) {",
+      "\t\t\t$this->error = $langs->trans('FieldCannotBeNegative', $langs->transnoentitiesnoconv(\"Amount\"));",
+      "\t\t\treturn -1;",
+      "\t\t}",
+      "\t\t$sql = \"UPDATE \".MAIN_DB_PREFIX.\"don SET\";",
+      "\t\t$sql .= \" amount = \".((float) $this->amount);"
+    ],
+    "deleted": [
+      "\t\t$sql = \"UPDATE \".MAIN_DB_PREFIX.\"don SET \";",
+      "\t\t$sql .= \"amount = \".price2num($this->amount);",
+      "\t\t$sql .= \",fk_payment = \".($this->modepaymentid ? $this->modepaymentid : \"null\");"
+    ]
+  },
+  "cwe": [
+    "CWE-1284"
+  ],
+  "cve_description": "Improper Validation of Specified Quantity in Input vulnerability in dolibarr dolibarr/dolibarr.",
+  "id": 33
+},
+{
+  "cve_id": "CVE-2022-0596",
+  "code_before_change": "    public function makeInstallation(Browser $browser)\n    {\n        $siteUrl = site_url();\n\n        if (mw_is_installed()) {\n            PHPUnit::assertTrue(true);\n            return true;\n        }\n\n        /* $deleteDbFiles = [];\n         $deleteDbFiles[] = dirname(dirname(__DIR__)) . DS . 'config/microweber.php';\n         $deleteDbFiles[] = dirname(dirname(__DIR__)) . DS . 'storage/127_0_0_1.sqlite';\n         foreach ($deleteDbFiles as $file) {\n             if (is_file($file)) {\n                 unlink($file);\n             }\n         }*/\n\n        $browser->visit($siteUrl)->assertSee('install');\n\n        $browser->within(new ChekForJavascriptErrors(), function ($browser) {\n            $browser->validate();\n        });\n\n\n        // Fill the install fields\n        $browser->type('admin_username', '1');\n        $browser->type('admin_password', '1');\n        $browser->type('admin_password2', '1');\n        $browser->type('admin_email', 'bobi@microweber.com');\n\n        $browser->pause(300);\n        $browser->select('#default_template', 'new-world');\n\n        $browser->pause(100);\n        $browser->click('@install-button');\n\n        $browser->pause(20000);\n\n        clearcache();\n\n    }",
+  "code_after_change": "    public function makeInstallation(Browser $browser)\n    {\n        $siteUrl = 'http://127.0.0.1:8000/';\n\n        if (mw_is_installed()) {\n            PHPUnit::assertTrue(true);\n            return true;\n        }\n\n        /* $deleteDbFiles = [];\n         $deleteDbFiles[] = dirname(dirname(__DIR__)) . DS . 'config/microweber.php';\n         $deleteDbFiles[] = dirname(dirname(__DIR__)) . DS . 'storage/127_0_0_1.sqlite';\n         foreach ($deleteDbFiles as $file) {\n             if (is_file($file)) {\n                 unlink($file);\n             }\n         }*/\n\n        $browser->visit($siteUrl)->assertSee('install');\n\n        $browser->within(new ChekForJavascriptErrors(), function ($browser) {\n            $browser->validate();\n        });\n\n\n        // Fill the install fields\n        $browser->type('admin_username', '1');\n        $browser->type('admin_password', '1');\n        $browser->type('admin_password2', '1');\n        $browser->type('admin_email', 'bobi@microweber.com');\n\n        $browser->pause(300);\n        $browser->select('#default_template', 'new-world');\n\n        $browser->pause(100);\n        $browser->click('@install-button');\n\n        $browser->pause(20000);\n\n        clearcache();\n\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $siteUrl = 'http://127.0.0.1:8000/';"
+    ],
+    "deleted": [
+      "        $siteUrl = site_url();"
+    ]
+  },
+  "cwe": [
+    "CWE-1284"
+  ],
+  "cve_description": "Improper Validation of Specified Quantity in Input in Packagist microweber/microweber prior to 1.2.11.",
+  "id": 34
+}
+]

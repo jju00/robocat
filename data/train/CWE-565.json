@@ -1,0 +1,107 @@
+[
+{
+  "cve_id": "CVE-2021-3818",
+  "code_before_change": "    public function getFlashCookieObject($name)\n    {\n        if (isset($_COOKIE[$name])) {\n            $object = json_decode($_COOKIE[$name], false);\n            setcookie($name, '', time() - 3600, '/');\n            return $object;\n        }\n\n        return null;\n    }",
+  "code_after_change": "    public function getFlashCookieObject($name)\n    {\n        if (isset($_COOKIE[$name])) {\n            $cookie = $_COOKIE[$name];\n            setcookie($name, '', $this->getCookieOptions(-42000));\n\n            return json_decode($cookie, false, 512, JSON_THROW_ON_ERROR);\n        }\n\n        return null;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $cookie = $_COOKIE[$name];",
+      "            setcookie($name, '', $this->getCookieOptions(-42000));",
+      "            return json_decode($cookie, false, 512, JSON_THROW_ON_ERROR);"
+    ],
+    "deleted": [
+      "            $object = json_decode($_COOKIE[$name], false);",
+      "            setcookie($name, '', time() - 3600, '/');",
+      "            return $object;"
+    ]
+  },
+  "cwe": [
+    "CWE-565"
+  ],
+  "cve_description": "grav is vulnerable to Reliance on Cookies without Validation and Integrity Checking",
+  "id": 1519
+},
+{
+  "cve_id": "CVE-2021-3818",
+  "code_before_change": "    public function setFlashCookieObject($name, $object, $time = 60)\n    {\n        setcookie($name, json_encode($object), time() + $time, '/');\n\n        return $this;\n    }",
+  "code_after_change": "    public function setFlashCookieObject($name, $object, $time = 60)\n    {\n        setcookie($name, json_encode($object, JSON_THROW_ON_ERROR), $this->getCookieOptions($time));\n\n        return $this;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        setcookie($name, json_encode($object, JSON_THROW_ON_ERROR), $this->getCookieOptions($time));"
+    ],
+    "deleted": [
+      "        setcookie($name, json_encode($object), time() + $time, '/');"
+    ]
+  },
+  "cwe": [
+    "CWE-565"
+  ],
+  "cve_description": "grav is vulnerable to Reliance on Cookies without Validation and Integrity Checking",
+  "id": 1520
+},
+{
+  "cve_id": "CVE-2021-3818",
+  "code_before_change": "    public function invalidate()\n    {\n        $name = $this->getName();\n        if (null !== $name) {\n            $params = session_get_cookie_params();\n\n            $cookie_options = array (\n                'expires'  => time() - 42000,\n                'path'     => $params['path'],\n                'domain'   => $params['domain'],\n                'secure'   => $params['secure'],\n                'httponly' => $params['httponly'],\n                'samesite' => $params['samesite']\n            );\n\n            $this->removeCookie();\n\n            setcookie(\n                session_name(),\n                '',\n                $cookie_options\n            );\n        }\n\n        if ($this->isSessionStarted()) {\n            session_unset();\n            session_destroy();\n        }\n\n        $this->started = false;\n\n        return $this;\n    }",
+  "code_after_change": "    public function invalidate()\n    {\n        $name = $this->getName();\n        if (null !== $name) {\n            $this->removeCookie();\n\n            setcookie(\n                session_name(),\n                '',\n                $this->getCookieOptions(-42000)\n            );\n        }\n\n        if ($this->isSessionStarted()) {\n            session_unset();\n            session_destroy();\n        }\n\n        $this->started = false;\n\n        return $this;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                $this->getCookieOptions(-42000)"
+    ],
+    "deleted": [
+      "            $params = session_get_cookie_params();",
+      "            $cookie_options = array (",
+      "                'expires'  => time() - 42000,",
+      "                'path'     => $params['path'],",
+      "                'domain'   => $params['domain'],",
+      "                'secure'   => $params['secure'],",
+      "                'httponly' => $params['httponly'],",
+      "                'samesite' => $params['samesite']",
+      "            );",
+      "                $cookie_options"
+    ]
+  },
+  "cwe": [
+    "CWE-565"
+  ],
+  "cve_description": "grav is vulnerable to Reliance on Cookies without Validation and Integrity Checking",
+  "id": 1521
+},
+{
+  "cve_id": "CVE-2022-29248",
+  "code_before_change": "    public function getCookiePathsDataProvider()\n    {\n        return [\n            ['', '/'],\n            ['/', '/'],\n            ['/foo', '/'],\n            ['/foo/bar', '/foo'],\n            ['/foo/bar/', '/foo/bar'],\n            ['foo', '/'],\n            ['foo/bar', '/'],\n            ['foo/bar/', '/'],\n        ];\n    }",
+  "code_after_change": "    public function getCookiePathsDataProvider()\n    {\n        return [\n            ['', '/'],\n            ['/', '/'],\n            ['/foo', '/'],\n            ['/foo/bar', '/foo'],\n            ['/foo/bar/', '/foo/bar'],\n        ];\n    }\n\n    /**\n     * @dataProvider getCookiePathsDataProvider",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "            ['foo', '/'],",
+      "            ['foo/bar', '/'],",
+      "            ['foo/bar/', '/'],"
+    ]
+  },
+  "cwe": [
+    "CWE-565"
+  ],
+  "cve_description": "Guzzle is a PHP HTTP client. Guzzle prior to versions 6.5.6 and 7.4.3 contains a vulnerability with the cookie middleware. The vulnerability is that it is not checked if the cookie domain equals the domain of the server which sets the cookie via the Set-Cookie header, allowing a malicious server to set cookies for unrelated domains. The cookie middleware is disabled by default, so most library consumers will not be affected by this issue. Only those who manually add the cookie middleware to the handler stack or construct the client with ['cookies' => true] are affected. Moreover, those who do not use the same Guzzle client to call multiple domains and have disabled redirect forwarding are not affected by this vulnerability. Guzzle versions 6.5.6 and 7.4.3 contain a patch for this issue. As a workaround, turn off the cookie middleware.",
+  "id": 1522
+},
+{
+  "cve_id": "CVE-2022-29248",
+  "code_before_change": "    public function testCookiePathWithEmptySetCookiePath($uriPath, $cookiePath)\n    {\n        $response = (new Response(200))\n            ->withAddedHeader(\n                'Set-Cookie',\n                \"foo=bar; expires={$this->futureExpirationDate()}; domain=www.example.com; path=;\"\n            )\n            ->withAddedHeader(\n                'Set-Cookie',\n                \"bar=foo; expires={$this->futureExpirationDate()}; domain=www.example.com; path=foobar;\"\n            )\n        ;\n        $request = (new Request('GET', $uriPath))->withHeader('Host', 'www.example.com');\n        $this->jar->extractCookies($request, $response);\n\n        self::assertSame($cookiePath, $this->jar->toArray()[0]['Path']);\n        self::assertSame($cookiePath, $this->jar->toArray()[1]['Path']);\n    }",
+  "code_after_change": "    public function testCookiePathWithEmptySetCookiePath(string $uriPath, string $cookiePath)\n    {\n        $response = (new Response(200))\n            ->withAddedHeader(\n                'Set-Cookie',\n                \"foo=bar; expires={$this->futureExpirationDate()}; domain=www.example.com; path=;\"\n            )\n            ->withAddedHeader(\n                'Set-Cookie',\n                \"bar=foo; expires={$this->futureExpirationDate()}; domain=www.example.com; path=foobar;\"\n            )\n        ;\n        $request = (new Request('GET', \"https://www.example.com{$uriPath}\"));\n        $this->jar->extractCookies($request, $response);\n\n        self::assertSame($cookiePath, $this->jar->toArray()[0]['Path']);\n        self::assertSame($cookiePath, $this->jar->toArray()[1]['Path']);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function testCookiePathWithEmptySetCookiePath(string $uriPath, string $cookiePath)",
+      "        $request = (new Request('GET', \"https://www.example.com{$uriPath}\"));"
+    ],
+    "deleted": [
+      "    public function testCookiePathWithEmptySetCookiePath($uriPath, $cookiePath)",
+      "        $request = (new Request('GET', $uriPath))->withHeader('Host', 'www.example.com');"
+    ]
+  },
+  "cwe": [
+    "CWE-565"
+  ],
+  "cve_description": "Guzzle is a PHP HTTP client. Guzzle prior to versions 6.5.6 and 7.4.3 contains a vulnerability with the cookie middleware. The vulnerability is that it is not checked if the cookie domain equals the domain of the server which sets the cookie via the Set-Cookie header, allowing a malicious server to set cookies for unrelated domains. The cookie middleware is disabled by default, so most library consumers will not be affected by this issue. Only those who manually add the cookie middleware to the handler stack or construct the client with ['cookies' => true] are affected. Moreover, those who do not use the same Guzzle client to call multiple domains and have disabled redirect forwarding are not affected by this vulnerability. Guzzle versions 6.5.6 and 7.4.3 contain a patch for this issue. As a workaround, turn off the cookie middleware.",
+  "id": 1523
+}
+]

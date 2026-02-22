@@ -1,0 +1,61 @@
+[
+    {
+        "CVE_id": "CVE-2016-3735",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Use of non-cryptographically secure random number generation methods for sensitive token generation.",
+            "trigger_condition": "The application defaults to using a predictable random number generator when a secure method is not available, allowing attackers to predict token values.",
+            "specific_code_behavior_causing_vulnerability": "The code utilizes mt_rand for generating password reset tokens, which can be predicted if the seed is known, leading to potential account takeover."
+        },
+        "solution": "To mitigate the vulnerability, replace the use of non-cryptographically secure random number generation methods with a secure alternative that provides cryptographically strong randomness. This ensures that generated tokens are unpredictable and resistant to attacks.",
+        "purpose": "\"The function generates a secure random key of a specified size, using either `openssl_random_pseudo_bytes` for cryptographic security or `mt_rand` as a fallback.\"",
+        "function": "1. Generates a cryptographic key of a specified size.  \n2. Uses `openssl_random_pseudo_bytes` for secure key generation if available and conditions are met.  \n3. Falls back to using `mt_rand` to generate a key from a predefined alphabet if secure methods are not available.",
+        "analysis": "The modification to the `generate_key` function is necessary to address a security vulnerability (CVE-2016-3735) related to the use of the `mt_rand` function for generating password reset tokens. Here are the key reasons why the changes are important:\n\n1. **Predictability of `mt_rand`:** The original code used `mt_rand` to generate random strings when the `openssl_random_pseudo_bytes` function was not available. However, `mt_rand` is not cryptographically secure, meaning that its output can be predicted if an attacker can determine the seed value used to initialize the random number generator. This predictability poses a significant security risk, especially for generating sensitive tokens like password reset links.\n\n2. **Use of Cryptographically Secure Functions:** The modification replaces the use of `mt_rand` and `openssl_random_pseudo_bytes` with `random_bytes`, which is a cryptographically secure function introduced in PHP 7. This function generates random bytes that are suitable for cryptographic use, making it much harder for an attacker to predict the output. By using `random_bytes`, the generated tokens are more secure and resistant to attacks.\n\n3. **Removal of Version Checks:** The original code included version checks to determine whether to use `openssl_random_pseudo_bytes`. This added complexity and could lead to vulnerabilities if the checks were not properly maintained. The modified code simplifies the function by directly using `random_bytes`, which is available in PHP 7 and later, thus eliminating the need for such checks.\n\n4. **Consistent Token Length:** The modification ensures that the generated token is of a consistent length and format, as it uses `base64_encode` to encode the random bytes and then trims it to the desired size. This consistency is important for the integrity and usability of the tokens.\n\nIn summary, the modification is necessary to enhance the security of the token generation process by using a cryptographically secure method, thereby reducing the risk of token prediction and potential account takeover by attackers.",
+        "code_before_change": "function generate_key($size)\n{\n  if (\n    is_callable('openssl_random_pseudo_bytes')\n    and !(version_compare(PHP_VERSION, '5.3.4') < 0 and defined('PHP_WINDOWS_VERSION_MAJOR'))\n    )\n  {\n    return substr(\n      str_replace(\n        array('+', '/'),\n        '',\n        base64_encode(openssl_random_pseudo_bytes($size+10))\n        ),\n      0,\n      $size\n      );\n  }\n  else\n  {\n    $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';\n    $l = strlen($alphabet)-1;\n    $key = '';\n    for ($i=0; $i<$size; $i++)\n    {\n      $key.= $alphabet[mt_rand(0, $l)];\n    }\n    return $key;\n  }\n}",
+        "code_after_change": "function generate_key($size)\n{\n  include_once(PHPWG_ROOT_PATH.'include/random_compat/random.php');\n\n  return substr(\n    str_replace(\n      array('+', '/'),\n      '',\n      base64_encode(random_bytes($size+10))\n      ),\n    0,\n    $size\n    );\n}",
+        "modified_lines": {
+            "added": [
+                "  include_once(PHPWG_ROOT_PATH.'include/random_compat/random.php');",
+                "  return substr(",
+                "    str_replace(",
+                "      array('+', '/'),",
+                "      '',",
+                "      base64_encode(random_bytes($size+10))",
+                "      ),",
+                "    0,",
+                "    $size",
+                "    );"
+            ],
+            "deleted": [
+                "  if (",
+                "    is_callable('openssl_random_pseudo_bytes')",
+                "    and !(version_compare(PHP_VERSION, '5.3.4') < 0 and defined('PHP_WINDOWS_VERSION_MAJOR'))",
+                "    )",
+                "  {",
+                "    return substr(",
+                "      str_replace(",
+                "        array('+', '/'),",
+                "        '',",
+                "        base64_encode(openssl_random_pseudo_bytes($size+10))",
+                "        ),",
+                "      0,",
+                "      $size",
+                "      );",
+                "  }",
+                "  else",
+                "  {",
+                "    $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';",
+                "    $l = strlen($alphabet)-1;",
+                "    $key = '';",
+                "    for ($i=0; $i<$size; $i++)",
+                "    {",
+                "      $key.= $alphabet[mt_rand(0, $l)];",
+                "    }",
+                "    return $key;",
+                "  }"
+            ]
+        },
+        "vulnerability_cause_description": "Use of non-cryptographically secure random number generation methods for sensitive token generation.",
+        "trigger_condition": "The application defaults to using a predictable random number generator when a secure method is not available, allowing attackers to predict token values.",
+        "specific_code_behavior_causing_vulnerability": "The code utilizes mt_rand for generating password reset tokens, which can be predicted if the seed is known, leading to potential account takeover."
+    }
+]

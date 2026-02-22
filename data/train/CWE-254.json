@@ -1,0 +1,53 @@
+[
+{
+  "cve_id": "CVE-2016-5702",
+  "code_before_change": "    public function getCookiePath()\n    {\n        static $cookie_path = null;\n\n        if (null !== $cookie_path && !defined('TESTSUITE')) {\n            return $cookie_path;\n        }\n\n        if (isset($GLOBALS['PMA_PHP_SELF'])) {\n            $parsed_url = parse_url($GLOBALS['PMA_PHP_SELF']);\n        } else {\n            $parsed_url = parse_url(PMA_getenv('REQUEST_URI'));\n        }\n\n        $parts = explode(\n            '/',\n            rtrim(str_replace('\\\\', '/', $parsed_url['path']), '/')\n        );\n\n        /* Remove filename */\n        if (substr($parts[count($parts) - 1], -4) == '.php') {\n            $parts = array_slice($parts, 0, count($parts) - 1);\n        }\n\n        /* Remove extra path from javascript calls */\n        if (defined('PMA_PATH_TO_BASEDIR')) {\n            $parts = array_slice($parts, 0, count($parts) - 1);\n        }\n\n        $parts[] = '';\n\n        return implode('/', $parts);\n    }",
+  "code_after_change": "    public function getCookiePath()\n    {\n        static $cookie_path = null;\n\n        if (null !== $cookie_path && !defined('TESTSUITE')) {\n            return $cookie_path;\n        }\n\n        $parsed_url = parse_url($GLOBALS['PMA_PHP_SELF']);\n\n        $parts = explode(\n            '/',\n            rtrim(str_replace('\\\\', '/', $parsed_url['path']), '/')\n        );\n\n        /* Remove filename */\n        if (substr($parts[count($parts) - 1], -4) == '.php') {\n            $parts = array_slice($parts, 0, count($parts) - 1);\n        }\n\n        /* Remove extra path from javascript calls */\n        if (defined('PMA_PATH_TO_BASEDIR')) {\n            $parts = array_slice($parts, 0, count($parts) - 1);\n        }\n\n        $parts[] = '';\n\n        return implode('/', $parts);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $parsed_url = parse_url($GLOBALS['PMA_PHP_SELF']);"
+    ],
+    "deleted": [
+      "        if (isset($GLOBALS['PMA_PHP_SELF'])) {",
+      "            $parsed_url = parse_url($GLOBALS['PMA_PHP_SELF']);",
+      "        } else {",
+      "            $parsed_url = parse_url(PMA_getenv('REQUEST_URI'));",
+      "        }"
+    ]
+  },
+  "cwe": [
+    "CWE-254"
+  ],
+  "cve_description": "phpMyAdmin 4.6.x before 4.6.3, when the environment lacks a PHP_SELF value, allows remote attackers to conduct cookie-attribute injection attacks via a crafted URI.",
+  "id": 664
+},
+{
+  "cve_id": "CVE-2016-5702",
+  "code_before_change": "function PMA_cleanupPathInfo()\n{\n    global $PMA_PHP_SELF, $_PATH_INFO;\n\n    $PMA_PHP_SELF = PMA_getenv('PHP_SELF');\n    $_PATH_INFO = PMA_getenv('PATH_INFO');\n    if (! empty($_PATH_INFO) && ! empty($PMA_PHP_SELF)) {\n        $path_info_pos = mb_strrpos($PMA_PHP_SELF, $_PATH_INFO);\n        $pathLength = $path_info_pos + mb_strlen($_PATH_INFO);\n        if ($pathLength === mb_strlen($PMA_PHP_SELF)) {\n            $PMA_PHP_SELF = mb_substr($PMA_PHP_SELF, 0, $path_info_pos);\n        }\n    }\n    $PMA_PHP_SELF = htmlspecialchars($PMA_PHP_SELF);\n}",
+  "code_after_change": "function PMA_cleanupPathInfo()\n{\n    global $PMA_PHP_SELF;\n\n    $PMA_PHP_SELF = PMA_getenv('PHP_SELF');\n    if (empty($PMA_PHP_SELF)) {\n        $PMA_PHP_SELF = urldecode(PMA_getenv('REQUEST_URI'));\n    }\n    $_PATH_INFO = PMA_getenv('PATH_INFO');\n    if (! empty($_PATH_INFO) && ! empty($PMA_PHP_SELF)) {\n        $path_info_pos = mb_strrpos($PMA_PHP_SELF, $_PATH_INFO);\n        if ($path_info_pos !== false) {\n            $path_info_part = mb_substr($PMA_PHP_SELF, $path_info_pos, mb_strlen($_PATH_INFO));\n            if ($path_info_part == $_PATH_INFO) {\n                $PMA_PHP_SELF = mb_substr($PMA_PHP_SELF, 0, $path_info_pos);\n            }\n        }\n    }\n    $PMA_PHP_SELF = htmlspecialchars($PMA_PHP_SELF);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    global $PMA_PHP_SELF;",
+      "    if (empty($PMA_PHP_SELF)) {",
+      "        $PMA_PHP_SELF = urldecode(PMA_getenv('REQUEST_URI'));",
+      "    }",
+      "        if ($path_info_pos !== false) {",
+      "            $path_info_part = mb_substr($PMA_PHP_SELF, $path_info_pos, mb_strlen($_PATH_INFO));",
+      "            if ($path_info_part == $_PATH_INFO) {",
+      "                $PMA_PHP_SELF = mb_substr($PMA_PHP_SELF, 0, $path_info_pos);",
+      "            }"
+    ],
+    "deleted": [
+      "    global $PMA_PHP_SELF, $_PATH_INFO;",
+      "        $pathLength = $path_info_pos + mb_strlen($_PATH_INFO);",
+      "        if ($pathLength === mb_strlen($PMA_PHP_SELF)) {",
+      "            $PMA_PHP_SELF = mb_substr($PMA_PHP_SELF, 0, $path_info_pos);"
+    ]
+  },
+  "cwe": [
+    "CWE-254"
+  ],
+  "cve_description": "phpMyAdmin 4.6.x before 4.6.3, when the environment lacks a PHP_SELF value, allows remote attackers to conduct cookie-attribute injection attacks via a crafted URI.",
+  "id": 665
+}
+]

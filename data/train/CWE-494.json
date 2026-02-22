@@ -1,0 +1,61 @@
+[
+{
+  "cve_id": "CVE-2021-41714",
+  "code_before_change": "    public function download($name){\n        $attachFile = storage_path('app/'.str_replace(\"-\",\"/\",$name));\n        if(!is_file($attachFile)){\n            abort(404);\n        }\n        return response()->download($attachFile);\n    }",
+  "code_after_change": "    public function download($name){\n        $fileName = str_replace(\"..\",\"\",$name);\n        $attachFile = storage_path('app/'.str_replace(\"-\",\"/\",$fileName));\n        if(!is_file($attachFile)){\n            abort(404);\n        }\n        return response()->download($attachFile);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $fileName = str_replace(\"..\",\"\",$name);",
+      "        $attachFile = storage_path('app/'.str_replace(\"-\",\"/\",$fileName));"
+    ],
+    "deleted": [
+      "        $attachFile = storage_path('app/'.str_replace(\"-\",\"/\",$name));"
+    ]
+  },
+  "cwe": [
+    "CWE-494"
+  ],
+  "cve_description": "In Tipask < 3.5.9, path parameters entered by the user are not validated when downloading attachments, a registered user can download arbitrary files on the Tipask server such as .env, /etc/passwd, laravel.log, causing infomation leakage.",
+  "id": 1419
+},
+{
+  "cve_id": "CVE-2021-41714",
+  "code_before_change": "    public function avatar($avatar_name)\n    {\n        list($user_id,$size) = explode('_',str_replace(\".jpg\",'',$avatar_name));\n        $avatarFile = storage_path('app/'.User::getAvatarPath($user_id,$size));\n        if(!is_file($avatarFile)){\n            $avatarFile = public_path('static/images/default_avatar.jpg');\n        }\n        $image =   Image::make($avatarFile);\n        $response = response()->make($image->encode('jpg'));\n        $image->destroy();\n        $response->header('Content-Type', 'image/jpeg');\n        $response->header('Expires',  date(DATE_RFC822,strtotime(\" 2 day\")));\n        $response->header('Cache-Control', 'private, max-age=86400, pre-check=86400');\n        return $response;\n    }",
+  "code_after_change": "    public function avatar($avatar_name)\n    {\n        $fileName = str_replace(\"..\",\"\",$avatar_name);\n\n        list($user_id,$size) = explode('_',str_replace(\".jpg\",'',$fileName));\n        $avatarFile = storage_path('app/'.User::getAvatarPath($user_id,$size));\n        if(!is_file($avatarFile)){\n            $avatarFile = public_path('static/images/default_avatar.jpg');\n        }\n        $image =   Image::make($avatarFile);\n        $response = response()->make($image->encode('jpg'));\n        $image->destroy();\n        $response->header('Content-Type', 'image/jpeg');\n        $response->header('Expires',  date(DATE_RFC822,strtotime(\" 2 day\")));\n        $response->header('Cache-Control', 'private, max-age=86400, pre-check=86400');\n        return $response;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $fileName = str_replace(\"..\",\"\",$avatar_name);",
+      "        list($user_id,$size) = explode('_',str_replace(\".jpg\",'',$fileName));"
+    ],
+    "deleted": [
+      "        list($user_id,$size) = explode('_',str_replace(\".jpg\",'',$avatar_name));"
+    ]
+  },
+  "cwe": [
+    "CWE-494"
+  ],
+  "cve_description": "In Tipask < 3.5.9, path parameters entered by the user are not validated when downloading attachments, a registered user can download arbitrary files on the Tipask server such as .env, /etc/passwd, laravel.log, causing infomation leakage.",
+  "id": 1420
+},
+{
+  "cve_id": "CVE-2021-41714",
+  "code_before_change": "    public function show($image_name)\n    {\n        $imageFile = storage_path('app/'.str_replace(\"-\",\"/\",$image_name));\n        if(!is_file($imageFile)){\n            abort(404);\n        }\n\n\n        $image =   Image::make($imageFile);\n\n        if(config('tipask.upload.open_watermark') && $image_name != config('tipask.upload.watermark_image') && str_contains($image_name,'attachments')){\n            $watermarkImage = storage_path('app/'.str_replace(\"-\",\"/\",config('tipask.upload.watermark_image')));\n            $image->insert($watermarkImage, 'bottom-right', 15, 10);\n        }\n        $response = response()->make($image->encode('jpg'));\n        $response->header('Content-Type', 'image/jpeg');\n        $response->header('Expires',  date(DATE_RFC822,strtotime(\" 7 day\")));\n        $response->header('Cache-Control', 'private, max-age=259200, pre-check=259200');\n        return $response;\n    }",
+  "code_after_change": "    public function show($image_name)\n    {\n        $fileName = str_replace(\"..\",\"\",$image_name);\n\n        $imageFile = storage_path('app/'.str_replace(\"-\",\"/\",$fileName));\n        if(!is_file($imageFile)){\n            abort(404);\n        }\n\n\n        $image =   Image::make($imageFile);\n\n        if(config('tipask.upload.open_watermark') && $fileName != config('tipask.upload.watermark_image') && str_contains($fileName,'attachments')){\n            $watermarkImage = storage_path('app/'.str_replace(\"-\",\"/\",config('tipask.upload.watermark_image')));\n            $image->insert($watermarkImage, 'bottom-right', 15, 10);\n        }\n        $response = response()->make($image->encode('jpg'));\n        $response->header('Content-Type', 'image/jpeg');\n        $response->header('Expires',  date(DATE_RFC822,strtotime(\" 7 day\")));\n        $response->header('Cache-Control', 'private, max-age=259200, pre-check=259200');\n        return $response;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $fileName = str_replace(\"..\",\"\",$image_name);",
+      "        $imageFile = storage_path('app/'.str_replace(\"-\",\"/\",$fileName));",
+      "        if(config('tipask.upload.open_watermark') && $fileName != config('tipask.upload.watermark_image') && str_contains($fileName,'attachments')){"
+    ],
+    "deleted": [
+      "        $imageFile = storage_path('app/'.str_replace(\"-\",\"/\",$image_name));",
+      "        if(config('tipask.upload.open_watermark') && $image_name != config('tipask.upload.watermark_image') && str_contains($image_name,'attachments')){"
+    ]
+  },
+  "cwe": [
+    "CWE-494"
+  ],
+  "cve_description": "In Tipask < 3.5.9, path parameters entered by the user are not validated when downloading attachments, a registered user can download arbitrary files on the Tipask server such as .env, /etc/passwd, laravel.log, causing infomation leakage.",
+  "id": 1421
+}
+]

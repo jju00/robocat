@@ -1,0 +1,280 @@
+[
+    {
+        "CVE_id": "CVE-2022-31042",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Inadequate handling of sensitive headers during HTTP redirects, particularly for Cookie headers.",
+            "trigger_condition": "A request is made to an HTTPS endpoint that redirects to an HTTP endpoint or a different host, leading to potential exposure of sensitive Cookie information.",
+            "specific_code_behavior_causing_vulnerability": "The code does not strip Cookie headers from requests when following redirects to a different scheme or host, allowing sensitive information to be forwarded unintentionally."
+        },
+        "solution": "To mitigate the vulnerability, it is essential to ensure that Cookie headers are always stripped from requests when following redirects to a different scheme or host. This can be achieved by implementing comprehensive tests that validate the correct handling of Cookie headers in various redirect scenarios, ensuring that sensitive information is not inadvertently exposed.",
+        "purpose": "\"To test that the 'Authorization' header is removed from a request after a redirect response is received.\"",
+        "function": "1. It creates a mock HTTP response that simulates a redirect (HTTP 302) to a specified location.  \n2. It verifies that the `Authorization` header is not present in the request after the redirect.  \n3. It initializes a Guzzle HTTP client with a custom handler stack that uses the mock responses.  \n4. It makes a GET request to a specified URL with basic authentication credentials.",
+        "analysis": "The modification is necessary to address the vulnerability described in CVE-2022-31042, which pertains to how Guzzle, a PHP HTTP client, handles `Cookie` headers during HTTP redirects. The original code snippet did not adequately ensure that sensitive `Cookie` headers were stripped when following redirects, particularly when the redirect was to a different scheme (from `https` to `http`) or a different host.\n\n### Key Points of the Modification:\n\n1. **Security Concern**: The vulnerability highlights that `Cookie` headers can contain sensitive information. If a request is made to an HTTPS endpoint and the server responds with a redirect to an HTTP endpoint, the `Cookie` headers should not be forwarded. This is because HTTP is not secure, and sensitive information could be exposed.\n\n2. **Redirect Handling**: The original test method (`testRemoveAuthorizationHeaderOnRedirect`) was focused on checking the removal of the `Authorization` header, rather than the `Cookie` header. The modification introduces a new method (`crossOriginRedirectProvider`) that provides a set of test cases to validate the behavior of the client when handling redirects across different schemes and hosts.\n\n3. **Comprehensive Testing**: The new method provides a comprehensive set of test cases that cover various scenarios:\n   - Redirects from HTTP to HTTP\n   - Redirects from HTTPS to HTTPS\n   - Redirects from HTTP to HTTPS\n   - Redirects from HTTPS to HTTP\n   - Redirects to the same host and scheme\n   - Redirects to different hosts and schemes\n\n4. **Ensuring Correct Behavior**: By implementing these tests, the code ensures that the `Cookie` headers are properly managed according to the security requirements. The tests will validate that cookies are not forwarded in scenarios where they shouldn't be, thus preventing potential information leakage.\n\n5. **Removal of Vulnerable Code**: The deletion of the original test method indicates a shift in focus from testing the removal of the `Authorization` header to ensuring that `Cookie` headers are handled correctly during redirects. This aligns with the goal of addressing the vulnerability.\n\n### Conclusion\n\nThe modification is crucial for enhancing the security of the Guzzle HTTP client by ensuring that sensitive information in `Cookie` headers is not inadvertently exposed during redirects. By implementing a comprehensive set of tests, the code can now validate that the client behaves correctly in various redirect scenarios, thereby mitigating the risk associated with the vulnerability.",
+        "code_before_change": "    public function testRemoveAuthorizationHeaderOnRedirect()\n    {\n        $mock = new MockHandler([\n            new Response(302, ['Location' => 'http://test.com']),\n            static function (RequestInterface $request) {\n                self::assertFalse($request->hasHeader('Authorization'));\n                return new Response(200);\n            }\n        ]);\n        $handler = HandlerStack::create($mock);\n        $client = new Client(['handler' => $handler]);\n        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);\n    }",
+        "code_after_change": "    public function crossOriginRedirectProvider()\n    {\n        return [\n            ['http://example.com?a=b', 'http://test.com/', false],\n            ['https://example.com?a=b', 'https://test.com/', false],\n            ['http://example.com?a=b', 'https://test.com/', false],\n            ['https://example.com?a=b', 'http://test.com/', false],\n            ['http://example.com?a=b', 'http://example.com/', true],\n            ['https://example.com?a=b', 'https://example.com/', true],\n            ['http://example.com?a=b', 'https://example.com/', true],\n            ['https://example.com?a=b', 'http://example.com/', false],\n        ];\n    }",
+        "modified_lines": {
+            "added": [
+                "    public function crossOriginRedirectProvider()",
+                "    {",
+                "        return [",
+                "            ['http://example.com?a=b', 'http://test.com/', false],",
+                "            ['https://example.com?a=b', 'https://test.com/', false],",
+                "            ['http://example.com?a=b', 'https://test.com/', false],",
+                "            ['https://example.com?a=b', 'http://test.com/', false],",
+                "            ['http://example.com?a=b', 'http://example.com/', true],",
+                "            ['https://example.com?a=b', 'https://example.com/', true],",
+                "            ['http://example.com?a=b', 'https://example.com/', true],",
+                "            ['https://example.com?a=b', 'http://example.com/', false],",
+                "        ];",
+                "    }"
+            ],
+            "deleted": [
+                "    public function testRemoveAuthorizationHeaderOnRedirect()",
+                "            new Response(302, ['Location' => 'http://test.com']),",
+                "            static function (RequestInterface $request) {",
+                "                self::assertFalse($request->hasHeader('Authorization'));",
+                "        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);"
+            ]
+        },
+        "vulnerability_cause_description": "Inadequate handling of sensitive headers during HTTP redirects, particularly for Cookie headers.",
+        "trigger_condition": "A request is made to an HTTPS endpoint that redirects to an HTTP endpoint or a different host, leading to potential exposure of sensitive Cookie information.",
+        "specific_code_behavior_causing_vulnerability": "The code does not strip Cookie headers from requests when following redirects to a different scheme or host, allowing sensitive information to be forwarded unintentionally."
+    },
+    {
+        "CVE_id": "CVE-2022-31043",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects, specifically when transitioning from a secure HTTPS connection to an insecure HTTP connection.",
+            "trigger_condition": "A request is made using HTTPS that receives a redirect response to an HTTP URL, leading to the potential exposure of sensitive information in the Authorization header.",
+            "specific_code_behavior_causing_vulnerability": "The code does not remove the Authorization header when redirecting from an HTTPS URL to an HTTP URL, allowing sensitive credentials to be sent over an insecure connection."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to implement logic that removes the Authorization header when a redirect occurs from an HTTPS URL to an HTTP URL. This ensures that sensitive information is not exposed during insecure redirects.",
+        "purpose": "\"To test that the `Authorization` header is removed from a request when a redirect occurs from an `https` URL to an `http` URL.\"",
+        "function": "1. It creates a mock HTTP response that simulates a redirect (HTTP 302) to a specified location.  \n2. It checks that the `Authorization` header is not present in the request after the redirect.  \n3. It sends a GET request to a specified URL with basic authentication credentials.",
+        "analysis": "The modification is necessary to address the vulnerability described in CVE-2022-31043, which pertains to the handling of `Authorization` headers during HTTP redirects in the Guzzle HTTP client. Here’s a breakdown of why the changes are important:\n\n### Understanding the Vulnerability\n\n1. **Sensitive Information Exposure**: The `Authorization` header often contains sensitive information, such as tokens or credentials. If this header is forwarded during a redirect from an HTTPS URL to an HTTP URL, it can expose this sensitive information to potential attackers who might be monitoring the HTTP traffic.\n\n2. **Redirect Behavior**: The original code did not remove the `Authorization` header when redirecting from an HTTPS endpoint to an HTTP endpoint. This behavior is problematic because it allows sensitive credentials to be sent over an insecure connection.\n\n### Changes Made\n\n1. **Removal of the Test**: The original test `testRemoveAuthorizationHeaderOnRedirect` was removed. This test was designed to check that the `Authorization` header was not present in the redirected request. However, since the vulnerability existed, the test would have passed incorrectly, allowing the vulnerability to persist.\n\n2. **Addition of `crossOriginRedirectProvider`**: The new method `crossOriginRedirectProvider` provides a set of test cases that cover various scenarios of redirects, including:\n   - Redirects between HTTP and HTTPS.\n   - Same-origin and cross-origin redirects.\n   - Cases where the `Authorization` header should or should not be forwarded.\n\n### Importance of the New Test Cases\n\n- **Comprehensive Coverage**: The new provider method ensures that all relevant scenarios are tested, specifically focusing on whether the `Authorization` header is correctly removed when transitioning from HTTPS to HTTP.\n  \n- **Prevention of Future Vulnerabilities**: By implementing these tests, developers can ensure that any future changes to the code do not inadvertently reintroduce the vulnerability. It acts as a safeguard against regressions.\n\n- **Clear Expectations**: The test cases clearly define the expected behavior of the HTTP client regarding the handling of sensitive headers during redirects, making it easier for developers to understand and maintain the code.\n\n### Conclusion\n\nThe modification is crucial for enhancing the security of the Guzzle HTTP client by ensuring that sensitive information is not inadvertently exposed during redirects. By removing the old test and adding comprehensive tests for various redirect scenarios, the code now adheres to best practices for handling sensitive data in HTTP requests.",
+        "code_before_change": "    public function testRemoveAuthorizationHeaderOnRedirect()\n    {\n        $mock = new MockHandler([\n            new Response(302, ['Location' => 'http://test.com']),\n            static function (RequestInterface $request) {\n                self::assertFalse($request->hasHeader('Authorization'));\n                return new Response(200);\n            }\n        ]);\n        $handler = HandlerStack::create($mock);\n        $client = new Client(['handler' => $handler]);\n        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);\n    }",
+        "code_after_change": "    public function crossOriginRedirectProvider()\n    {\n        return [\n            ['http://example.com?a=b', 'http://test.com/', false],\n            ['https://example.com?a=b', 'https://test.com/', false],\n            ['http://example.com?a=b', 'https://test.com/', false],\n            ['https://example.com?a=b', 'http://test.com/', false],\n            ['http://example.com?a=b', 'http://example.com/', true],\n            ['https://example.com?a=b', 'https://example.com/', true],\n            ['http://example.com?a=b', 'https://example.com/', true],\n            ['https://example.com?a=b', 'http://example.com/', false],\n        ];\n    }",
+        "modified_lines": {
+            "added": [
+                "    public function crossOriginRedirectProvider()",
+                "    {",
+                "        return [",
+                "            ['http://example.com?a=b', 'http://test.com/', false],",
+                "            ['https://example.com?a=b', 'https://test.com/', false],",
+                "            ['http://example.com?a=b', 'https://test.com/', false],",
+                "            ['https://example.com?a=b', 'http://test.com/', false],",
+                "            ['http://example.com?a=b', 'http://example.com/', true],",
+                "            ['https://example.com?a=b', 'https://example.com/', true],",
+                "            ['http://example.com?a=b', 'https://example.com/', true],",
+                "            ['https://example.com?a=b', 'http://example.com/', false],",
+                "        ];",
+                "    }"
+            ],
+            "deleted": [
+                "    public function testRemoveAuthorizationHeaderOnRedirect()",
+                "            new Response(302, ['Location' => 'http://test.com']),",
+                "            static function (RequestInterface $request) {",
+                "                self::assertFalse($request->hasHeader('Authorization'));",
+                "        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects, specifically when transitioning from a secure HTTPS connection to an insecure HTTP connection.",
+        "trigger_condition": "A request is made using HTTPS that receives a redirect response to an HTTP URL, leading to the potential exposure of sensitive information in the Authorization header.",
+        "specific_code_behavior_causing_vulnerability": "The code does not remove the Authorization header when redirecting from an HTTPS URL to an HTTP URL, allowing sensitive credentials to be sent over an insecure connection."
+    },
+    {
+        "CVE_id": "CVE-2022-31090",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive information in HTTP requests during redirects.",
+            "trigger_condition": "A redirect response is received that points to a different origin (host, scheme, or port) while the request includes an Authorization header.",
+            "specific_code_behavior_causing_vulnerability": "The code only checks for differences in the host of the URI when deciding whether to unset the Authorization header, failing to account for changes in scheme or port, which could lead to sensitive information being sent to an unintended server."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to implement a comprehensive check that determines if the redirect is cross-origin by evaluating the host, scheme, and port of the URIs. If a cross-origin redirect is detected, the code should unset any Authorization headers to prevent sensitive information from being sent to a different origin.",
+        "purpose": "\"The function checks for HTTP redirects in a response and modifies the request accordingly while ensuring sensitive authorization headers are not sent to different origins.\"",
+        "function": "1. Checks if the response status code indicates a redirect (3xx) and if a 'Location' header is present.  \n2. Guards against exceeding the maximum number of redirects.  \n3. Modifies the original request based on the redirect response.  \n4. Unsets `CURLOPT_HTTPAUTH` and `CURLOPT_USERPWD` options if the host of the next request is different from the original request.  \n5. Executes a callback function if defined for handling redirects.  \n6. Creates a promise for the next request.  \n7. Tracks the history of redirects if tracking is enabled in the options.  \n8. Returns the promise for the next request or the tracked request with redirect history.",
+        "analysis": "The modification to the code is necessary to address a security vulnerability (CVE-2022-31090) in the Guzzle HTTP client related to the handling of `Authorization` headers during HTTP redirects. Here's a breakdown of why the changes are important:\n\n### Background on the Vulnerability\n\n1. **Sensitive Information Exposure**: The `Authorization` header often contains sensitive information, such as tokens or credentials. If this header is inadvertently sent to a different origin (i.e., a different host, scheme, or port) during a redirect, it could expose sensitive data to an unintended server.\n\n2. **Redirect Behavior**: In the original code, the check for whether to unset the `CURLOPT_HTTPAUTH` option was only based on whether the host of the original request and the next request were different. This means that if the scheme (HTTP vs. HTTPS) or port changed, the `Authorization` header could still be sent to the new origin, leading to potential security issues.\n\n### Changes Made\n\n1. **Cross-Origin Check**: The modification introduces a more comprehensive check using `Psr7\\UriComparator::isCrossOrigin()`. This function evaluates whether the two URIs (the original request and the next request) are cross-origin based on host, scheme, and port.\n\n2. **Unsetting Authorization Headers**: The updated code unsets the `CURLOPT_HTTPAUTH` and `CURLOPT_USERPWD` options if the requests are determined to be cross-origin. This ensures that the `Authorization` header is not sent to a different origin, thereby protecting sensitive information.\n\n### Summary of Importance\n\n- **Enhanced Security**: By ensuring that `Authorization` headers are not sent to different origins, the modification significantly reduces the risk of sensitive information leakage.\n- **Compliance with Best Practices**: The change aligns with security best practices for handling sensitive data in HTTP requests, particularly in the context of redirects.\n- **Comprehensive Handling**: The new approach accounts for all scenarios where a redirect could lead to a different origin, not just changes in the host, making the code more robust against potential vulnerabilities.\n\nIn summary, the modification is necessary to close a security loophole that could allow sensitive information to be exposed during HTTP redirects, thereby enhancing the overall security of the Guzzle HTTP client.",
+        "code_before_change": "    public function checkRedirect(RequestInterface $request, array $options, ResponseInterface $response)\n    {\n        if (\\strpos((string) $response->getStatusCode(), '3') !== 0\n            || !$response->hasHeader('Location')\n        ) {\n            return $response;\n        }\n\n        $this->guardMax($request, $response, $options);\n        $nextRequest = $this->modifyRequest($request, $options, $response);\n\n        // If authorization is handled by curl, unset it if host is different.\n        if ($request->getUri()->getHost() !== $nextRequest->getUri()->getHost()\n            && defined('\\CURLOPT_HTTPAUTH')\n        ) {\n            unset(\n                $options['curl'][\\CURLOPT_HTTPAUTH],\n                $options['curl'][\\CURLOPT_USERPWD]\n            );\n        }\n\n        if (isset($options['allow_redirects']['on_redirect'])) {\n            ($options['allow_redirects']['on_redirect'])(\n                $request,\n                $response,\n                $nextRequest->getUri()\n            );\n        }\n\n        $promise = $this($nextRequest, $options);\n\n        // Add headers to be able to track history of redirects.\n        if (!empty($options['allow_redirects']['track_redirects'])) {\n            return $this->withTracking(\n                $promise,\n                (string) $nextRequest->getUri(),\n                $response->getStatusCode()\n            );\n        }\n\n        return $promise;\n    }",
+        "code_after_change": "    public function checkRedirect(RequestInterface $request, array $options, ResponseInterface $response)\n    {\n        if (\\strpos((string) $response->getStatusCode(), '3') !== 0\n            || !$response->hasHeader('Location')\n        ) {\n            return $response;\n        }\n\n        $this->guardMax($request, $response, $options);\n        $nextRequest = $this->modifyRequest($request, $options, $response);\n\n        // If authorization is handled by curl, unset it if URI is cross-origin.\n        if (Psr7\\UriComparator::isCrossOrigin($request->getUri(), $nextRequest->getUri()) && defined('\\CURLOPT_HTTPAUTH')) {\n            unset(\n                $options['curl'][\\CURLOPT_HTTPAUTH],\n                $options['curl'][\\CURLOPT_USERPWD]\n            );\n        }\n\n        if (isset($options['allow_redirects']['on_redirect'])) {\n            ($options['allow_redirects']['on_redirect'])(\n                $request,\n                $response,\n                $nextRequest->getUri()\n            );\n        }\n\n        $promise = $this($nextRequest, $options);\n\n        // Add headers to be able to track history of redirects.\n        if (!empty($options['allow_redirects']['track_redirects'])) {\n            return $this->withTracking(\n                $promise,\n                (string) $nextRequest->getUri(),\n                $response->getStatusCode()\n            );\n        }\n\n        return $promise;\n    }",
+        "modified_lines": {
+            "added": [
+                "        // If authorization is handled by curl, unset it if URI is cross-origin.",
+                "        if (Psr7\\UriComparator::isCrossOrigin($request->getUri(), $nextRequest->getUri()) && defined('\\CURLOPT_HTTPAUTH')) {"
+            ],
+            "deleted": [
+                "        // If authorization is handled by curl, unset it if host is different.",
+                "        if ($request->getUri()->getHost() !== $nextRequest->getUri()->getHost()",
+                "            && defined('\\CURLOPT_HTTPAUTH')",
+                "        ) {"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive information in HTTP requests during redirects.",
+        "trigger_condition": "A redirect response is received that points to a different origin (host, scheme, or port) while the request includes an Authorization header.",
+        "specific_code_behavior_causing_vulnerability": "The code only checks for differences in the host of the URI when deciding whether to unset the Authorization header, failing to account for changes in scheme or port, which could lead to sensitive information being sent to an unintended server."
+    },
+    {
+        "CVE_id": "CVE-2022-31090",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects.",
+            "trigger_condition": "A request that includes sensitive information in the Authorization header is redirected to a different origin, potentially exposing that information.",
+            "specific_code_behavior_causing_vulnerability": "The code does not check if the request is cross-origin before asserting the presence of the Authorization and Cookie headers, allowing sensitive information to be sent to unintended recipients during redirects."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to check if the request is cross-origin before asserting the presence of sensitive headers like Authorization and Cookie. This ensures that such headers are not included in requests that are redirected to different origins, thereby preventing potential information leakage.",
+        "purpose": "\"The function checks the presence of 'Authorization' and 'Cookie' headers in the request and returns a 200 response.\"",
+        "function": "1. Asserts that the presence of the `Authorization` header matches the expected value (`$shouldBePresent`).  \n2. Asserts that the presence of the `Cookie` header matches the expected value (`$shouldBePresent`).  \n3. Returns a new HTTP response with a status code of 200.",
+        "analysis": "The modification is necessary to address the vulnerability described in CVE-2022-31090, which pertains to the handling of sensitive information in HTTP requests made using Guzzle, a PHP HTTP client.\n\n### Explanation of the Vulnerability\n\n1. **Sensitive Information Exposure**: The `Authorization` header often contains sensitive information, such as tokens or credentials. If a request is made that results in a redirect to a different origin (i.e., a different host, scheme, or port), the `Authorization` header should not be sent along with the redirected request. This is because it could inadvertently expose sensitive information to an unintended recipient.\n\n2. **Redirect Behavior**: In the affected versions of Guzzle, when following redirects, the `CURLOPT_HTTPAUTH` option could still append the `Authorization` header to the new request. This means that if the redirect leads to a different origin, the sensitive information could be leaked.\n\n### Changes Made\n\n- **Original Code**: The original assertions checked if the `Authorization` and `Cookie` headers were present based on a variable `$shouldBePresent`. This did not account for whether the request was cross-origin or not.\n\n- **Modified Code**: The modified assertions now check if the headers should be present based on the `$isCrossOrigin` variable. Specifically:\n  - `self::assertSame(!$isCrossOrigin, $request->hasHeader('Authorization'));`\n  - `self::assertSame(!$isCrossOrigin, $request->hasHeader('Cookie'));`\n\n### Why the Change is Important\n\n1. **Security**: By modifying the assertions to check against `$isCrossOrigin`, the code now correctly verifies that the `Authorization` and `Cookie` headers are not present when the request is cross-origin. This aligns with the security best practice of not sending sensitive information to different origins.\n\n2. **Preventing Information Leakage**: The change helps ensure that if a redirect occurs to a different origin, the sensitive headers are not included in the request, thus preventing potential information leakage.\n\n3. **Compliance with Fix Recommendations**: The modification follows the recommendations provided in the CVE description, which emphasizes the importance of removing sensitive headers when following redirects to different origins.\n\nIn summary, the modification is crucial for enhancing the security of the application by ensuring that sensitive information is not inadvertently exposed during cross-origin redirects.",
+        "code_before_change": "                self::assertSame($shouldBePresent, $request->hasHeader('Authorization'));\n                self::assertSame($shouldBePresent, $request->hasHeader('Cookie'));\n\n                return new Response(200);\n            }\n        ]);",
+        "code_after_change": "                self::assertSame(!$isCrossOrigin, $request->hasHeader('Authorization'));\n                self::assertSame(!$isCrossOrigin, $request->hasHeader('Cookie'));\n\n                return new Response(200);\n            }\n        ]);",
+        "modified_lines": {
+            "added": [
+                "                self::assertSame(!$isCrossOrigin, $request->hasHeader('Authorization'));",
+                "                self::assertSame(!$isCrossOrigin, $request->hasHeader('Cookie'));",
+                "                return new Response(200);",
+                "            }",
+                "        ]);"
+            ],
+            "deleted": [
+                "                self::assertSame($shouldBePresent, $request->hasHeader('Authorization'));",
+                "                self::assertSame($shouldBePresent, $request->hasHeader('Cookie'));"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects.",
+        "trigger_condition": "A request that includes sensitive information in the Authorization header is redirected to a different origin, potentially exposing that information.",
+        "specific_code_behavior_causing_vulnerability": "The code does not check if the request is cross-origin before asserting the presence of the Authorization and Cookie headers, allowing sensitive information to be sent to unintended recipients during redirects."
+    },
+    {
+        "CVE_id": "CVE-2022-31090",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive authorization headers during HTTP redirects.",
+            "trigger_condition": "When a request with an authorization header is redirected to a different origin (change in host, scheme, or port), the authorization header is not removed, leading to potential exposure of sensitive information.",
+            "specific_code_behavior_causing_vulnerability": "The code does not adequately remove the CURLOPT_HTTPAUTH and CURLOPT_USERPWD options from the cURL options when following a redirect to a different origin, allowing sensitive authorization headers to be sent to unintended destinations."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to ensure that the cURL options related to authorization, specifically CURLOPT_HTTPAUTH and CURLOPT_USERPWD, are removed before following any redirects that change the origin. This prevents sensitive information from being sent to unintended recipients and enhances the security of the HTTP client.",
+        "purpose": "\"The function tests that sensitive `CURLOPT_HTTPAUTH` and `CURLOPT_USERPWD` options are removed from cURL options when following a redirect to a different origin.\"",
+        "function": "1. Checks if the cURL extension is loaded and skips the test if it is not.  \n2. Mocks a response for a redirect (HTTP 302) to a specified location.  \n3. Asserts that the cURL options do not contain sensitive authorization entries (`CURLOPT_HTTPAUTH` and `CURLOPT_USERPWD`) after a redirect.  \n4. Creates a Guzzle HTTP client with a custom handler stack that includes the mocked responses.  \n5. Sends a GET request to a specified URL with authorization credentials.",
+        "analysis": "The modification is necessary to address the vulnerability described by CVE-2022-31090 in the Guzzle HTTP client. This vulnerability relates to how Guzzle handles authorization headers when following redirects, particularly when the redirect leads to a different origin (which includes changes in host, scheme, or port).\n\n### Key Points of the Vulnerability:\n\n1. **Sensitive Information Exposure**: The `Authorization` headers (which may contain sensitive information like usernames and passwords) should not be sent to a different origin when following a redirect. If the `CURLOPT_HTTPAUTH` option is not removed, cURL may append the `Authorization` header to the redirected request, potentially exposing sensitive information to unintended recipients.\n\n2. **Redirect Behavior**: The original test case was designed to check if the `CURLOPT_HTTPAUTH` and `CURLOPT_USERPWD` options were removed when a redirect occurred. However, the original test only handled redirects to a specific location (`http://test.com`), which may not have adequately tested the behavior when the redirect changes the scheme or port.\n\n3. **Comprehensive Testing**: The modified test case introduces a new test method (`testRemoveCurlAuthorizationOptionsOnRedirectCrossScheme`) that uses different authentication methods (`digest` and `ntlm`) and checks for redirects to a different origin (`http://example.com?a=b`). This ensures that the behavior of removing sensitive authorization options is tested more thoroughly across various scenarios.\n\n### Summary of Changes:\n\n- **New Test Method**: The new test method is designed to ensure that the `CURLOPT_HTTPAUTH` option is removed when following redirects that change the scheme or host, thereby addressing the vulnerability more comprehensively.\n  \n- **Improved Mock Response**: The mock response has been updated to reflect a redirect to a different origin, which is critical for testing the vulnerability.\n\n- **Validation of Options**: The assertions in the new test method ensure that the sensitive options are indeed removed, thus validating that the fix is effective.\n\n### Conclusion:\n\nThe modification is crucial for enhancing the security of the Guzzle HTTP client by ensuring that sensitive authorization headers are not inadvertently sent to unintended destinations during redirects. This helps prevent potential security breaches and aligns with best practices for handling sensitive information in HTTP requests.",
+        "code_before_change": "    public function testRemoveCurlAuthorizationOptionsOnRedirect($auth)\n    {\n        if (!defined('\\CURLOPT_HTTPAUTH')) {\n            self::markTestSkipped('ext-curl is required for this test');\n        }\n\n        $mock = new MockHandler([\n            new Response(302, ['Location' => 'http://test.com']),\n            static function (RequestInterface $request, $options) {\n                self::assertFalse(\n                    isset($options['curl'][\\CURLOPT_HTTPAUTH]),\n                    'curl options still contain CURLOPT_HTTPAUTH entry'\n                );\n                self::assertFalse(\n                    isset($options['curl'][\\CURLOPT_USERPWD]),\n                    'curl options still contain CURLOPT_USERPWD entry'\n                );\n                return new Response(200);\n            }\n        ]);\n        $handler = HandlerStack::create($mock);\n        $client = new Client(['handler' => $handler]);\n        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass', $auth]]);\n    }",
+        "code_after_change": "            }\n        ]);\n        $handler = HandlerStack::create($mock);\n        $client = new Client(['handler' => $handler]);\n        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass', $auth]]);\n    }\n\n    /**\n     * @testWith [\"digest\"]\n     *           [\"ntlm\"]\n     */\n    public function testRemoveCurlAuthorizationOptionsOnRedirectCrossScheme($auth)\n    {\n        if (!defined('\\CURLOPT_HTTPAUTH')) {\n            self::markTestSkipped('ext-curl is required for this test');\n        }\n\n        $mock = new MockHandler([\n            new Response(302, ['Location' => 'http://example.com?a=b']),\n            static function (RequestInterface $request, $options) {\n                self::assertFalse(\n                    isset($options['curl'][\\CURLOPT_HTTPAUTH]),\n                    'curl options still contain CURLOPT_HTTPAUTH entry'\n                );",
+        "modified_lines": {
+            "added": [
+                "        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass', $auth]]);",
+                "    /**",
+                "     * @testWith [\"digest\"]",
+                "     *           [\"ntlm\"]",
+                "     */",
+                "    public function testRemoveCurlAuthorizationOptionsOnRedirectCrossScheme($auth)",
+                "        if (!defined('\\CURLOPT_HTTPAUTH')) {",
+                "            self::markTestSkipped('ext-curl is required for this test');",
+                "        }",
+                "            new Response(302, ['Location' => 'http://example.com?a=b']),",
+                "            static function (RequestInterface $request, $options) {",
+                "                self::assertFalse(",
+                "                    isset($options['curl'][\\CURLOPT_HTTPAUTH]),",
+                "                    'curl options still contain CURLOPT_HTTPAUTH entry'",
+                "                );"
+            ],
+            "deleted": [
+                "    public function testRemoveCurlAuthorizationOptionsOnRedirect($auth)",
+                "            new Response(302, ['Location' => 'http://test.com']),",
+                "        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass', $auth]]);"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive authorization headers during HTTP redirects.",
+        "trigger_condition": "When a request with an authorization header is redirected to a different origin (change in host, scheme, or port), the authorization header is not removed, leading to potential exposure of sensitive information.",
+        "specific_code_behavior_causing_vulnerability": "The code does not adequately remove the CURLOPT_HTTPAUTH and CURLOPT_USERPWD options from the cURL options when following a redirect to a different origin, allowing sensitive authorization headers to be sent to unintended destinations."
+    },
+    {
+        "CVE_id": "CVE-2022-31090",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects.",
+            "trigger_condition": "A request with an Authorization header is redirected to a different origin (change in host, scheme, or port), leading to potential exposure of sensitive information.",
+            "specific_code_behavior_causing_vulnerability": "The code does not adequately check for changes in scheme or port when following redirects, allowing the Authorization header to be sent to unintended destinations."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to implement comprehensive checks for all types of redirects, including changes in host, scheme, and port. Ensure that the Authorization header is removed or not sent when following redirects to different origins, thereby preventing the exposure of sensitive information.",
+        "purpose": "\"The function provides a set of test cases for validating cross-origin redirect behavior in HTTP requests.\"",
+        "function": "1. Provides a set of test cases for cross-origin redirect behavior.  \n2. Tests various combinations of URLs with different schemes (http/https) and hosts.  \n3. Indicates whether a redirect is considered safe based on the origin of the URLs.",
+        "analysis": "The modification to the `crossOriginRedirectProvider` function is necessary to address the vulnerability described in CVE-2022-31090, which pertains to how Guzzle handles redirects when making HTTP requests with sensitive `Authorization` headers.\n\n### Key Points of the Vulnerability:\n\n1. **Sensitive Information Exposure**: The vulnerability arises when Guzzle, using the Curl handler, follows redirects to a different origin (i.e., a different host, scheme, or port). If the `Authorization` header is not properly managed during these redirects, sensitive information could be inadvertently sent to an unintended destination.\n\n2. **Redirect Behavior**: The original code snippet only checks for specific redirect scenarios without considering various combinations of schemes, ports, and hosts. This could lead to situations where a redirect to a different origin still results in the `Authorization` header being sent, which is a security risk.\n\n### Reasons for the Modification:\n\n1. **Comprehensive Testing**: The modified test cases cover a broader range of scenarios, including:\n   - Different ports (e.g., `http://example.com:80` and `http://example.com:81`).\n   - Different schemes (e.g., `http` to `https` and vice versa).\n   - Subdomains (e.g., `www.example.com` vs. `example.com`).\n\n   This comprehensive testing ensures that all potential redirect scenarios are accounted for, which helps to verify that the `Authorization` header is not sent when it shouldn't be.\n\n2. **Correctness of Redirect Logic**: The modified test cases explicitly check for both allowed and disallowed redirects based on the origin. For example:\n   - Redirecting from `http://example.com/123` to `http://example.com/` should not send the `Authorization` header (same origin).\n   - Redirecting from `http://example.com/123` to `https://example.com/` should send the `Authorization` header (same host, different scheme).\n   - Redirecting from `https://example.com/123` to `http://example.com/` should not send the `Authorization` header (different scheme).\n\n3. **Mitigation of Security Risks**: By ensuring that the tests cover all edge cases, the modification helps to mitigate the risk of inadvertently exposing sensitive information through mismanaged redirects. This is crucial for maintaining the security of applications that rely on Guzzle for HTTP requests.\n\n### Conclusion:\n\nThe modification is necessary to enhance the security posture of the application by ensuring that the handling of redirects is robust and that sensitive information is not leaked during HTTP requests. By expanding the test cases, developers can better ensure that the application behaves correctly in various scenarios and adheres to security best practices.",
+        "code_before_change": "    public function crossOriginRedirectProvider()\n    {\n        return [\n            ['http://example.com?a=b', 'http://test.com/', false],\n            ['https://example.com?a=b', 'https://test.com/', false],\n            ['http://example.com?a=b', 'https://test.com/', false],\n            ['https://example.com?a=b', 'http://test.com/', false],\n            ['http://example.com?a=b', 'http://example.com/', true],\n            ['https://example.com?a=b', 'https://example.com/', true],\n            ['http://example.com?a=b', 'https://example.com/', true],\n            ['https://example.com?a=b', 'http://example.com/', false],\n        ];\n    }",
+        "code_after_change": "    public function crossOriginRedirectProvider()\n    {\n        return [\n            ['http://example.com/123', 'http://example.com/', false],\n            ['http://example.com/123', 'http://example.com:80/', false],\n            ['http://example.com:80/123', 'http://example.com/', false],\n            ['http://example.com:80/123', 'http://example.com:80/', false],\n            ['http://example.com/123', 'https://example.com/', true],\n            ['http://example.com/123', 'http://www.example.com/', true],\n            ['http://example.com/123', 'http://example.com:81/', true],\n            ['http://example.com:80/123', 'http://example.com:81/', true],\n            ['https://example.com/123', 'https://example.com/', false],\n            ['https://example.com/123', 'https://example.com:443/', false],\n            ['https://example.com:443/123', 'https://example.com/', false],\n            ['https://example.com:443/123', 'https://example.com:443/', false],\n            ['https://example.com/123', 'http://example.com/', true],\n            ['https://example.com/123', 'https://www.example.com/', true],\n            ['https://example.com/123', 'https://example.com:444/', true],\n            ['https://example.com:443/123', 'https://example.com:444/', true],\n        ];\n    }",
+        "modified_lines": {
+            "added": [
+                "    public function crossOriginRedirectProvider()",
+                "    {",
+                "        return [",
+                "            ['http://example.com/123', 'http://example.com/', false],",
+                "            ['http://example.com/123', 'http://example.com:80/', false],",
+                "            ['http://example.com:80/123', 'http://example.com/', false],",
+                "            ['http://example.com:80/123', 'http://example.com:80/', false],",
+                "            ['http://example.com/123', 'https://example.com/', true],",
+                "            ['http://example.com/123', 'http://www.example.com/', true],",
+                "            ['http://example.com/123', 'http://example.com:81/', true],",
+                "            ['http://example.com:80/123', 'http://example.com:81/', true],",
+                "            ['https://example.com/123', 'https://example.com/', false],",
+                "            ['https://example.com/123', 'https://example.com:443/', false],",
+                "            ['https://example.com:443/123', 'https://example.com/', false],",
+                "            ['https://example.com:443/123', 'https://example.com:443/', false],",
+                "            ['https://example.com/123', 'http://example.com/', true],",
+                "            ['https://example.com/123', 'https://www.example.com/', true],",
+                "            ['https://example.com/123', 'https://example.com:444/', true],",
+                "            ['https://example.com:443/123', 'https://example.com:444/', true],",
+                "        ];",
+                "    }"
+            ],
+            "deleted": [
+                "    public function crossOriginRedirectProvider()",
+                "        return [",
+                "            ['http://example.com?a=b', 'http://test.com/', false],",
+                "            ['https://example.com?a=b', 'https://test.com/', false],",
+                "            ['http://example.com?a=b', 'https://test.com/', false],",
+                "            ['https://example.com?a=b', 'http://test.com/', false],",
+                "            ['http://example.com?a=b', 'http://example.com/', true],",
+                "            ['https://example.com?a=b', 'https://example.com/', true],",
+                "            ['http://example.com?a=b', 'https://example.com/', true],",
+                "            ['https://example.com?a=b', 'http://example.com/', false],",
+                "        ];"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects.",
+        "trigger_condition": "A request with an Authorization header is redirected to a different origin (change in host, scheme, or port), leading to potential exposure of sensitive information.",
+        "specific_code_behavior_causing_vulnerability": "The code does not adequately check for changes in scheme or port when following redirects, allowing the Authorization header to be sent to unintended destinations."
+    },
+    {
+        "CVE_id": "CVE-2022-31090",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects.",
+            "trigger_condition": "A request is made that results in a redirect to a different origin (different host, scheme, or port), leading to the potential exposure of sensitive information.",
+            "specific_code_behavior_causing_vulnerability": "The code does not remove the `Authorization` header when following redirects to a different origin, allowing sensitive credentials to be sent to unintended servers."
+        },
+        "solution": "To mitigate the vulnerability, ensure that the `Authorization` header is removed when a redirect occurs to a different origin. This can be achieved by upgrading to a version of the HTTP client that addresses this issue or by disabling redirects altogether if they are not necessary.",
+        "purpose": "\"The function tests that the `Authorization` header is not removed when following a redirect to a different URI.\"",
+        "function": "1. Tests that the `Authorization` header is not removed when following a redirect.  \n2. Mocks a response that simulates a redirect (HTTP 302) to a different location.  \n3. Asserts that the `Authorization` header is present in the request after the redirect.",
+        "analysis": "The modification you provided appears to be a misunderstanding of the vulnerability and the fix needed for CVE-2022-31090. The code snippet you shared does not actually implement any changes to address the vulnerability; it simply repeats the original code without any alterations.\n\n### Understanding the Vulnerability\n\nThe vulnerability CVE-2022-31090 in Guzzle relates to how the `Authorization` header is handled during HTTP redirects. Specifically, when a request is made that results in a redirect to a different origin (i.e., a different host, scheme, or port), the `Authorization` header should not be sent along with the redirected request. This is crucial because the `Authorization` header can contain sensitive information, and sending it to a different origin could expose it to unintended parties.\n\n### Why the Modification is Necessary\n\n1. **Security Risk**: If the `Authorization` header is not removed during a redirect to a different origin, it can lead to security risks, such as leaking sensitive credentials to an unauthorized server.\n\n2. **Compliance with Best Practices**: It is a best practice in HTTP client design to ensure that sensitive headers are not forwarded to different origins without explicit consent. This helps maintain the confidentiality and integrity of user credentials.\n\n3. **Fixing the Vulnerability**: The correct way to fix this vulnerability involves ensuring that the `Authorization` header is removed when a redirect occurs to a different origin. This can be done by modifying the Guzzle client configuration or by using a different handler that respects this requirement.\n\n### Suggested Fix\n\nTo properly address the vulnerability, you could:\n\n- **Upgrade Guzzle**: Ensure that you are using a version of Guzzle that has addressed this vulnerability (e.g., Guzzle 7.4.5 or later).\n  \n- **Disable Redirects**: If you do not need to follow redirects, you can disable them by setting the `'allow_redirects'` option to `false` in the client configuration.\n\n- **Use a Different Handler**: If you need to follow redirects but want to avoid the vulnerability, consider using the Guzzle stream handler instead of the cURL handler, as it may handle the `Authorization` header differently.\n\n### Conclusion\n\nThe modification you provided does not actually implement any changes to mitigate the vulnerability. To effectively address CVE-2022-31090, you need to ensure that the `Authorization` header is not sent during redirects to different origins, either by upgrading Guzzle or adjusting your client configuration.",
+        "code_before_change": "    public function testNotRemoveAuthorizationHeaderOnRedirect()\n    {\n        $mock = new MockHandler([\n            new Response(302, ['Location' => 'http://example.com/2']),\n            static function (RequestInterface $request) {\n                self::assertTrue($request->hasHeader('Authorization'));\n                return new Response(200);\n            }\n        ]);\n        $handler = HandlerStack::create($mock);\n        $client = new Client(['handler' => $handler]);\n        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);\n    }",
+        "code_after_change": "    public function testNotRemoveAuthorizationHeaderOnRedirect()\n    {\n        $mock = new MockHandler([\n            new Response(302, ['Location' => 'http://example.com/2']),\n            static function (RequestInterface $request) {\n                self::assertTrue($request->hasHeader('Authorization'));\n                return new Response(200);\n            }\n        ]);\n        $handler = HandlerStack::create($mock);\n        $client = new Client(['handler' => $handler]);\n        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);\n    }",
+        "modified_lines": {
+            "added": [
+                "    public function testNotRemoveAuthorizationHeaderOnRedirect()",
+                "    {",
+                "        $mock = new MockHandler([",
+                "            new Response(302, ['Location' => 'http://example.com/2']),",
+                "            static function (RequestInterface $request) {",
+                "                self::assertTrue($request->hasHeader('Authorization'));",
+                "                return new Response(200);",
+                "            }",
+                "        ]);",
+                "        $handler = HandlerStack::create($mock);",
+                "        $client = new Client(['handler' => $handler]);",
+                "        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);",
+                "    }"
+            ],
+            "deleted": [
+                "    public function testNotRemoveAuthorizationHeaderOnRedirect()",
+                "            new Response(302, ['Location' => 'http://example.com/2']),",
+                "            static function (RequestInterface $request) {",
+                "                self::assertTrue($request->hasHeader('Authorization'));",
+                "        $client->get('http://example.com?a=b', ['auth' => ['testuser', 'testpass']]);"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive headers during HTTP redirects.",
+        "trigger_condition": "A request is made that results in a redirect to a different origin (different host, scheme, or port), leading to the potential exposure of sensitive information.",
+        "specific_code_behavior_causing_vulnerability": "The code does not remove the `Authorization` header when following redirects to a different origin, allowing sensitive credentials to be sent to unintended servers."
+    }
+]

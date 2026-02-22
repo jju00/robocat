@@ -1,0 +1,567 @@
+[
+{
+  "cve_id": "CVE-2012-5618",
+  "code_before_change": "    private function _new_password($user_id = 0, $password, $token)\n    {\n    \t$auth = Auth::instance();\n\t\t$user = ORM::factory('user',$user_id);\n\t\tif ($user->loaded == true)\n\t\t{\n\t\t\t// Determine Method (RiverID or standard)\n\n\t\t\tif (kohana::config('riverid.enable') == TRUE AND ! empty($user->riverid))\n\t\t\t{\n\t\t\t\t// Use RiverID\n\n\t\t\t\t// We don't really have to save the password locally but if a deployer\n\t\t\t\t//   ever wants to switch back locally, it's nice to have the pw there\n\t\t\t\t$user->password = $password;\n\t\t\t\t$user->save();\n\n\t\t\t\t// Relay the password change back to the RiverID server\n\t\t\t\t$riverid = new RiverID;\n\t\t\t\t$riverid->email = $user->email;\n\t\t\t\t$riverid->token = $token;\n\t\t\t\t$riverid->new_password = $password;\n\t\t\t\tif ($riverid->setpassword() == FALSE)\n\t\t\t\t{\n\t\t\t\t\t// TODO: Something went wrong. Tell the user.\n\t\t\t\t}\n\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\t// Use Standard\n\n\t\t\t\tif($auth->hash_password($user->email.$user->last_login, $auth->find_salt($token)) == $token)\n\t\t\t\t{\n\t\t\t\t\t$user->password = $password;\n\t\t\t\t\t$user->save();\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{\n\t\t\t\t\t// TODO: Something went wrong, tell the user.\n\t\t\t\t}\n\t\t\t}\n\n\t\t\treturn TRUE;\n\t\t}\n\n\t\t// TODO: User doesn't exist, tell the user (meta, I know).\n\n\t\treturn FALSE;\n\t}",
+  "code_after_change": "    private function _new_password($user_id = 0, $password, $token)\n    {\n    \t$auth = Auth::instance();\n\t\t$user = ORM::factory('user',$user_id);\n\t\tif ($user->loaded == true)\n\t\t{\n\t\t\t// Determine Method (RiverID or standard)\n\n\t\t\tif (kohana::config('riverid.enable') == TRUE AND ! empty($user->riverid))\n\t\t\t{\n\t\t\t\t// Use RiverID\n\n\t\t\t\t// We don't really have to save the password locally but if a deployer\n\t\t\t\t//   ever wants to switch back locally, it's nice to have the pw there\n\t\t\t\t$user->password = $password;\n\t\t\t\t$user->save();\n\n\t\t\t\t// Relay the password change back to the RiverID server\n\t\t\t\t$riverid = new RiverID;\n\t\t\t\t$riverid->email = $user->email;\n\t\t\t\t$riverid->token = $token;\n\t\t\t\t$riverid->new_password = $password;\n\t\t\t\tif ($riverid->setpassword() == FALSE)\n\t\t\t\t{\n\t\t\t\t\t// TODO: Something went wrong. Tell the user.\n\t\t\t\t}\n\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\t// Use Standard\n\t\t\t\tif($user->check_forgot_password_token($token))\n\t\t\t\t{\n\t\t\t\t\t$user->password = $password;\n\t\t\t\t\t$user->save();\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{\n\t\t\t\t\t// TODO: Something went wrong, tell the user.\n\t\t\t\t}\n\t\t\t}\n\n\t\t\treturn TRUE;\n\t\t}\n\n\t\t// TODO: User doesn't exist, tell the user (meta, I know).\n\n\t\treturn FALSE;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\tif($user->check_forgot_password_token($token))"
+    ],
+    "deleted": [
+      "\t\t\t\tif($auth->hash_password($user->email.$user->last_login, $auth->find_salt($token)) == $token)"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "Ushahidi before 2.6.1 has insufficient entropy for forgot-password tokens.",
+  "id": 2001
+},
+{
+  "cve_id": "CVE-2017-12851",
+  "code_before_change": "    public function savePassword()\n    {\n        $user = $this->getUser();\n        $values = $this->request->getValues();\n\n        list($valid, $errors) = $this->userValidator->validatePasswordModification($values);\n\n        if (! $this->userSession->isAdmin()) {\n            $values['id'] = $this->userSession->getId();\n        }\n\n        if ($valid) {\n            if ($this->userModel->update($values)) {\n                $this->flash->success(t('Password modified successfully.'));\n                $this->userLockingModel->resetFailedLogin($user['username']);\n                $this->response->redirect($this->helper->url->to('UserViewController', 'show', array('user_id' => $user['id'])), true);\n                return;\n            } else {\n                $this->flash->failure(t('Unable to change the password.'));\n            }\n        }\n\n        $this->changePassword($values, $errors);\n    }",
+  "code_after_change": "    public function savePassword()\n    {\n        $user = $this->getUser();\n        $values = $this->request->getValues();\n\n        list($valid, $errors) = $this->userValidator->validatePasswordModification($values);\n\n        if (! $this->userSession->isAdmin()) {\n            $values = array(\n                'id' => $this->userSession->getId(),\n                'password' => isset($values['password']) ? $values['password'] : '',\n                'confirmation' => isset($values['confirmation']) ? $values['confirmation'] : '',\n            );\n        }\n\n        if ($valid) {\n            if ($this->userModel->update($values)) {\n                $this->flash->success(t('Password modified successfully.'));\n                $this->userLockingModel->resetFailedLogin($user['username']);\n                $this->response->redirect($this->helper->url->to('UserViewController', 'show', array('user_id' => $user['id'])), true);\n                return;\n            } else {\n                $this->flash->failure(t('Unable to change the password.'));\n            }\n        }\n\n        $this->changePassword($values, $errors);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $values = array(",
+      "                'id' => $this->userSession->getId(),",
+      "                'password' => isset($values['password']) ? $values['password'] : '',",
+      "                'confirmation' => isset($values['confirmation']) ? $values['confirmation'] : '',",
+      "            );"
+    ],
+    "deleted": [
+      "            $values['id'] = $this->userSession->getId();"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "An authenticated standard user could reset the password of the admin by altering form data. Affects kanboard before 1.0.46.",
+  "id": 2002
+},
+{
+  "cve_id": "CVE-2017-12851",
+  "code_before_change": "    public function save()\n    {\n        $user = $this->getUser();\n        $values = $this->request->getValues();\n\n        if (! $this->userSession->isAdmin()) {\n            if (isset($values['role'])) {\n                unset($values['role']);\n            }\n        }\n\n        list($valid, $errors) = $this->userValidator->validateModification($values);\n\n        if ($valid) {\n            if ($this->userModel->update($values)) {\n                $this->flash->success(t('User updated successfully.'));\n                $this->response->redirect($this->helper->url->to('UserViewController', 'show', array('user_id' => $user['id'])), true);\n                return;\n            } else {\n                $this->flash->failure(t('Unable to update this user.'));\n            }\n        }\n\n        $this->show($values, $errors);\n    }",
+  "code_after_change": "    public function save()\n    {\n        $user = $this->getUser();\n        $values = $this->request->getValues();\n\n        if (! $this->userSession->isAdmin()) {\n            $values = array(\n                'id' => $this->userSession->getId(),\n                'username' => isset($values['username']) ? $values['username'] : '',\n                'name' => isset($values['name']) ? $values['name'] : '',\n                'email' => isset($values['email']) ? $values['email'] : '',\n                'timezone' => isset($values['timezone']) ? $values['timezone'] : '',\n                'language' => isset($values['language']) ? $values['language'] : '',\n            );\n        }\n\n        list($valid, $errors) = $this->userValidator->validateModification($values);\n\n        if ($valid) {\n            if ($this->userModel->update($values)) {\n                $this->flash->success(t('User updated successfully.'));\n                $this->response->redirect($this->helper->url->to('UserViewController', 'show', array('user_id' => $user['id'])), true);\n                return;\n            } else {\n                $this->flash->failure(t('Unable to update this user.'));\n            }\n        }\n\n        $this->show($values, $errors);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $values = array(",
+      "                'id' => $this->userSession->getId(),",
+      "                'username' => isset($values['username']) ? $values['username'] : '',",
+      "                'name' => isset($values['name']) ? $values['name'] : '',",
+      "                'email' => isset($values['email']) ? $values['email'] : '',",
+      "                'timezone' => isset($values['timezone']) ? $values['timezone'] : '',",
+      "                'language' => isset($values['language']) ? $values['language'] : '',",
+      "            );"
+    ],
+    "deleted": [
+      "            if (isset($values['role'])) {",
+      "                unset($values['role']);",
+      "            }"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "An authenticated standard user could reset the password of the admin by altering form data. Affects kanboard before 1.0.46.",
+  "id": 2003
+},
+{
+  "cve_id": "CVE-2018-1000501",
+  "code_before_change": "\tpublic function remind()\n\t{\n\t\t/*if (!check_captcha())\n\t\t{\n\t\t\t$this->templatemanager->notify_next(__(\"You have entered wrong security code.\"), \"error\", __(\"Error!\"));\n\t\t\tredirect(\"administration/auth/forgot\");\n\t\t\tdie;\n\t\t}//*/\n\n\t\t$email = trim($this->input->post(\"email\", true));\n\n\t\t$u = User::factory()->get_by_email($email);\n\n\t\tif (!$u->exists())\n\t\t{\n\t\t\t$this->templatemanager->notify_next(__(\"User with that e-mail does not exists!\"), \"error\", __(\"Error\"));\n\t\t\tredirect(\"administration/auth/forgot\");\n\t\t}\n\n\t\t$u->key = random_string('unique');\n\t\t$u->save();\n\n\t\tLog::write('requested password change', LogSeverity::Notice, $u->id);\n\n\t\t//set variables for template\n\t\t$vars = array(\n\t\t\t'name'=>$u->name\n\t\t\t,'email'=>$u->email\n\n\t\t\t,'website_title'=>Setting::value('website_title', CS_PRODUCT_NAME)\n\t\t\t,'reset_link'=>site_url('administration/auth/resetpass/'.$u->id.'/'.$u->key)\n\t\t\t,'site_url'=>site_url()\n\t\t);\n\n\t\t//get email template\n\t\t$template = file_get_contents(APPPATH . \"templates/forgot_password.html\");\n\t\t$template = __($template, null, 'email');\n\t\t$template .= \"<br />\\n<br />\\n<br />\\n\" . __(file_get_contents(APPPATH . \"templates/signature.html\"), null, 'email');\n\t\t$template = parse_template($template, $vars);\n\n\t\t//send email\n\t\t$this->email->to(\"$email\");\n\t\t$this->email->subject(__(\"%s password reset\", Setting::value('website_title', CS_PRODUCT_NAME), 'email'));\n\t\t$this->email->message($template);\n\t\t$this->email->set_alt_message(strip_tags($template));\n\n\t\t$from = Setting::value(\"default_email\", false);\n\n\t\tif (empty($from))\n\t\t\t$from = \"noreply@\".get_domain_name(true);\n\n\t\t$this->email->from($from);\n\n\t\t$sent = $this->email->send();\n\n\t\tif ($sent)\n\t\t\t$this->templatemanager->notify_next(__(\"Please check your e-mail for further information.\"), \"notice\", __(\"Notice\"));\n\t\telse\n\t\t\t$this->templatemanager->notify_next(__(\"Activation e-mail could not be sent!\"), \"error\", __(\"Error\"));\n\n\t\tredirect(\"administration/auth/login\");\n\t}",
+  "code_after_change": "\tpublic function remind()\n\t{\n\t\t/*if (!check_captcha())\n\t\t{\n\t\t\t$this->templatemanager->notify_next(__(\"You have entered wrong security code.\"), \"error\", __(\"Error!\"));\n\t\t\tredirect(\"administration/auth/forgot\");\n\t\t\tdie;\n\t\t}//*/\n\n\t\t$email = trim($this->input->post(\"email\", true));\n\n\t\t$u = User::factory()->get_by_email($email);\n\n\t\tif (!$u->exists())\n\t\t{\n\t\t\t$this->templatemanager->notify_next(__(\"User with that e-mail does not exists!\"), \"error\", __(\"Error\"));\n\t\t\tredirect(\"administration/auth/forgot\");\n\t\t}\n\n\t\t$u->key = random_string('unique');\n\t\t$u->save();\n\n\t\tLog::write('requested password change', LogSeverity::Notice, $u->id);\n\n\t\t//set variables for template\n\t\t$vars = array(\n\t\t\t'name'=>$u->name\n\t\t\t,'email'=>$u->email\n\n\t\t\t,'website_title'=>Setting::value('website_title', CS_PRODUCT_NAME)\n\t\t\t,'reset_link'=>site_url('administration/auth/resetpass/'.$u->id.'/'.$u->key)\n\t\t\t,'site_url'=>site_url()\n\t\t);\n\n\t\t//get email template\n\t\t$template = file_get_contents(APPPATH . \"templates/forgot_password.html\");\n\t\t$template = __($template, null, 'email');\n\t\t$template .= \"<br />\\n<br />\\n<br />\\n\" . __(file_get_contents(APPPATH . \"templates/signature.html\"), null, 'email');\n\t\t$template = parse_template($template, $vars);\n\n\t\t//send email\n\t\t$this->email->to($u->email);\n\t\t$this->email->subject(__(\"%s password reset\", Setting::value('website_title', CS_PRODUCT_NAME), 'email'));\n\t\t$this->email->message($template);\n\t\t$this->email->set_alt_message(strip_tags($template));\n\n\t\t$from = Setting::value(\"default_email\", false);\n\n\t\tif (empty($from))\n\t\t\t$from = \"noreply@\".get_domain_name(true);\n\n\t\t$this->email->from($from);\n\n\t\t$sent = $this->email->send();\n\n\t\tif ($sent)\n\t\t\t$this->templatemanager->notify_next(__(\"Please check your e-mail for further information.\"), \"notice\", __(\"Notice\"));\n\t\telse\n\t\t\t$this->templatemanager->notify_next(__(\"Activation e-mail could not be sent!\"), \"error\", __(\"Error\"));\n\n\t\tredirect(\"administration/auth/login\");\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$this->email->to($u->email);"
+    ],
+    "deleted": [
+      "\t\t$this->email->to(\"$email\");"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "Instant Update CMS contains a Password Reset Vulnerability vulnerability in /iu-application/controllers/administration/auth.php that can result in Account Tackover. This attack appear to be exploitable via network connectivity. This vulnerability appears to have been fixed in v0.3.3.",
+  "id": 2004
+},
+{
+  "cve_id": "CVE-2019-13240",
+  "code_before_change": "   static function showPasswordForgetChangeForm($token) {\n      global $CFG_GLPI, $DB;\n\n      // Verif token.\n      $token_ok = false;\n      $iterator = $DB->request([\n         'FROM'   => self::getTable(),\n         'WHERE'  => [\n            'password_forget_token'       => $token,\n            new \\QueryExpression('NOW() < ADDDATE(password_forget_token_date, INTERVAL 1 DAY))')\n         ]\n      ]);\n\n      if (count($iterator) == 1) {\n         $token_ok = true;\n      }\n      echo \"<div class='center'>\";\n\n      if ($token_ok) {\n         echo \"<form method='post' name='forgetpassword' action='\".$CFG_GLPI['root_doc'].\n                \"/front/lostpassword.php'>\";\n         echo \"<table class='tab_cadre'>\";\n         echo \"<tr><th colspan='2'>\" . __('Forgotten password?').\"</th></tr>\";\n\n         echo \"<tr class='tab_bg_1'>\";\n         echo \"<td colspan='2'>\". __('Please confirm your email address and enter your new password.').\n              \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\" . _n('Email', 'Emails', 1).\"</td>\";\n         echo \"<td><input type='text' name='email' value='' size='60'></td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\" . __('Password').\"</td>\";\n         echo \"<td><input id='password' type='password' name='password' value='' size='20'\n                    autocomplete='off' onkeyup=\\\"return passwordCheck();\\\">\";\n         echo \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\" . __('Password confirmation').\"</td>\";\n         echo \"<td><input type='password' name='password2' value='' size='20' autocomplete='off'>\";\n         echo \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\".__('Password security policy').\"</td>\";\n         echo \"<td>\";\n         Config::displayPasswordSecurityChecks();\n         echo \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_2 center'><td colspan='2'>\";\n         echo \"<input type='hidden' name='password_forget_token' value='$token'>\";\n         echo \"<input type='submit' name='update' value=\\\"\".__s('Save').\"\\\" class='submit'>\";\n         echo \"</td></tr>\";\n\n         echo \"</table>\";\n         Html::closeForm();\n\n      } else {\n         echo __('Your password reset request has expired or is invalid. Please renew it.');\n      }\n      echo \"</div>\";\n   }",
+  "code_after_change": "   static function showPasswordForgetChangeForm($token) {\n      global $CFG_GLPI, $DB;\n\n      // Verif token.\n      $token_ok = false;\n      $iterator = $DB->request([\n         'FROM'   => self::getTable(),\n         'WHERE'  => [\n            'password_forget_token'       => $token,\n            new \\QueryExpression('NOW() < ADDDATE(' . $DB->quoteName('password_forget_token_date') . ', INTERVAL 1 DAY)')\n         ]\n      ]);\n\n      if (count($iterator) == 1) {\n         $token_ok = true;\n      }\n      echo \"<div class='center'>\";\n\n      if ($token_ok) {\n         echo \"<form method='post' name='forgetpassword' action='\".$CFG_GLPI['root_doc'].\n                \"/front/lostpassword.php'>\";\n         echo \"<table class='tab_cadre'>\";\n         echo \"<tr><th colspan='2'>\" . __('Forgotten password?').\"</th></tr>\";\n\n         echo \"<tr class='tab_bg_1'>\";\n         echo \"<td colspan='2'>\". __('Please confirm your email address and enter your new password.').\n              \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\" . _n('Email', 'Emails', 1).\"</td>\";\n         echo \"<td><input type='text' name='email' value='' size='60'></td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\" . __('Password').\"</td>\";\n         echo \"<td><input id='password' type='password' name='password' value='' size='20'\n                    autocomplete='off' onkeyup=\\\"return passwordCheck();\\\">\";\n         echo \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\" . __('Password confirmation').\"</td>\";\n         echo \"<td><input type='password' name='password2' value='' size='20' autocomplete='off'>\";\n         echo \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_1'><td>\".__('Password security policy').\"</td>\";\n         echo \"<td>\";\n         Config::displayPasswordSecurityChecks();\n         echo \"</td></tr>\";\n\n         echo \"<tr class='tab_bg_2 center'><td colspan='2'>\";\n         echo \"<input type='hidden' name='password_forget_token' value='$token'>\";\n         echo \"<input type='submit' name='update' value=\\\"\".__s('Save').\"\\\" class='submit'>\";\n         echo \"</td></tr>\";\n\n         echo \"</table>\";\n         Html::closeForm();\n\n      } else {\n         echo __('Your password reset request has expired or is invalid. Please renew it.');\n      }\n      echo \"</div>\";\n   }",
+  "function_modified_lines": {
+    "added": [
+      "            new \\QueryExpression('NOW() < ADDDATE(' . $DB->quoteName('password_forget_token_date') . ', INTERVAL 1 DAY)')"
+    ],
+    "deleted": [
+      "            new \\QueryExpression('NOW() < ADDDATE(password_forget_token_date, INTERVAL 1 DAY))')"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "An issue was discovered in GLPI before 9.4.1. After a successful password reset by a user, it is possible to change that user's password again during the next 24 hours without any information except the associated email address.",
+  "id": 2005
+},
+{
+  "cve_id": "CVE-2019-13240",
+  "code_before_change": "   public function updateForgottenPassword(array $input) {\n      $condition = [\n         'glpi_users.is_active'  => 1,\n         'glpi_users.is_deleted' => 0, [\n            'OR' => [\n               ['glpi_users.begin_date' => null],\n               ['glpi_users.begin_date' => ['<', new QueryExpression('NOW()')]]\n            ],\n         ], [\n            'OR'  => [\n               ['glpi_users.end_date'   => null],\n               ['glpi_users.end_date'   => ['>', new QueryExpression('NOW()')]]\n            ]\n         ]\n      ];\n      if ($this->getFromDBbyEmail($input['email'], $condition)) {\n         if (($this->fields[\"authtype\"] == Auth::DB_GLPI)\n             || !Auth::useAuthExt()) {\n\n            if (($input['password_forget_token'] == $this->fields['password_forget_token'])\n                && (abs(strtotime($_SESSION[\"glpi_currenttime\"])\n                        -strtotime($this->fields['password_forget_token_date'])) < DAY_TIMESTAMP)) {\n\n               $input['id'] = $this->fields['id'];\n               Config::validatePassword($input[\"password\"], false); // Throws exception if password is invalid\n               if (!$this->update($input)) {\n                  return false;\n               }\n               $input2 = [\n                  'password_forget_token'      => '',\n                  'password_forget_token_date' => null,\n                  'id'                         => $this->fields['id']\n               ];\n               $this->update($input2);\n               return true;\n\n            } else {\n               throw new ForgetPasswordException(__('Your password reset request has expired or is invalid. Please renew it.'));\n            }\n\n         } else {\n            throw new ForgetPasswordException(__(\"The authentication method configuration doesn't allow you to change your password.\"));\n         }\n\n      } else {\n         throw new ForgetPasswordException(__('Email address not found.'));\n      }\n\n      return false;\n   }",
+  "code_after_change": "   public function updateForgottenPassword(array $input) {\n      $condition = [\n         'glpi_users.is_active'  => 1,\n         'glpi_users.is_deleted' => 0, [\n            'OR' => [\n               ['glpi_users.begin_date' => null],\n               ['glpi_users.begin_date' => ['<', new QueryExpression('NOW()')]]\n            ],\n         ], [\n            'OR'  => [\n               ['glpi_users.end_date'   => null],\n               ['glpi_users.end_date'   => ['>', new QueryExpression('NOW()')]]\n            ]\n         ]\n      ];\n      if ($this->getFromDBbyEmail($input['email'], $condition)) {\n         if (($this->fields[\"authtype\"] == Auth::DB_GLPI)\n             || !Auth::useAuthExt()) {\n\n            if (($input['password_forget_token'] == $this->fields['password_forget_token'])\n                && (abs(strtotime($_SESSION[\"glpi_currenttime\"])\n                        -strtotime($this->fields['password_forget_token_date'])) < DAY_TIMESTAMP)) {\n\n               $input['id'] = $this->fields['id'];\n               Config::validatePassword($input[\"password\"], false); // Throws exception if password is invalid\n               if (!$this->update($input)) {\n                  return false;\n               }\n               $input2 = [\n                  'password_forget_token'      => '',\n                  'password_forget_token_date' => 'NULL',\n                  'id'                         => $this->fields['id']\n               ];\n               $this->update($input2);\n               return true;\n\n            } else {\n               throw new ForgetPasswordException(__('Your password reset request has expired or is invalid. Please renew it.'));\n            }\n\n         } else {\n            throw new ForgetPasswordException(__(\"The authentication method configuration doesn't allow you to change your password.\"));\n         }\n\n      } else {\n         throw new ForgetPasswordException(__('Email address not found.'));\n      }\n\n      return false;\n   }",
+  "function_modified_lines": {
+    "added": [
+      "                  'password_forget_token_date' => 'NULL',"
+    ],
+    "deleted": [
+      "                  'password_forget_token_date' => null,"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "An issue was discovered in GLPI before 9.4.1. After a successful password reset by a user, it is possible to change that user's password again during the next 24 hours without any information except the associated email address.",
+  "id": 2006
+},
+{
+  "cve_id": "CVE-2021-25961",
+  "code_before_change": "function cleanCSV($string)\n{\n    $check = '/^[=@]/';\n    if (!is_numeric($string)) {\n        $check = '/^[=@+-]/';\n    }\n\n    return preg_replace($check, \"\", $string);\n}",
+  "code_after_change": " * All Rights Reserved.\n * Contributor(s): ______________________________________..\n */\nfunction safe_map($request_var, &$focus, $always_copy = false)\n{\n    safe_map_named($request_var, $focus, $request_var, $always_copy);\n}\n\n/**",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "function cleanCSV($string)",
+      "{",
+      "    $check = '/^[=@]/';",
+      "    if (!is_numeric($string)) {",
+      "        $check = '/^[=@+-]/';",
+      "    }",
+      "    return preg_replace($check, \"\", $string);",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "In “SuiteCRM” application, v7.1.7 through v7.10.31 and v7.11-beta through v7.11.20 fail to properly invalidate password reset links that is associated with a deleted user id, which makes it possible for account takeover of any newly created user with the same user id.",
+  "id": 2007
+},
+{
+  "cve_id": "CVE-2021-25961",
+  "code_before_change": "    private function encloseForCSV($field)\n    {\n        return '\"' .  cleanCSV($field) . '\"';\n    }",
+  "code_after_change": "    private function encloseForCSV($field)\n    {\n        $cleanCSV = new CleanCSV();\n\n        return '\"' . $cleanCSV->escapeField($field) . '\"';\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $cleanCSV = new CleanCSV();",
+      "        return '\"' . $cleanCSV->escapeField($field) . '\"';"
+    ],
+    "deleted": [
+      "        return '\"' .  cleanCSV($field) . '\"';"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "In “SuiteCRM” application, v7.1.7 through v7.10.31 and v7.11-beta through v7.11.20 fail to properly invalidate password reset links that is associated with a deleted user id, which makes it possible for account takeover of any newly created user with the same user id.",
+  "id": 2008
+},
+{
+  "cve_id": "CVE-2021-25961",
+  "code_before_change": "    public function testCreateRelationshipMeta()\n    {\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), null);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts');\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts', true);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(6, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', $this->db, null, array(), 'Contacts');\n        self::assertNotTrue(isset($GLOBALS['log']->calls['fatal']));\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('Nonexists1', $this->db, null, array(), 'Nonexists2');\n        self::assertCount(1, $GLOBALS['log']->calls['debug']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(6, $GLOBALS['log']->calls['fatal']);\n    }",
+  "code_after_change": "    public function testCreateRelationshipMeta()\n    {\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), null);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts');\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts', true);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(8, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', $this->db, null, array(), 'Contacts');\n        self::assertNotTrue(isset($GLOBALS['log']->calls['fatal']));\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('Nonexists1', $this->db, null, array(), 'Nonexists2');\n        self::assertCount(1, $GLOBALS['log']->calls['debug']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(8, $GLOBALS['log']->calls['fatal']);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        self::assertCount(8, $GLOBALS['log']->calls['fatal']);",
+      "        self::assertCount(8, $GLOBALS['log']->calls['fatal']);"
+    ],
+    "deleted": [
+      "        self::assertCount(6, $GLOBALS['log']->calls['fatal']);",
+      "        self::assertCount(6, $GLOBALS['log']->calls['fatal']);"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "In “SuiteCRM” application, v7.1.7 through v7.10.31 and v7.11-beta through v7.11.20 fail to properly invalidate password reset links that is associated with a deleted user id, which makes it possible for account takeover of any newly created user with the same user id.",
+  "id": 2009
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    static function activate($uid, $karmalevel = 'pear.dev')\n    {\n        require_once 'Damblan/Karma.php';\n\n        global $dbh, $auth_user;\n\n        $karma = new Damblan_Karma($dbh);\n\n        $user = user::info($uid, null, 0);\n        if (!isset($user['registered'])) {\n            return false;\n        }\n        @$arr = unserialize($user['userinfo']);\n\n        include_once 'pear-database-note.php';\n        note::removeAll($uid);\n\n        $data = array();\n        $data['registered'] = 1;\n        $data['active']     = 1;\n        /* $data['ppp_only'] = 0; */\n        if (is_array($arr)) {\n            $data['userinfo'] = $arr[1];\n        }\n        $data['created']   = gmdate('Y-m-d H:i');\n        $data['createdby'] = $auth_user->handle;\n        $data['handle']    = $user['handle'];\n\n        user::update($data, true);\n\n        $karma->grant($user['handle'], $karmalevel);\n        if ($karma->has($user['handle'], 'pear.dev')) {\n            include_once 'pear-rest.php';\n            $pear_rest = new pearweb_Channel_REST_Generator(PEAR_REST_PATH, $dbh);\n            $pear_rest->saveMaintainerREST($user['handle']);\n            $pear_rest->saveAllMaintainersREST();\n        }\n\n        include_once 'pear-database-note.php';\n        note::add($uid, \"Account opened\");\n        $msg = \"Your PEAR account request has been opened.\\n\".\n             \"To log in, go to http://\" . PEAR_CHANNELNAME . \"/ and click on \\\"login\\\" in\\n\".\n             \"the top-right menu.\\n\";\n        $xhdr = 'From: ' . $auth_user->handle . '@php.net';\n        if (!DEVBOX) {\n            mail($user['email'], \"Your PEAR Account Request\", $msg, $xhdr, '-f ' . PEAR_BOUNCE_EMAIL);\n        }\n        return true;\n    }",
+  "code_after_change": "    static function activate($uid, $karmalevel = 'pear.dev')\n    {\n        require_once 'Damblan/Karma.php';\n\n        global $dbh, $auth_user;\n\n        $karma = new Damblan_Karma($dbh);\n\n        $user = user::info($uid, null, 0);\n        if (!isset($user['registered'])) {\n            return false;\n        }\n        try {\n            @$arr = unserialize($user['userinfo'], ['allowed_classes' => false]);\n        } catch (Exception $ex) {\n            $arr = false;\n        }\n\n        include_once 'pear-database-note.php';\n        note::removeAll($uid);\n\n        $data = array();\n        $data['registered'] = 1;\n        $data['active']     = 1;\n        /* $data['ppp_only'] = 0; */\n        if (is_array($arr)) {\n            $data['userinfo'] = $arr[1];\n        }\n        $data['created']   = gmdate('Y-m-d H:i');\n        $data['createdby'] = $auth_user->handle;\n        $data['handle']    = $user['handle'];\n\n        user::update($data, true);\n\n        $karma->grant($user['handle'], $karmalevel);\n        if ($karma->has($user['handle'], 'pear.dev')) {\n            include_once 'pear-rest.php';\n            $pear_rest = new pearweb_Channel_REST_Generator(PEAR_REST_PATH, $dbh);\n            $pear_rest->saveMaintainerREST($user['handle']);\n            $pear_rest->saveAllMaintainersREST();\n        }\n\n        include_once 'pear-database-note.php';\n        note::add($uid, \"Account opened\");\n        $msg = \"Your PEAR account request has been opened.\\n\".\n             \"To log in, go to http://\" . PEAR_CHANNELNAME . \"/ and click on \\\"login\\\" in\\n\".\n             \"the top-right menu.\\n\";\n        $xhdr = 'From: ' . $auth_user->handle . '@php.net';\n        if (!DEVBOX) {\n            mail($user['email'], \"Your PEAR Account Request\", $msg, $xhdr, '-f ' . PEAR_BOUNCE_EMAIL);\n        }\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        try {",
+      "            @$arr = unserialize($user['userinfo'], ['allowed_classes' => false]);",
+      "        } catch (Exception $ex) {",
+      "            $arr = false;",
+      "        }"
+    ],
+    "deleted": [
+      "        @$arr = unserialize($user['userinfo']);"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2010
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    function get(&$dbh, $proposalId, $handle)\n    {\n        $sql = \"SELECT *, UNIX_TIMESTAMP(timestamp) AS timestamp FROM package_proposal_votes WHERE pkg_prop_id = \". $dbh->quoteSmart($proposalId) .\" AND user_handle= \". $dbh->quoteSmart($handle);\n        $res = $dbh->query($sql);\n        if (DB::isError($res)) {\n            return $res;\n        }\n        if (!$res->numRows()) {\n            return null;\n        }\n        $set = $res->fetchRow(DB_FETCHMODE_ASSOC);\n        $set['reviews'] = unserialize($set['reviews']);\n        $vote = new ppVote($set);\n        return $vote;\n    }",
+  "code_after_change": "    function get(&$dbh, $proposalId, $handle)\n    {\n        $sql = \"SELECT *, UNIX_TIMESTAMP(timestamp) AS timestamp FROM package_proposal_votes WHERE pkg_prop_id = \". $dbh->quoteSmart($proposalId) .\" AND user_handle= \". $dbh->quoteSmart($handle);\n        $res = $dbh->query($sql);\n        if (DB::isError($res)) {\n            return $res;\n        }\n        if (!$res->numRows()) {\n            return null;\n        }\n        $set = $res->fetchRow(DB_FETCHMODE_ASSOC);\n        try {\n            $unserialised = unserialize($set['reviews'], ['allowed_classes' => false]);\n            if ($unserialised !== false) {\n                $set['reviews'] = $unserialised;\n            }\n        } catch (Exception $ex) {\n            $set['reviews'] = array();\n        }\n        $vote = new ppVote($set);\n        return $vote;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        try {",
+      "            $unserialised = unserialize($set['reviews'], ['allowed_classes' => false]);",
+      "            if ($unserialised !== false) {",
+      "                $set['reviews'] = $unserialised;",
+      "            }",
+      "        } catch (Exception $ex) {",
+      "            $set['reviews'] = array();",
+      "        }"
+    ],
+    "deleted": [
+      "        $set['reviews'] = unserialize($set['reviews']);"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2011
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    function &getAll(&$dbh, $proposalId)\n    {\n        $sql = \"SELECT *, UNIX_TIMESTAMP(timestamp) AS timestamp FROM package_proposal_votes WHERE pkg_prop_id = \". $dbh->quoteSmart($proposalId) .\" ORDER BY timestamp ASC\";\n        $res = $dbh->query($sql);\n        if (DB::isError($res)) {\n            return $res;\n        }\n        $votes = array();\n        while ($set = $res->fetchRow(DB_FETCHMODE_ASSOC)) {\n            $set['reviews'] = unserialize($set['reviews']);\n            $votes[$set['user_handle']] = new ppVote($set);\n        }\n        return $votes;\n    }",
+  "code_after_change": "    function &getAll(&$dbh, $proposalId)\n    {\n        $sql = \"SELECT *, UNIX_TIMESTAMP(timestamp) AS timestamp FROM package_proposal_votes WHERE pkg_prop_id = \". $dbh->quoteSmart($proposalId) .\" ORDER BY timestamp ASC\";\n        $res = $dbh->query($sql);\n        if (DB::isError($res)) {\n            return $res;\n        }\n        $votes = array();\n        while ($set = $res->fetchRow(DB_FETCHMODE_ASSOC)) {\n            $uReviews = unserialize($set['reviews'], ['allowed_classes' => false]);\n            if ($uReviews !== false) {\n                $set['reviews'] = $uReviews;\n            }\n            $votes[$set['user_handle']] = new ppVote($set);\n        }\n        return $votes;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $uReviews = unserialize($set['reviews'], ['allowed_classes' => false]);",
+      "            if ($uReviews !== false) {",
+      "                $set['reviews'] = $uReviews;",
+      "            }"
+    ],
+    "deleted": [
+      "            $set['reviews'] = unserialize($set['reviews']);"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2012
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    function initializeDatabase($answers)\n    {\n        $this->dsn = array(\n            'phptype' => $answers['driver'],\n            'username' => $answers['user'],\n            'password' => $answers['password'],\n            'hostspec' => $answers['host'],\n            'database' => $answers['database']);\n        $a = MDB2_Schema::factory($this->dsn,\n            array('idxname_format' => '%s',\n                  'seqname_format' => 'id',\n                  'quote_identifier' => true));\n                  \n        // for upgrade purposes\n        $updir = '@www-dir@/pear.php.net/sql/.pearweb-upgrade';\n        if (!file_exists($updir)) {\n            if (!mkdir($updir)) {\n                $this->_ui->outputData('error - make sure we can create directories');\n                return false;\n            }\n        }\n        PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n        $c = $a->parseDatabaseDefinitionFile(\n            realpath('@www-dir@/pear.php.net/sql/pearweb_mdb2schema.xml'));\n        PEAR::staticPopErrorHandling();\n        if (PEAR::isError($c)) {\n            $extra = '';\n            if (MDB2_Schema::isError($c) || MDB2::isError($c)) {\n                $extra = \"\\n\" . $c->getUserInfo();\n            }\n            $this->_ui->outputData('ERROR: ' . $c->getMessage() . $extra);\n            return false;\n        }\n        $c['name'] = $answers['database'];\n        $c['create'] = 1;\n        $c['overwrite'] = 0;\n        $dir = opendir('@www-dir@/pear.php.net/sql/.pearweb-upgrade');\n        $oldversion = false;\n        while (false !== ($entry = readdir($dir))) {\n            if ($entry[0] === '.') {\n                continue;\n            }\n            if (strpos($entry, $answers['database']) === 0) {\n                // this is one of ours\n                // strip databasename-\n                $entry = substr($entry, strlen($answers['database']) + 1);\n                // strip \".ser\"\n                $entry = substr($entry, 0, strlen($entry) - 4);\n                // ... and we're left with just the version\n                if (!$oldversion) {\n                    $oldversion = $entry;\n                    continue;\n                }\n                if (version_compare($entry, $oldversion, '>')) {\n                    $oldversion = $entry;\n                }\n            }\n        }\n        \n        $serfile = $updir . $answers['database'] . '-@version@.ser';\n        if (!file_exists($serfile)) {\n            $fp = fopen($serfile, 'w');\n            fwrite($fp, serialize($c));\n            fclose($fp);\n        }\n        if ($oldversion == '@version@') {\n            // this is where to change if we need to add a \"force upgrade of\n            // structure\" option\n            // we would uncomment the following line:\n            //$c['overwrite'] = true;\n            $oldversion = false;\n        }\n        if ($oldversion) {\n            $curdef = unserialize(file_get_contents($updir .\n              $answers['database'] . '-' . $oldversion . '.ser'));\n            if (!is_array($curdef)) {\n                $this->_ui->outputData('invalid data returned from previous version');\n            }\n            // get a database diff (MDB2_Schema is very useful here)\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $c = $a->compareDefinitions($c, $curdef);\n            if (PEAR::isError($c)) {\n                $this->_ui->outputData($err->getMessage());\n                $this->_ui->outputData($err->getUserInfo());\n                $this->_ui->outputData('Unable to automatically update database');\n                return false;\n            }\n            $err = $a->updateDatabase($curdef, $c);\n            PEAR::staticPopErrorHandling();\n        } else {\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $err = $a->createDatabase($c);\n            PEAR::staticPopErrorHandling();\n        }\n        if (PEAR::isError($err)) {\n            $this->_ui->outputData($err->getUserInfo());\n            $this->_ui->outputData($err->getMessage());\n            return false;\n        }\n        return true;\n    }",
+  "code_after_change": "    function initializeDatabase($answers)\n    {\n        $this->dsn = array(\n            'phptype' => $answers['driver'],\n            'username' => $answers['user'],\n            'password' => $answers['password'],\n            'hostspec' => $answers['host'],\n            'database' => $answers['database']);\n        $a = MDB2_Schema::factory($this->dsn,\n            array('idxname_format' => '%s',\n                  'seqname_format' => 'id',\n                  'quote_identifier' => true));\n                  \n        // for upgrade purposes\n        $updir = '@www-dir@/pear.php.net/sql/.pearweb-upgrade';\n        if (!file_exists($updir)) {\n            if (!mkdir($updir)) {\n                $this->_ui->outputData('error - make sure we can create directories');\n                return false;\n            }\n        }\n        PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n        $c = $a->parseDatabaseDefinitionFile(\n            realpath('@www-dir@/pear.php.net/sql/pearweb_mdb2schema.xml'));\n        PEAR::staticPopErrorHandling();\n        if (PEAR::isError($c)) {\n            $extra = '';\n            if (MDB2_Schema::isError($c) || MDB2::isError($c)) {\n                $extra = \"\\n\" . $c->getUserInfo();\n            }\n            $this->_ui->outputData('ERROR: ' . $c->getMessage() . $extra);\n            return false;\n        }\n        $c['name'] = $answers['database'];\n        $c['create'] = 1;\n        $c['overwrite'] = 0;\n        $dir = opendir('@www-dir@/pear.php.net/sql/.pearweb-upgrade');\n        $oldversion = false;\n        while (false !== ($entry = readdir($dir))) {\n            if ($entry[0] === '.') {\n                continue;\n            }\n            if (strpos($entry, $answers['database']) === 0) {\n                // this is one of ours\n                // strip databasename-\n                $entry = substr($entry, strlen($answers['database']) + 1);\n                // strip \".ser\"\n                $entry = substr($entry, 0, strlen($entry) - 4);\n                // ... and we're left with just the version\n                if (!$oldversion) {\n                    $oldversion = $entry;\n                    continue;\n                }\n                if (version_compare($entry, $oldversion, '>')) {\n                    $oldversion = $entry;\n                }\n            }\n        }\n        \n        $serfile = $updir . $answers['database'] . '-@version@.ser';\n        if (!file_exists($serfile)) {\n            $fp = fopen($serfile, 'w');\n            fwrite($fp, serialize($c));\n            fclose($fp);\n        }\n        if ($oldversion == '@version@') {\n            // this is where to change if we need to add a \"force upgrade of\n            // structure\" option\n            // we would uncomment the following line:\n            //$c['overwrite'] = true;\n            $oldversion = false;\n        }\n        if ($oldversion) {\n            $sFile = $updir . $answers['database'] . '-' . $oldversion . '.ser';\n            try {\n                $curdef = unserialize(file_get_contents($sFile), ['allowed_classes' => false]);\n            } catch (Exception $ex) {\n                $curdef = false;\n            }\n\n            if (!is_array($curdef)) {\n                $this->_ui->outputData('invalid data returned from previous version');\n            }\n            // get a database diff (MDB2_Schema is very useful here)\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $c = $a->compareDefinitions($c, $curdef);\n            if (PEAR::isError($c)) {\n                $this->_ui->outputData($err->getMessage());\n                $this->_ui->outputData($err->getUserInfo());\n                $this->_ui->outputData('Unable to automatically update database');\n                return false;\n            }\n            $err = $a->updateDatabase($curdef, $c);\n            PEAR::staticPopErrorHandling();\n        } else {\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $err = $a->createDatabase($c);\n            PEAR::staticPopErrorHandling();\n        }\n        if (PEAR::isError($err)) {\n            $this->_ui->outputData($err->getUserInfo());\n            $this->_ui->outputData($err->getMessage());\n            return false;\n        }\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $sFile = $updir . $answers['database'] . '-' . $oldversion . '.ser';",
+      "            try {",
+      "                $curdef = unserialize(file_get_contents($sFile), ['allowed_classes' => false]);",
+      "            } catch (Exception $ex) {",
+      "                $curdef = false;",
+      "            }"
+    ],
+    "deleted": [
+      "            $curdef = unserialize(file_get_contents($updir .",
+      "              $answers['database'] . '-' . $oldversion . '.ser'));"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2013
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    function initializeDatabase($answers)\n    {\n        //include_once dirname(__FILE__) . 'include/pear-config.php';\n        //$a = MDB2_Schema::factory(PEAR_DATABASE_DSN,\n        $this->dsn = array(\n            'phptype' => $answers['driver'],\n            'username' => $answers['user'],\n            'password' => $answers['password'],\n            'hostspec' => $answers['host'],\n            'database' => $answers['database']);\n        $a = MDB2_Schema::factory($this->dsn,\n            array('idxname_format' => '%s',\n                  'seqname_format' => 'id',\n                  'quote_identifier' => true));\n        // for upgrade purposes\n        if (!file_exists('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n            '.pearweb-upgrade')) {\n            if (!mkdir('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n                  '.pearweb-upgrade')) {\n                $this->_ui->outputData('error - make sure we can create directories');\n                return false;\n            }\n        }\n        PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n        $c = $a->parseDatabaseDefinitionFile(\n            realpath('@www-dir@/sql/pearweb_election.xml'));\n        PEAR::staticPopErrorHandling();\n        if (PEAR::isError($c)) {\n            $extra = '';\n            if (MDB2_Schema::isError($c) || MDB2::isError($c)) {\n                $extra = \"\\n\" . $c->getUserInfo();\n            }\n            $this->_ui->outputData('ERROR: ' . $c->getMessage() . $extra);\n            return false;\n        }\n        $c['name']      = $answers['database'];\n        $c['create']    = 1;\n        $c['overwrite'] = 0;\n        $dir = opendir('@www-dir@/sql/.pearweb-upgrade');\n        $oldversion = false;\n        while (false !== ($entry = readdir($dir))) {\n            if ($entry[0] === '.') {\n                continue;\n            }\n            if (strpos($entry, $answers['database']) === 0) {\n                // this is one of ours\n                // strip databasename-\n                $entry = substr($entry, strlen($answers['database']) + 1);\n                // strip \".ser\"\n                $entry = substr($entry, 0, strlen($entry) - 4);\n                // ... and we're left with just the version\n                if (!$oldversion) {\n                    $oldversion = $entry;\n                    continue;\n                }\n                if (version_compare($entry, $oldversion, '>')) {\n                    $oldversion = $entry;\n                }\n            }\n        }\n        if (!file_exists('@www-dir@/sql/.pearweb-upgrade/' .\n              $answers['database'] . '-@version@.ser')) {\n            $fp = fopen('@www-dir@/sql/.pearweb-upgrade/' .\n                $answers['database'] . '-@version@.ser', 'w');\n            fwrite($fp, serialize($c));\n            fclose($fp);\n        }\n        if ($oldversion == '@version@') {\n            // this is where to change if we need to add a \"force upgrade of\n            // structure\" option\n            // we would uncomment the following line:\n            //$c['overwrite'] = true;\n            $oldversion = false;\n        }\n        if ($oldversion) {\n            $curdef = unserialize(file_get_contents('@www-dir@/sql/.pearweb-upgrade/' .\n              $answers['database'] . '-' . $oldversion . '.ser'));\n            if (!is_array($curdef)) {\n                $this->_ui->outputData('invalid data returned from previous version');\n            }\n            // get a database diff (MDB2_Schema is very useful here)\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $c = $a->compareDefinitions($c, $curdef);\n            if (PEAR::isError($c)) {\n                $this->_ui->outputData($err->getMessage());\n                $this->_ui->outputData($err->getUserInfo());\n                $this->_ui->outputData('Unable to automatically update database');\n                return false;\n            }\n            $err = $a->updateDatabase($curdef, $c);\n            PEAR::staticPopErrorHandling();\n        } else {\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $err = $a->createDatabase($c);\n            PEAR::staticPopErrorHandling();\n        }\n        if (PEAR::isError($err)) {\n            $this->_ui->outputData($err->getUserInfo());\n            $this->_ui->outputData($err->getMessage());\n            return false;\n        }\n        return true;\n    }",
+  "code_after_change": "    function initializeDatabase($answers)\n    {\n        //include_once dirname(__FILE__) . 'include/pear-config.php';\n        //$a = MDB2_Schema::factory(PEAR_DATABASE_DSN,\n        $this->dsn = array(\n            'phptype' => $answers['driver'],\n            'username' => $answers['user'],\n            'password' => $answers['password'],\n            'hostspec' => $answers['host'],\n            'database' => $answers['database']);\n        $a = MDB2_Schema::factory($this->dsn,\n            array('idxname_format' => '%s',\n                  'seqname_format' => 'id',\n                  'quote_identifier' => true));\n        // for upgrade purposes\n        if (!file_exists('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n            '.pearweb-upgrade')) {\n            if (!mkdir('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n                  '.pearweb-upgrade')) {\n                $this->_ui->outputData('error - make sure we can create directories');\n                return false;\n            }\n        }\n        PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n        $c = $a->parseDatabaseDefinitionFile(\n            realpath('@www-dir@/sql/pearweb_election.xml'));\n        PEAR::staticPopErrorHandling();\n        if (PEAR::isError($c)) {\n            $extra = '';\n            if (MDB2_Schema::isError($c) || MDB2::isError($c)) {\n                $extra = \"\\n\" . $c->getUserInfo();\n            }\n            $this->_ui->outputData('ERROR: ' . $c->getMessage() . $extra);\n            return false;\n        }\n        $c['name']      = $answers['database'];\n        $c['create']    = 1;\n        $c['overwrite'] = 0;\n        $dir = opendir('@www-dir@/sql/.pearweb-upgrade');\n        $oldversion = false;\n        while (false !== ($entry = readdir($dir))) {\n            if ($entry[0] === '.') {\n                continue;\n            }\n            if (strpos($entry, $answers['database']) === 0) {\n                // this is one of ours\n                // strip databasename-\n                $entry = substr($entry, strlen($answers['database']) + 1);\n                // strip \".ser\"\n                $entry = substr($entry, 0, strlen($entry) - 4);\n                // ... and we're left with just the version\n                if (!$oldversion) {\n                    $oldversion = $entry;\n                    continue;\n                }\n                if (version_compare($entry, $oldversion, '>')) {\n                    $oldversion = $entry;\n                }\n            }\n        }\n        if (!file_exists('@www-dir@/sql/.pearweb-upgrade/' .\n              $answers['database'] . '-@version@.ser')) {\n            $fp = fopen('@www-dir@/sql/.pearweb-upgrade/' .\n                $answers['database'] . '-@version@.ser', 'w');\n            fwrite($fp, serialize($c));\n            fclose($fp);\n        }\n        if ($oldversion == '@version@') {\n            // this is where to change if we need to add a \"force upgrade of\n            // structure\" option\n            // we would uncomment the following line:\n            //$c['overwrite'] = true;\n            $oldversion = false;\n        }\n        if ($oldversion) {\n            $sFile = '@www-dir@/sql/.pearweb-upgrade/' . $answers['database'] . '-' . $oldversion . '.ser';\n            try {\n                $curdef = unserialize(file_get_contents($sFile), ['allowed_classes' => false]);\n            } catch (Exception $ex) {\n                $curdef = false;\n            }\n            if (!is_array($curdef)) {\n                $this->_ui->outputData('invalid data returned from previous version');\n            }\n            // get a database diff (MDB2_Schema is very useful here)\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $c = $a->compareDefinitions($c, $curdef);\n            if (PEAR::isError($c)) {\n                $this->_ui->outputData($err->getMessage());\n                $this->_ui->outputData($err->getUserInfo());\n                $this->_ui->outputData('Unable to automatically update database');\n                return false;\n            }\n            $err = $a->updateDatabase($curdef, $c);\n            PEAR::staticPopErrorHandling();\n        } else {\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $err = $a->createDatabase($c);\n            PEAR::staticPopErrorHandling();\n        }\n        if (PEAR::isError($err)) {\n            $this->_ui->outputData($err->getUserInfo());\n            $this->_ui->outputData($err->getMessage());\n            return false;\n        }\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $sFile = '@www-dir@/sql/.pearweb-upgrade/' . $answers['database'] . '-' . $oldversion . '.ser';",
+      "            try {",
+      "                $curdef = unserialize(file_get_contents($sFile), ['allowed_classes' => false]);",
+      "            } catch (Exception $ex) {",
+      "                $curdef = false;",
+      "            }"
+    ],
+    "deleted": [
+      "            $curdef = unserialize(file_get_contents('@www-dir@/sql/.pearweb-upgrade/' .",
+      "              $answers['database'] . '-' . $oldversion . '.ser'));"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2014
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    function initializeDatabase($answers)\n    {\n        $this->dsn = array(\n            'phptype' => $answers['driver'],\n            'username' => $answers['user'],\n            'password' => $answers['password'],\n            'hostspec' => $answers['host'],\n            'database' => $answers['database']);\n        $a = MDB2_Schema::factory($this->dsn,\n            array('idxname_format' => '%s',\n                  'seqname_format' => 'id',\n                  'quote_identifier' => true));\n        // for upgrade purposes\n        if (!file_exists('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n            '.pearweb-upgrade')) {\n            if (!mkdir('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n                  '.pearweb-upgrade')) {\n                $this->_ui->outputData('error - make sure we can create directories');\n                return false;\n            }\n        }\n        PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n        $c = $a->parseDatabaseDefinitionFile(\n            realpath('@www-dir@/sql/pearweb_mdb2schema.xml'));\n        PEAR::staticPopErrorHandling();\n        if (PEAR::isError($c)) {\n            $extra = '';\n            if (MDB2_Schema::isError($c) || MDB2::isError($c)) {\n                $extra = \"\\n\" . $c->getUserInfo();\n            }\n            $this->_ui->outputData('ERROR: ' . $c->getMessage() . $extra);\n            return false;\n        }\n        $c['name']      = $answers['database'];\n        $c['create']    = 1;\n        $c['overwrite'] = 0;\n        $dir = opendir('@www-dir@/sql/.pearweb-upgrade');\n        $oldversion = false;\n        while (false !== ($entry = readdir($dir))) {\n            if ($entry[0] === '.') {\n                continue;\n            }\n            if (strpos($entry, $answers['database']) === 0) {\n                // this is one of ours\n                // strip databasename-\n                $entry = substr($entry, strlen($answers['database']) + 1);\n                // strip \".ser\"\n                $entry = substr($entry, 0, strlen($entry) - 4);\n                // ... and we're left with just the version\n                if (!$oldversion) {\n                    $oldversion = $entry;\n                    continue;\n                }\n                if (version_compare($entry, $oldversion, '>')) {\n                    $oldversion = $entry;\n                }\n            }\n        }\n        if (!file_exists('@www-dir@/sql/.pearweb-upgrade/' .\n              $answers['database'] . '-@version@.ser')) {\n            $fp = fopen('@www-dir@/sql/.pearweb-upgrade/' .\n                $answers['database'] . '-@version@.ser', 'w');\n            fwrite($fp, serialize($c));\n            fclose($fp);\n        }\n        if ($oldversion == '@version@') {\n            // this is where to change if we need to add a \"force upgrade of\n            // structure\" option\n            // we would uncomment the following line:\n            //$c['overwrite'] = true;\n            $oldversion = false;\n        }\n        if ($oldversion) {\n            $curdef = unserialize(file_get_contents('@www-dir@/sql/.pearweb-upgrade/' .\n              $answers['database'] . '-' . $oldversion . '.ser'));\n            if (!is_array($curdef)) {\n                $this->_ui->outputData('invalid data returned from previous version');\n            }\n            // get a database diff (MDB2_Schema is very useful here)\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $c = $a->compareDefinitions($c, $curdef);\n            if (PEAR::isError($c)) {\n                $this->_ui->outputData($err->getMessage());\n                $this->_ui->outputData($err->getUserInfo());\n                $this->_ui->outputData('Unable to automatically update database');\n                return false;\n            }\n            $err = $a->updateDatabase($curdef, $c);\n            PEAR::staticPopErrorHandling();\n        } else {\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $err = $a->createDatabase($c);\n            PEAR::staticPopErrorHandling();\n        }\n        if (PEAR::isError($err)) {\n            $this->_ui->outputData($err->getUserInfo());\n            $this->_ui->outputData($err->getMessage());\n            return false;\n        }\n        return true;\n    }",
+  "code_after_change": "    function initializeDatabase($answers)\n    {\n        $this->dsn = array(\n            'phptype' => $answers['driver'],\n            'username' => $answers['user'],\n            'password' => $answers['password'],\n            'hostspec' => $answers['host'],\n            'database' => $answers['database']);\n        $a = MDB2_Schema::factory($this->dsn,\n            array('idxname_format' => '%s',\n                  'seqname_format' => 'id',\n                  'quote_identifier' => true));\n        // for upgrade purposes\n        if (!file_exists('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n            '.pearweb-upgrade')) {\n            if (!mkdir('@www-dir@' . DIRECTORY_SEPARATOR . 'sql' . DIRECTORY_SEPARATOR .\n                  '.pearweb-upgrade')) {\n                $this->_ui->outputData('error - make sure we can create directories');\n                return false;\n            }\n        }\n        PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n        $c = $a->parseDatabaseDefinitionFile(\n            realpath('@www-dir@/sql/pearweb_mdb2schema.xml'));\n        PEAR::staticPopErrorHandling();\n        if (PEAR::isError($c)) {\n            $extra = '';\n            if (MDB2_Schema::isError($c) || MDB2::isError($c)) {\n                $extra = \"\\n\" . $c->getUserInfo();\n            }\n            $this->_ui->outputData('ERROR: ' . $c->getMessage() . $extra);\n            return false;\n        }\n        $c['name']      = $answers['database'];\n        $c['create']    = 1;\n        $c['overwrite'] = 0;\n        $dir = opendir('@www-dir@/sql/.pearweb-upgrade');\n        $oldversion = false;\n        while (false !== ($entry = readdir($dir))) {\n            if ($entry[0] === '.') {\n                continue;\n            }\n            if (strpos($entry, $answers['database']) === 0) {\n                // this is one of ours\n                // strip databasename-\n                $entry = substr($entry, strlen($answers['database']) + 1);\n                // strip \".ser\"\n                $entry = substr($entry, 0, strlen($entry) - 4);\n                // ... and we're left with just the version\n                if (!$oldversion) {\n                    $oldversion = $entry;\n                    continue;\n                }\n                if (version_compare($entry, $oldversion, '>')) {\n                    $oldversion = $entry;\n                }\n            }\n        }\n        if (!file_exists('@www-dir@/sql/.pearweb-upgrade/' .\n              $answers['database'] . '-@version@.ser')) {\n            $fp = fopen('@www-dir@/sql/.pearweb-upgrade/' .\n                $answers['database'] . '-@version@.ser', 'w');\n            fwrite($fp, serialize($c));\n            fclose($fp);\n        }\n        if ($oldversion == '@version@') {\n            // this is where to change if we need to add a \"force upgrade of\n            // structure\" option\n            // we would uncomment the following line:\n            //$c['overwrite'] = true;\n            $oldversion = false;\n        }\n        if ($oldversion) {\n            try {\n                $sFile = '@www-dir@/sql/.pearweb-upgrade/' . $answers['database'] . '-' . $oldversion . '.ser';\n                $curdef = unserialize(file_get_contents($sFile), ['allowed_classes' => false]);\n            } catch (Exception $ex) {\n                $curdef = false;\n            }\n            if (!is_array($curdef)) {\n                $this->_ui->outputData('invalid data returned from previous version');\n            }\n            // get a database diff (MDB2_Schema is very useful here)\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $c = $a->compareDefinitions($c, $curdef);\n            if (PEAR::isError($c)) {\n                $this->_ui->outputData($err->getMessage());\n                $this->_ui->outputData($err->getUserInfo());\n                $this->_ui->outputData('Unable to automatically update database');\n                return false;\n            }\n            $err = $a->updateDatabase($curdef, $c);\n            PEAR::staticPopErrorHandling();\n        } else {\n            PEAR::staticPushErrorHandling(PEAR_ERROR_RETURN);\n            $err = $a->createDatabase($c);\n            PEAR::staticPopErrorHandling();\n        }\n        if (PEAR::isError($err)) {\n            $this->_ui->outputData($err->getUserInfo());\n            $this->_ui->outputData($err->getMessage());\n            return false;\n        }\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            try {",
+      "                $sFile = '@www-dir@/sql/.pearweb-upgrade/' . $answers['database'] . '-' . $oldversion . '.ser';",
+      "                $curdef = unserialize(file_get_contents($sFile), ['allowed_classes' => false]);",
+      "            } catch (Exception $ex) {",
+      "                $curdef = false;",
+      "            }"
+    ],
+    "deleted": [
+      "            $curdef = unserialize(file_get_contents('@www-dir@/sql/.pearweb-upgrade/' .",
+      "              $answers['database'] . '-' . $oldversion . '.ser'));"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2015
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    protected function moveVotes()\n    {\n        $sql = \"SELECT * FROM package_proposal_votes WHERE pkg_prop_id = {$this->proposal}\";\n        $res = $this->mdb2->query($sql);\n        if (MDB2::isError($res)) {\n            throw new RuntimeException(\"DB error occurred: {$res->getDebugInfo()}\");\n        }\n        if ($res->numRows() == 0) {\n            return; // nothing to do\n        }\n\n        $insert  = \"INSERT INTO package_proposal_comments (\";\n        $insert .= \"user_handle, pkg_prop_id, timestamp, comment\";\n        $insert .= \") VALUES(%s, {$this->proposal}, %d, %s)\";\n\n        $delete  = \"DELETE FROM package_proposal_votes WHERE\";\n        $delete .= \" pkg_prop_id = {$this->proposal}\";\n        $delete .= \" AND user_handle = %s\";\n\n        while ($row = $res->fetchRow(MDB2_FETCHMODE_OBJECT)) {\n\n            $comment  = \"Original vote: {$row->value}\\n\";\n            $comment .= \"Conditional vote: \" . ($row->is_conditional != 0)?'yes':'no' . \"\\n\";\n            $comment .= \"Comment on vote: \" . $row->comment . \"\\n\\n\";\n            $comment .= \"Reviewed: \" . implode(\", \", unserialize($row->reviews));\n\n            $sql = sprintf(\n                $insert,\n                $this->mdb2->quote($row->user_handle),\n                $row->timestamp,\n                $this->mdb2->quote($comment)\n            );\n            $this->queryChange($sql);\n\n            $sql = sprintf(\n                $delete,\n                $this->mdb2->quote($row->user_handle)\n            );\n            $this->queryChange($sql);\n        }",
+  "code_after_change": "    protected function moveVotes()\n    {\n        $sql = \"SELECT * FROM package_proposal_votes WHERE pkg_prop_id = {$this->proposal}\";\n        $res = $this->mdb2->query($sql);\n        if (MDB2::isError($res)) {\n            throw new RuntimeException(\"DB error occurred: {$res->getDebugInfo()}\");\n        }\n        if ($res->numRows() == 0) {\n            return; // nothing to do\n        }\n\n        $insert  = \"INSERT INTO package_proposal_comments (\";\n        $insert .= \"user_handle, pkg_prop_id, timestamp, comment\";\n        $insert .= \") VALUES(%s, {$this->proposal}, %d, %s)\";\n\n        $delete  = \"DELETE FROM package_proposal_votes WHERE\";\n        $delete .= \" pkg_prop_id = {$this->proposal}\";\n        $delete .= \" AND user_handle = %s\";\n\n        while ($row = $res->fetchRow(MDB2_FETCHMODE_OBJECT)) {\n\n            $comment  = \"Original vote: {$row->value}\\n\";\n            $comment .= \"Conditional vote: \" . ($row->is_conditional != 0)?'yes':'no' . \"\\n\";\n            $comment .= \"Comment on vote: \" . $row->comment . \"\\n\\n\";\n            $reviewed = \"Reviewed: n/a\";\n            try {\n                $uInfo = unserialize($row->reviews, ['allowed_classes' => false]);\n                if ($uInfo !== false) {\n                    $reviewed = \"Reviewed: \" . implode(\", \", $uInfo);\n                }\n            } catch (Exception $ex) {\n                // do nothing\n            }\n            $comment .= $reviewed;\n\n            $sql = sprintf(\n                $insert,\n                $this->mdb2->quote($row->user_handle),\n                $row->timestamp,\n                $this->mdb2->quote($comment)\n            );\n            $this->queryChange($sql);\n\n            $sql = sprintf(\n                $delete,\n                $this->mdb2->quote($row->user_handle)\n            );\n            $this->queryChange($sql);\n        }",
+  "function_modified_lines": {
+    "added": [
+      "            $reviewed = \"Reviewed: n/a\";",
+      "            try {",
+      "                $uInfo = unserialize($row->reviews, ['allowed_classes' => false]);",
+      "                if ($uInfo !== false) {",
+      "                    $reviewed = \"Reviewed: \" . implode(\", \", $uInfo);",
+      "                }",
+      "            } catch (Exception $ex) {",
+      "                // do nothing",
+      "            }",
+      "            $comment .= $reviewed;"
+    ],
+    "deleted": [
+      "            $comment .= \"Reviewed: \" . implode(\", \", unserialize($row->reviews));"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2016
+},
+{
+  "cve_id": "CVE-2022-27157",
+  "code_before_change": "    protected function moveVotes()\n    {\n        $sql = \"SELECT * FROM package_proposal_votes WHERE pkg_prop_id = {$this->proposal}\";\n        $res = $this->mdb2->query($sql);\n        if (MDB2::isError($res)) {\n            throw new RuntimeException(\"DB error occurred: {$res->getDebugInfo()}\");\n        }\n        if ($res->numRows() == 0) {\n            return; // nothing to do\n        }\n\n        $insert  = \"INSERT INTO package_proposal_comments (\";\n        $insert .= \"user_handle, pkg_prop_id, timestamp, comment\";\n        $insert .= \") VALUES(%s, {$this->proposal}, %d, %s)\";\n\n        $delete  = \"DELETE FROM package_proposal_votes WHERE\";\n        $delete .= \" pkg_prop_id = {$this->proposal}\";\n        $delete .= \" AND user_handle = %s\";\n\n        while ($row = $res->fetchRow(MDB2_FETCHMODE_OBJECT)) {\n\n            $comment  = \"Original vote: {$row->value}\\n\";\n            $comment .= \"Conditional vote: \" . (($row->is_conditional != 0)?'yes':'no') . \"\\n\";\n            $comment .= \"Comment on vote: \" . $row->comment . \"\\n\";\n            $comment .= \"Reviewed: \" . implode(\", \", unserialize($row->reviews));\n\n            $sql = sprintf(\n                $insert,\n                $this->mdb2->quote($row->user_handle),\n                $row->timestamp,\n                $this->mdb2->quote($comment)\n            );\n            $this->queryChange($sql);\n\n            $sql = sprintf(\n                $delete,\n                $this->mdb2->quote($row->user_handle)\n            );\n            $this->queryChange($sql);\n        }",
+  "code_after_change": "    protected function moveVotes()\n    {\n        $sql = \"SELECT * FROM package_proposal_votes WHERE pkg_prop_id = {$this->proposal}\";\n        $res = $this->mdb2->query($sql);\n        if (MDB2::isError($res)) {\n            throw new RuntimeException(\"DB error occurred: {$res->getDebugInfo()}\");\n        }\n        if ($res->numRows() == 0) {\n            return; // nothing to do\n        }\n\n        $insert  = \"INSERT INTO package_proposal_comments (\";\n        $insert .= \"user_handle, pkg_prop_id, timestamp, comment\";\n        $insert .= \") VALUES(%s, {$this->proposal}, %d, %s)\";\n\n        $delete  = \"DELETE FROM package_proposal_votes WHERE\";\n        $delete .= \" pkg_prop_id = {$this->proposal}\";\n        $delete .= \" AND user_handle = %s\";\n\n        while ($row = $res->fetchRow(MDB2_FETCHMODE_OBJECT)) {\n\n            $comment  = \"Original vote: {$row->value}\\n\";\n            $comment .= \"Conditional vote: \" . (($row->is_conditional != 0)?'yes':'no') . \"\\n\";\n            $comment .= \"Comment on vote: \" . $row->comment . \"\\n\";\n            $reviewed = \"Reviewed: n/a\";\n            try {\n                $uInfo = unserialize($row->reviews, ['allowed_classes' => false]);\n                if ($uInfo !== false) {\n                    $reviewed = \"Reviewed: \" . implode(\", \", $uInfo);\n                }\n            } catch (Exception $ex) {\n                // do nothing\n            }\n            $comment .= $reviewed;\n\n            $sql = sprintf(\n                $insert,\n                $this->mdb2->quote($row->user_handle),\n                $row->timestamp,\n                $this->mdb2->quote($comment)\n            );\n            $this->queryChange($sql);\n\n            $sql = sprintf(\n                $delete,\n                $this->mdb2->quote($row->user_handle)\n            );\n            $this->queryChange($sql);\n        }",
+  "function_modified_lines": {
+    "added": [
+      "            $reviewed = \"Reviewed: n/a\";",
+      "            try {",
+      "                $uInfo = unserialize($row->reviews, ['allowed_classes' => false]);",
+      "                if ($uInfo !== false) {",
+      "                    $reviewed = \"Reviewed: \" . implode(\", \", $uInfo);",
+      "                }",
+      "            } catch (Exception $ex) {",
+      "                // do nothing",
+      "            }",
+      "            $comment .= $reviewed;"
+    ],
+    "deleted": [
+      "            $comment .= \"Reviewed: \" . implode(\", \", unserialize($row->reviews));"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "pearweb < 1.32 is suffers from a Weak Password Recovery Mechanism via include/users/passwordmanage.php.",
+  "id": 2017
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "        function encode($string = '', $skey = 'cxphp')\n        {\n            $strArr = str_split(base64_encode($string));\n            $strCount = count($strArr);\n            foreach (str_split($skey) as $key => $value)\n                $key < $strCount && $strArr[$key] .= $value;\n            return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n        }",
+  "code_after_change": "     <html lang=\"zh-cn\">\n\n     <head>\n         <meta charset=\"utf-8\">\n         <title>RapidCMS管理后台</title>\n         <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n         <link rel=\"shortcut icon\"\" href=\" ../../../../../resource/img/icon.png\" type=\"image/x-icon\" />",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "        function encode($string = '', $skey = 'cxphp')",
+      "        {",
+      "            $strArr = str_split(base64_encode($string));",
+      "            $strCount = count($strArr);",
+      "            foreach (str_split($skey) as $key => $value)",
+      "                $key < $strCount && $strArr[$key] .= $value;",
+      "            return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "        }"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2018
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "function encode($string = '', $skey = 'cxphp')\n{\n    $strArr = str_split(base64_encode($string));\n    $strCount = count($strArr);\n    foreach (str_split($skey) as $key => $value)\n        $key < $strCount && $strArr[$key] .= $value;\n    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n}",
+  "code_after_change": "?>\n\n<!DOCTYPE html>\n<html lang=\"zh-cn\">\n\n<head>\n    <meta charset=\"utf-8\">\n    <title>RapidCMS管理后台</title>",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "function encode($string = '', $skey = 'cxphp')",
+      "{",
+      "    $strArr = str_split(base64_encode($string));",
+      "    $strCount = count($strArr);",
+      "    foreach (str_split($skey) as $key => $value)",
+      "        $key < $strCount && $strArr[$key] .= $value;",
+      "    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2019
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "function encode($string = '', $skey = 'cxphp')\n{\n    $strArr = str_split(base64_encode($string));\n    $strCount = count($strArr);\n    foreach (str_split($skey) as $key => $value)\n        $key < $strCount && $strArr[$key] .= $value;\n    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n}",
+  "code_after_change": "\n?>  <script type=\"text/javascript\" language=\"javascript\"> \nfunction confirmAct() \n{ \n  if(confirm('确定要删除吗?')) \n  { \n    return true; \n  } ",
+  "function_modified_lines": {
+    "added": [
+      "?>  <script type=\"text/javascript\" language=\"javascript\">"
+    ],
+    "deleted": [
+      "function encode($string = '', $skey = 'cxphp')",
+      "{",
+      "    $strArr = str_split(base64_encode($string));",
+      "    $strCount = count($strArr);",
+      "    foreach (str_split($skey) as $key => $value)",
+      "        $key < $strCount && $strArr[$key] .= $value;",
+      "    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2020
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "function encode($string = '', $skey = 'cxphp')\n{\n    $strArr = str_split(base64_encode($string));\n    $strCount = count($strArr);\n    foreach (str_split($skey) as $key => $value)\n        $key < $strCount && $strArr[$key] .= $value;\n    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n}",
+  "code_after_change": "\n?>\n\n        <?php\nerror_reporting(0);\nheader(\"Content-type:text/html;charset=utf-8\");\n$table_name = \"rapidcmscategory\";\n",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "function encode($string = '', $skey = 'cxphp')",
+      "{",
+      "    $strArr = str_split(base64_encode($string));",
+      "    $strCount = count($strArr);",
+      "    foreach (str_split($skey) as $key => $value)",
+      "        $key < $strCount && $strArr[$key] .= $value;",
+      "    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2021
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "function encode($string = '', $skey = 'cxphp')\n{\n    $strArr = str_split(base64_encode($string));\n    $strCount = count($strArr);\n    foreach (str_split($skey) as $key => $value)\n        $key < $strCount && $strArr[$key] .= $value;\n    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n}",
+  "code_after_change": "\n?>\n\n\n<script type=\"text/javascript\" language=\"javascript\"> \nfunction confirmAct() \n{ \n  if(confirm('确定要删除吗?')) ",
+  "function_modified_lines": {
+    "added": [
+      "<script type=\"text/javascript\" language=\"javascript\">"
+    ],
+    "deleted": [
+      "function encode($string = '', $skey = 'cxphp')",
+      "{",
+      "    $strArr = str_split(base64_encode($string));",
+      "    $strCount = count($strArr);",
+      "    foreach (str_split($skey) as $key => $value)",
+      "        $key < $strCount && $strArr[$key] .= $value;",
+      "    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2022
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "function encode($string = '', $skey = 'cxphp')\n{\n    $strArr = str_split(base64_encode($string));\n    $strCount = count($strArr);\n    foreach (str_split($skey) as $key => $value)\n        $key < $strCount && $strArr[$key] .= $value;\n    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n}",
+  "code_after_change": "\n        <div class=\"mdui-card\">\n\n            <div class=\"mdui-card-primary\">\n                <div class=\"mdui-card-primary-title\" style=\"font-size:30px\">邮箱设置</div>\n            </div>\n            <form method=\"post\" action=\"run-mail.php\">\n                <m-scrollbar style=\"height: 650px;width:900px\">",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "function encode($string = '', $skey = 'cxphp')",
+      "{",
+      "    $strArr = str_split(base64_encode($string));",
+      "    $strCount = count($strArr);",
+      "    foreach (str_split($skey) as $key => $value)",
+      "        $key < $strCount && $strArr[$key] .= $value;",
+      "    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2023
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "function encode($string = '', $skey = 'cxphp')\n{\n    $strArr = str_split(base64_encode($string));\n    $strCount = count($strArr);\n    foreach (str_split($skey) as $key => $value)\n        $key < $strCount && $strArr[$key] .= $value;\n    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n}",
+  "code_after_change": "    <div style=\"    position: absolute;left: 60%;top:10%;text-align:center;    transform: translateX(-50%  );\">\n\n        <div class=\"mdui-card\">\n\n            <div class=\"mdui-card-primary\">\n                <div class=\"mdui-card-primary-title\" style=\"font-size:30px\">基本设置</div>\n            </div>\n            <form method=\"post\" action=\"run-setting.php\">",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "function encode($string = '', $skey = 'cxphp')",
+      "{",
+      "    $strArr = str_split(base64_encode($string));",
+      "    $strCount = count($strArr);",
+      "    foreach (str_split($skey) as $key => $value)",
+      "        $key < $strCount && $strArr[$key] .= $value;",
+      "    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2024
+},
+{
+  "cve_id": "CVE-2023-4448",
+  "code_before_change": "function encode($string = '', $skey = 'cxphp')\n{\n    $strArr = str_split(base64_encode($string));\n    $strCount = count($strArr);\n    foreach (str_split($skey) as $key => $value)\n        $key < $strCount && $strArr[$key] .= $value;\n    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));\n}",
+  "code_after_change": "$ran12 = rand() * 10;\n$dir = './backup/';\nmkdir($dir);\nchmod($dir, 0755);\n\n\nheader(\"Content-type:text/html;charset=utf-8\");\n",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "function encode($string = '', $skey = 'cxphp')",
+      "{",
+      "    $strArr = str_split(base64_encode($string));",
+      "    $strCount = count($strArr);",
+      "    foreach (str_split($skey) as $key => $value)",
+      "        $key < $strCount && $strArr[$key] .= $value;",
+      "    return str_replace(array('=', '+', '/'), array('O0O0O', 'o000o', 'oo00o'), join('', $strArr));",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-640"
+  ],
+  "cve_description": "A vulnerability was found in OpenRapid RapidCMS 1.3.1 and classified as critical. This issue affects some unknown processing of the file admin/run-movepass.php. The manipulation of the argument password/password2 leads to weak password recovery. The attack may be initiated remotely. The exploit has been disclosed to the public and may be used. The identifier of the patch is 4dff387283060961c362d50105ff8da8ea40bcbe. It is recommended to apply a patch to fix this issue. The identifier VDB-237569 was assigned to this vulnerability.",
+  "id": 2025
+}
+]

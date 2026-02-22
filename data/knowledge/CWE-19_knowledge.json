@@ -1,0 +1,28 @@
+[
+    {
+        "CVE_id": "CVE-2019-10477",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Insufficient validation of user input before accessing sensitive files.",
+            "trigger_condition": "An attacker manipulates the input parameter to access unauthorized files on the server.",
+            "specific_code_behavior_causing_vulnerability": "The code checks user permissions but does not validate the format or content of the input parameter, allowing for potential directory traversal attacks."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to implement input validation that ensures the input parameter adheres to a specific format before proceeding with file access. This prevents unauthorized access to sensitive files and enhances overall security.",
+        "purpose": "\"The function `sendXML` retrieves and outputs XML data for a specified item if the user has permission to view it.\"",
+        "function": "1. Checks if the user has permission to view the item using the `canView` method.  \n2. Retrieves the XML content from a specified file path based on the `items_id`.  \n3. Outputs the XML content if the user has permission; otherwise, displays an error message.",
+        "analysis": "The modification to the `sendXML` function is necessary to address a security vulnerability (CVE-2019-10477) that allows unauthorized access to XML files in the FusionInventory plugin for GLPI. The original code only checked if the user had permission to view the item (via `call_user_func([$itemtype, 'canView'])`) before attempting to read and output the XML file. This check alone is insufficient because it does not validate the format or the content of the `$items_id` parameter.\n\n### Reasons for the Modification:\n\n1. **Input Validation**: The original code did not validate the format of the `$items_id` parameter. An attacker could potentially manipulate this parameter to access arbitrary files on the server, leading to unauthorized data exposure. By adding the `preg_match` check, the modified code ensures that `$items_id` adheres to a specific format (i.e., it must match the pattern of `something/number/number.xml`). This restricts the input to only expected and valid XML file requests.\n\n2. **Preventing Directory Traversal**: Without proper validation, an attacker could exploit the function to perform directory traversal attacks, where they could potentially access sensitive files outside the intended directory by manipulating the `$items_id`. The regex pattern helps mitigate this risk by ensuring that only specific, well-defined file paths are allowed.\n\n3. **Security Best Practices**: Input validation is a fundamental security best practice. It helps to ensure that only valid and expected data is processed by the application, reducing the risk of various types of attacks, including injection attacks and unauthorized access.\n\n4. **Combining Checks**: The modification combines the format validation with the permission check in a single conditional statement. This ensures that both conditions must be satisfied before proceeding to read and output the XML file, thereby enhancing the overall security of the function.\n\nIn summary, the modification is necessary to enhance the security of the `sendXML` function by validating the input and preventing unauthorized access to sensitive files, thereby mitigating the risk associated with the identified vulnerability.",
+        "code_before_change": "   static function sendXML($items_id, $itemtype) {\n      if (call_user_func([$itemtype, 'canView'])) {\n         $xml = file_get_contents(GLPI_PLUGIN_DOC_DIR.\"/fusioninventory/xml/\".$items_id);\n         echo $xml;\n      } else {\n         Html::displayRightError();\n      }\n\n   }",
+        "code_after_change": "   static function sendXML($items_id, $itemtype) {\n      if (preg_match(\"/^([a-zA-Z]+)\\/(\\d+)\\/(\\d+)\\.xml$/\", $items_id)\n         && call_user_func([$itemtype, 'canView'])) {\n         $xml = file_get_contents(GLPI_PLUGIN_DOC_DIR.\"/fusioninventory/xml/\".$items_id);\n         echo $xml;\n      } else {\n         Html::displayRightError();\n      }\n\n   }",
+        "modified_lines": {
+            "added": [
+                "      if (preg_match(\"/^([a-zA-Z]+)\\/(\\d+)\\/(\\d+)\\.xml$/\", $items_id)",
+                "         && call_user_func([$itemtype, 'canView'])) {"
+            ],
+            "deleted": [
+                "      if (call_user_func([$itemtype, 'canView'])) {"
+            ]
+        },
+        "vulnerability_cause_description": "Insufficient validation of user input before accessing sensitive files.",
+        "trigger_condition": "An attacker manipulates the input parameter to access unauthorized files on the server.",
+        "specific_code_behavior_causing_vulnerability": "The code checks user permissions but does not validate the format or content of the input parameter, allowing for potential directory traversal attacks."
+    }
+]
