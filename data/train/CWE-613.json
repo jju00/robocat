@@ -1,0 +1,244 @@
+[
+{
+  "cve_id": "CVE-2021-3311",
+  "code_before_change": "    public function logout()\n    {\n        // Initialize the current auth session before trying to remove it\n        if (is_null($this->user) && !$this->check()) {\n            return;\n        }\n\n        if ($this->isImpersonator()) {\n            $this->user = $this->getImpersonator();\n            $this->stopImpersonate();\n            return;\n        }\n\n        if ($this->user) {\n            $this->user->setRememberToken(null);\n            $this->user->forceSave();\n        }\n\n        $this->user = null;\n\n        Session::flush();\n        Cookie::queue(Cookie::forget($this->sessionKey));\n    }",
+  "code_after_change": "    public function logout()\n    {\n        // Initialize the current auth session before trying to remove it\n        if (is_null($this->user) && !$this->check()) {\n            return;\n        }\n\n        if ($this->isImpersonator()) {\n            $this->user = $this->getImpersonator();\n            $this->stopImpersonate();\n            return;\n        }\n\n        if ($this->user) {\n            $this->user->setRememberToken(null);\n            $this->user->forceSave();\n        }\n\n        $this->user = null;\n\n        Session::invalidate();\n        Cookie::queue(Cookie::forget($this->sessionKey));\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        Session::invalidate();"
+    ],
+    "deleted": [
+      "        Session::flush();"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "An issue was discovered in October through build 471. It reactivates an old session ID (which had been invalid after a logout) once a new login occurs. NOTE: this violates the intended Auth/Manager.php authentication behavior but, admittedly, is only relevant if an old session ID is known to an attacker.",
+  "id": 1561
+},
+{
+  "cve_id": "CVE-2022-31050",
+  "code_before_change": "    public function isAuthorizedBackendUserSession()\n    {\n        if (!$this->hasSessionCookie()) {\n            return false;\n        }\n        $this->initializeSession();\n        if (empty($_SESSION['authorized']) || empty($_SESSION['isBackendSession'])) {\n            return false;\n        }\n        return !$this->isExpired();\n    }",
+  "code_after_change": "     * Check if we have an already authorized session\n     *\n     * @return bool TRUE if this session has been authorized before (by a correct password)\n     */\n    public function isAuthorized()\n    {\n        if (!$this->hasSessionCookie()) {\n            return false;\n        }\n        $this->initializeSession();\n        if (empty($_SESSION['authorized'])) {",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "    public function isAuthorizedBackendUserSession()"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "TYPO3 is an open source web content management system. Prior to versions 9.5.34 ELTS, 10.4.29, and 11.5.11, Admin Tool sessions initiated via the TYPO3 backend user interface had not been revoked even if the corresponding user account was degraded to lower permissions or disabled completely. This way, sessions in the admin tool theoretically could have been prolonged without any limit. TYPO3 versions 9.5.34 ELTS, 10.4.29, and 11.5.11 contain a fix for the problem.",
+  "id": 1562
+},
+{
+  "cve_id": "CVE-2022-31050",
+  "code_before_change": "    public function setAuthorizedBackendSession()\n    {\n        $_SESSION['authorized'] = true;\n        $_SESSION['lastSessionId'] = time();\n        $_SESSION['tstamp'] = time();\n        $_SESSION['expires'] = time() + $this->expireTimeInMinutes * 60;\n        $_SESSION['isBackendSession'] = true;\n        // Renew the session id to avoid session fixation\n        $this->renewSession();\n    }",
+  "code_after_change": "    public function setAuthorizedBackendSession(UserSession $userSession)\n    {\n        $nonce = bin2hex(random_bytes(20));\n        $sessionBackend = $this->getBackendUserSessionBackend();\n        // use hash mechanism of session backend, or pass plain value through generic hmac\n        $sessionHmac = $sessionBackend instanceof HashableSessionBackendInterface\n            ? $sessionBackend->hash($userSession->getIdentifier())\n            : hash_hmac('sha256', $userSession->getIdentifier(), $nonce);\n\n        $_SESSION['authorized'] = true;\n        $_SESSION['lastSessionId'] = time();\n        $_SESSION['tstamp'] = time();\n        $_SESSION['expires'] = time() + $this->expireTimeInMinutes * 60;\n        $_SESSION['isBackendSession'] = true;\n        $_SESSION['backendUserSession'] = [\n            'nonce' => $nonce,\n            'userId' => $userSession->getUserId(),\n            'hmac' => $sessionHmac,\n        ];\n        // Renew the session id to avoid session fixation\n        $this->renewSession();\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function setAuthorizedBackendSession(UserSession $userSession)",
+      "        $nonce = bin2hex(random_bytes(20));",
+      "        $sessionBackend = $this->getBackendUserSessionBackend();",
+      "        // use hash mechanism of session backend, or pass plain value through generic hmac",
+      "        $sessionHmac = $sessionBackend instanceof HashableSessionBackendInterface",
+      "            ? $sessionBackend->hash($userSession->getIdentifier())",
+      "            : hash_hmac('sha256', $userSession->getIdentifier(), $nonce);",
+      "        $_SESSION['backendUserSession'] = [",
+      "            'nonce' => $nonce,",
+      "            'userId' => $userSession->getUserId(),",
+      "            'hmac' => $sessionHmac,",
+      "        ];"
+    ],
+    "deleted": [
+      "    public function setAuthorizedBackendSession()"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "TYPO3 is an open source web content management system. Prior to versions 9.5.34 ELTS, 10.4.29, and 11.5.11, Admin Tool sessions initiated via the TYPO3 backend user interface had not been revoked even if the corresponding user account was degraded to lower permissions or disabled completely. This way, sessions in the admin tool theoretically could have been prolonged without any limit. TYPO3 versions 9.5.34 ELTS, 10.4.29, and 11.5.11 contain a fix for the problem.",
+  "id": 1563
+},
+{
+  "cve_id": "CVE-2023-38489",
+  "code_before_change": "\tpublic function currentUserFromSession($session = null)\n\t{\n\t\t$session = $this->session($session);\n\n\t\t$id = $session->data()->get('kirby.userId');\n\n\t\tif (is_string($id) !== true) {\n\t\t\treturn null;\n\t\t}\n\n\t\tif ($user = $this->kirby->users()->find($id)) {\n\t\t\t// in case the session needs to be updated, do it now\n\t\t\t// for better performance\n\t\t\t$session->commit();\n\t\t\treturn $user;\n\t\t}\n\n\t\treturn null;\n\t}",
+  "code_after_change": "\tpublic function currentUserFromSession($session = null)\n\t{\n\t\t$session = $this->session($session);\n\n\t\t$id = $session->data()->get('kirby.userId');\n\n\t\t// if no user is logged in, return immediately\n\t\tif (is_string($id) !== true) {\n\t\t\treturn null;\n\t\t}\n\n\t\t// a user is logged in, ensure it exists\n\t\t$user = $this->kirby->users()->find($id);\n\t\tif ($user === null) {\n\t\t\treturn null;\n\t\t}\n\n\t\tif ($passwordTimestamp = $user->passwordTimestamp()) {\n\t\t\t$loginTimestamp = $session->data()->get('kirby.loginTimestamp');\n\t\t\tif (is_int($loginTimestamp) !== true) {\n\t\t\t\t// session that was created before Kirby\n\t\t\t\t// 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1 or 3.9.6\n\t\t\t\t// or when the user didn't have a password set\n\t\t\t\t$user->logout();\n\t\t\t\treturn null;\n\t\t\t}\n\n\t\t\t// invalidate the session if the password\n\t\t\t// changed since the login\n\t\t\tif ($loginTimestamp < $passwordTimestamp) {\n\t\t\t\t$user->logout();\n\t\t\t\treturn null;\n\t\t\t}\n\t\t}\n\n\t\t// in case the session needs to be updated, do it now\n\t\t// for better performance\n\t\t$session->commit();\n\t\treturn $user;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t// if no user is logged in, return immediately",
+      "\t\t// a user is logged in, ensure it exists",
+      "\t\t$user = $this->kirby->users()->find($id);",
+      "\t\tif ($user === null) {",
+      "\t\t\treturn null;",
+      "\t\tif ($passwordTimestamp = $user->passwordTimestamp()) {",
+      "\t\t\t$loginTimestamp = $session->data()->get('kirby.loginTimestamp');",
+      "\t\t\tif (is_int($loginTimestamp) !== true) {",
+      "\t\t\t\t// session that was created before Kirby",
+      "\t\t\t\t// 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1 or 3.9.6",
+      "\t\t\t\t// or when the user didn't have a password set",
+      "\t\t\t\t$user->logout();",
+      "\t\t\t\treturn null;",
+      "\t\t\t}",
+      "\t\t\t// invalidate the session if the password",
+      "\t\t\t// changed since the login",
+      "\t\t\tif ($loginTimestamp < $passwordTimestamp) {",
+      "\t\t\t\t$user->logout();",
+      "\t\t\t\treturn null;",
+      "\t\t\t}",
+      "\t\t}",
+      "\t\t// in case the session needs to be updated, do it now",
+      "\t\t// for better performance",
+      "\t\t$session->commit();",
+      "\t\treturn $user;"
+    ],
+    "deleted": [
+      "\t\tif ($user = $this->kirby->users()->find($id)) {",
+      "\t\t\t// in case the session needs to be updated, do it now",
+      "\t\t\t// for better performance",
+      "\t\t\t$session->commit();",
+      "\t\t\treturn $user;",
+      "\t\treturn null;"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Kirby is a content management system. A vulnerability in versions prior to 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6 affects all Kirby sites with user accounts (unless Kirby's API and Panel are disabled in the config). It can only be abused if a Kirby user is logged in on a device or browser that is shared with potentially untrusted users or if an attacker already maliciously used a previous password to log in to a Kirby site as the affected user.\n\nInsufficient Session Expiration is when a web site permits an attacker to reuse old session credentials or session IDs for authorization. In the variation described in this advisory, it allows attackers to stay logged in to a Kirby site on another device even if the logged in user has since changed their password. Kirby did not invalidate user sessions that were created with a password that was since changed by the user or by a site admin. If a user changed their password to lock out an attacker who was already in possession of the previous password or of a login session on another device or browser, the attacker would not be reliably prevented from accessing the Kirby site as the affected user.\n\nThe problem has been patched in Kirby 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6. In all of the mentioned releases, the maintainers have updated the authentication implementation to keep track of the hashed password in each active session. If the password changed since the login, the session is invalidated. To enforce this fix even if the vulnerability was previously abused, all users are logged out from the Kirby site after updating to one of the patched releases.",
+  "id": 1564
+},
+{
+  "cve_id": "CVE-2023-38489",
+  "code_before_change": "\tprotected function readPassword()\n\t{\n\t\treturn F::read($this->root() . '/.htpasswd');\n\t}",
+  "code_after_change": "\tprotected function readPassword()\n\t{\n\t\treturn F::read($this->passwordFile());\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\treturn F::read($this->passwordFile());"
+    ],
+    "deleted": [
+      "\t\treturn F::read($this->root() . '/.htpasswd');"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Kirby is a content management system. A vulnerability in versions prior to 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6 affects all Kirby sites with user accounts (unless Kirby's API and Panel are disabled in the config). It can only be abused if a Kirby user is logged in on a device or browser that is shared with potentially untrusted users or if an attacker already maliciously used a previous password to log in to a Kirby site as the affected user.\n\nInsufficient Session Expiration is when a web site permits an attacker to reuse old session credentials or session IDs for authorization. In the variation described in this advisory, it allows attackers to stay logged in to a Kirby site on another device even if the logged in user has since changed their password. Kirby did not invalidate user sessions that were created with a password that was since changed by the user or by a site admin. If a user changed their password to lock out an attacker who was already in possession of the previous password or of a login session on another device or browser, the attacker would not be reliably prevented from accessing the Kirby site as the affected user.\n\nThe problem has been patched in Kirby 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6. In all of the mentioned releases, the maintainers have updated the authentication implementation to keep track of the hashed password in each active session. If the password changed since the login, the session is invalidated. To enforce this fix even if the vulnerability was previously abused, all users are logged out from the Kirby site after updating to one of the patched releases.",
+  "id": 1565
+},
+{
+  "cve_id": "CVE-2023-38489",
+  "code_before_change": "\tpublic function testUserSession1()\n\t{\n\t\t$session = $this->app->session();\n\t\t$session->set('kirby.userId', 'marge');\n\n\t\t$user = $this->auth->user();\n\t\t$this->assertSame('marge@simpsons.com', $user->email());\n\n\t\t$this->assertSame([\n\t\t\t'challenge' => null,\n\t\t\t'email'     => 'marge@simpsons.com',\n\t\t\t'status'    => 'active'\n\t\t], $this->auth->status()->toArray());\n\n\t\t// impersonation is not set\n\t\t$this->assertNull($this->auth->currentUserFromImpersonation());\n\n\t\t// value is cached\n\t\t$session->set('kirby.userId', 'homer');\n\t\t$user = $this->auth->user();\n\t\t$this->assertSame('marge@simpsons.com', $user->email());\n\t\t$this->assertSame([\n\t\t\t'challenge' => null,\n\t\t\t'email'     => 'marge@simpsons.com',\n\t\t\t'status'    => 'active'\n\t\t], $this->auth->status()->toArray());\n\t}",
+  "code_after_change": "\t * @covers ::status\n\t * @covers ::user\n\t */\n\tpublic function testUserSession()\n\t{\n\t\t$session = $this->app->session();\n\t\t$session->set('kirby.userId', 'marge');\n\n\t\t$user = $this->auth->user();\n\t\t$this->assertSame('marge@simpsons.com', $user->email());\n\n\t\t$this->assertSame([\n\t\t\t'challenge' => null,\n\t\t\t'email'     => 'marge@simpsons.com',\n\t\t\t'status'    => 'active'\n\t\t], $this->auth->status()->toArray());\n\n\t\t// impersonation is not set\n\t\t$this->assertNull($this->auth->currentUserFromImpersonation());\n\n\t\t// value is cached\n\t\t$session->set('kirby.userId', 'homer');\n\t\t$user = $this->auth->user();\n\t\t$this->assertSame('marge@simpsons.com', $user->email());\n\t\t$this->assertSame([\n\t\t\t'challenge' => null,\n\t\t\t'email'     => 'marge@simpsons.com',",
+  "function_modified_lines": {
+    "added": [
+      "\tpublic function testUserSession()"
+    ],
+    "deleted": [
+      "\tpublic function testUserSession1()"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Kirby is a content management system. A vulnerability in versions prior to 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6 affects all Kirby sites with user accounts (unless Kirby's API and Panel are disabled in the config). It can only be abused if a Kirby user is logged in on a device or browser that is shared with potentially untrusted users or if an attacker already maliciously used a previous password to log in to a Kirby site as the affected user.\n\nInsufficient Session Expiration is when a web site permits an attacker to reuse old session credentials or session IDs for authorization. In the variation described in this advisory, it allows attackers to stay logged in to a Kirby site on another device even if the logged in user has since changed their password. Kirby did not invalidate user sessions that were created with a password that was since changed by the user or by a site admin. If a user changed their password to lock out an attacker who was already in possession of the previous password or of a login session on another device or browser, the attacker would not be reliably prevented from accessing the Kirby site as the affected user.\n\nThe problem has been patched in Kirby 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6. In all of the mentioned releases, the maintainers have updated the authentication implementation to keep track of the hashed password in each active session. If the password changed since the login, the session is invalidated. To enforce this fix even if the vulnerability was previously abused, all users are logged out from the Kirby site after updating to one of the patched releases.",
+  "id": 1566
+},
+{
+  "cve_id": "CVE-2023-38489",
+  "code_before_change": "\tpublic function testUserSession2()\n\t{\n\t\t$session = (new AutoSession($this->app->root('sessions')))->createManually();\n\t\t$session->set('kirby.userId', 'homer');\n\n\t\t$user = $this->auth->user($session);\n\t\t$this->assertSame('homer@simpsons.com', $user->email());\n\t\t$this->assertSame([\n\t\t\t'challenge' => null,\n\t\t\t'email'     => 'homer@simpsons.com',\n\t\t\t'status'    => 'active'\n\t\t], $this->auth->status()->toArray());\n\t}",
+  "code_after_change": "\t * @covers ::status\n\t * @covers ::user\n\t */\n\tpublic function testUserSessionManualSession()\n\t{\n\t\t$session = (new AutoSession($this->app->root('sessions')))->createManually();\n\t\t$session->set('kirby.userId', 'homer');\n\t\t$session->set('kirby.loginTimestamp', 1337000000);\n\n\t\t$user = $this->auth->user($session);\n\t\t$this->assertSame('homer@simpsons.com', $user->email());\n\t\t$this->assertSame([\n\t\t\t'challenge' => null,",
+  "function_modified_lines": {
+    "added": [
+      "\tpublic function testUserSessionManualSession()",
+      "\t\t$session->set('kirby.loginTimestamp', 1337000000);"
+    ],
+    "deleted": [
+      "\tpublic function testUserSession2()"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Kirby is a content management system. A vulnerability in versions prior to 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6 affects all Kirby sites with user accounts (unless Kirby's API and Panel are disabled in the config). It can only be abused if a Kirby user is logged in on a device or browser that is shared with potentially untrusted users or if an attacker already maliciously used a previous password to log in to a Kirby site as the affected user.\n\nInsufficient Session Expiration is when a web site permits an attacker to reuse old session credentials or session IDs for authorization. In the variation described in this advisory, it allows attackers to stay logged in to a Kirby site on another device even if the logged in user has since changed their password. Kirby did not invalidate user sessions that were created with a password that was since changed by the user or by a site admin. If a user changed their password to lock out an attacker who was already in possession of the previous password or of a login session on another device or browser, the attacker would not be reliably prevented from accessing the Kirby site as the affected user.\n\nThe problem has been patched in Kirby 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6. In all of the mentioned releases, the maintainers have updated the authentication implementation to keep track of the hashed password in each active session. If the password changed since the login, the session is invalidated. To enforce this fix even if the vulnerability was previously abused, all users are logged out from the Kirby site after updating to one of the patched releases.",
+  "id": 1567
+},
+{
+  "cve_id": "CVE-2023-38489",
+  "code_before_change": "\t\t\t\t\t$phpunit->assertTrue($newUser->validatePassword('topsecret2018'));\n\t\t\t\t\t$phpunit->assertEmpty($oldUser->password());\n\t\t\t\t\t$calls++;\n\t\t\t\t}",
+  "code_after_change": "\t\t\t\t\t$phpunit->assertTrue($newUser->validatePassword('topsecret2018'));\n\t\t\t\t\t$phpunit->assertEmpty($oldUser->password());\n\t\t\t\t\t$calls += 2;\n\t\t\t\t},",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t\t$calls += 2;",
+      "\t\t\t\t},"
+    ],
+    "deleted": [
+      "\t\t\t\t\t$calls++;",
+      "\t\t\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Kirby is a content management system. A vulnerability in versions prior to 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6 affects all Kirby sites with user accounts (unless Kirby's API and Panel are disabled in the config). It can only be abused if a Kirby user is logged in on a device or browser that is shared with potentially untrusted users or if an attacker already maliciously used a previous password to log in to a Kirby site as the affected user.\n\nInsufficient Session Expiration is when a web site permits an attacker to reuse old session credentials or session IDs for authorization. In the variation described in this advisory, it allows attackers to stay logged in to a Kirby site on another device even if the logged in user has since changed their password. Kirby did not invalidate user sessions that were created with a password that was since changed by the user or by a site admin. If a user changed their password to lock out an attacker who was already in possession of the previous password or of a login session on another device or browser, the attacker would not be reliably prevented from accessing the Kirby site as the affected user.\n\nThe problem has been patched in Kirby 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6. In all of the mentioned releases, the maintainers have updated the authentication implementation to keep track of the hashed password in each active session. If the password changed since the login, the session is invalidated. To enforce this fix even if the vulnerability was previously abused, all users are logged out from the Kirby site after updating to one of the patched releases.",
+  "id": 1568
+},
+{
+  "cve_id": "CVE-2023-4005",
+  "code_before_change": "    public function change_password($data)\n    {\n        $required = [\n            'current_password' => 'Current password required',\n            'new_password' => 'New password required',\n            'confirm_password' => 'New password confirmation required',\n        ];\n        $validator = $this->di['validator'];\n        $validator->checkRequiredParamsForArray($required, $data);\n        $validator->isPasswordStrong($data['new_password']);\n\n        if ($data['new_password'] != $data['confirm_password']) {\n            throw new \\Exception('Passwords do not match');\n        }\n\n        $staff = $this->getIdentity();\n\n        if(!$this->di['password']->verify($data['current_password'], $staff->pass)) {\n            throw new \\Exception('Current password incorrect');\n        }\n\n        return $this->getService()->changeAdminPassword($staff, $data['new_password']);\n    }",
+  "code_after_change": "    public function change_password($data)\n    {\n        $required = [\n            'current_password' => 'Current password required',\n            'new_password' => 'New password required',\n            'confirm_password' => 'New password confirmation required',\n        ];\n        $validator = $this->di['validator'];\n        $validator->checkRequiredParamsForArray($required, $data);\n        $validator->isPasswordStrong($data['new_password']);\n\n        if ($data['new_password'] != $data['confirm_password']) {\n            throw new \\Exception('Passwords do not match');\n        }\n\n        $staff = $this->getIdentity();\n\n        if (!$this->di['password']->verify($data['current_password'], $staff->pass)) {\n            throw new \\Exception('Current password incorrect');\n        }\n\n        $this->getService()->invalidateSessions();\n        return $this->getService()->changeAdminPassword($staff, $data['new_password']);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        if (!$this->di['password']->verify($data['current_password'], $staff->pass)) {",
+      "        $this->getService()->invalidateSessions();"
+    ],
+    "deleted": [
+      "        if(!$this->di['password']->verify($data['current_password'], $staff->pass)) {"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Insufficient Session Expiration in GitHub repository fossbilling/fossbilling prior to 0.5.5.",
+  "id": 1569
+},
+{
+  "cve_id": "CVE-2023-4005",
+  "code_before_change": "    public function change_password($data)\n    {\n        $required = [\n            'current_password' => 'Current password required',\n            'new_password' => 'New password required',\n            'confirm_password' => 'New password confirmation required',\n        ];\n        $this->di['validator']->checkRequiredParamsForArray($required, $data);\n        $this->di['validator']->isPasswordStrong($data['new_password']);\n\n        if ($data['new_password'] != $data['confirm_password']) {\n            throw new \\Exception('Passwords do not match');\n        }\n\n        $client = $this->getIdentity();\n\n        if(!$this->di['password']->verify($data['current_password'], $client->pass)) {\n            throw new \\Exception('Current password incorrect');\n        }\n\n        return $this->getService()->changeClientPassword($client, $data['new_password']);\n    }",
+  "code_after_change": "    public function change_password($data)\n    {\n        $required = [\n            'current_password' => 'Current password required',\n            'new_password' => 'New password required',\n            'confirm_password' => 'New password confirmation required',\n        ];\n        $this->di['validator']->checkRequiredParamsForArray($required, $data);\n        $this->di['validator']->isPasswordStrong($data['new_password']);\n\n        if ($data['new_password'] != $data['confirm_password']) {\n            throw new \\Exception('Passwords do not match');\n        }\n\n        $client = $this->getIdentity();\n\n        if (!$this->di['password']->verify($data['current_password'], $client->pass)) {\n            throw new \\Exception('Current password incorrect');\n        }\n\n        $this->getService()->invalidateSessions();\n        return $this->getService()->changeClientPassword($client, $data['new_password']);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        if (!$this->di['password']->verify($data['current_password'], $client->pass)) {",
+      "        $this->getService()->invalidateSessions();"
+    ],
+    "deleted": [
+      "        if(!$this->di['password']->verify($data['current_password'], $client->pass)) {"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Insufficient Session Expiration in GitHub repository fossbilling/fossbilling prior to 0.5.5.",
+  "id": 1570
+},
+{
+  "cve_id": "CVE-2023-4005",
+  "code_before_change": "    public function testchange_password()\n    {\n        $data = array(\n            'id'               => 1,\n            'password'         => 'strongPass',\n            'password_confirm' => 'strongPass',\n        );\n\n        $model = new \\Model_Client();\n        $model->loadBean(new \\DummyBean());\n\n        $dbMock = $this->getMockBuilder('\\Box_Database')->getMock();\n        $dbMock->expects($this->atLeastOnce())\n            ->method('getExistingModelById')->will($this->returnValue($model));\n\n        $dbMock->expects($this->atLeastOnce())\n            ->method('store')->will($this->returnValue(1));\n\n        $eventMock = $this->getMockBuilder('\\Box_EventManager')->getMock();\n        $eventMock->expects($this->atLeastOnce())->\n        method('fire');\n\n        $passwordMock = $this->getMockBuilder('\\Box_Password')->getMock();\n        $passwordMock->expects($this->atLeastOnce())\n            ->method('hashIt')\n            ->with($data['password']);\n\n        $di                   = new \\Pimple\\Container();\n        $di['db']             = $dbMock;\n        $di['events_manager'] = $eventMock;\n        $di['logger']         = new \\Box_Log();\n        $di['password']       = $passwordMock;\n        $validatorMock = $this->getMockBuilder('\\FOSSBilling\\Validate')->disableOriginalConstructor()->getMock();\n        $validatorMock->expects($this->atLeastOnce())\n            ->method('checkRequiredParamsForArray')\n            ->will($this->returnValue(null));\n        $di['validator'] = $validatorMock;\n\n\n        $admin_Client = new \\Box\\Mod\\Client\\Api\\Admin();\n        $admin_Client->setDi($di);\n\n        $result = $admin_Client->change_password($data);\n        $this->assertTrue($result);\n    }",
+  "code_after_change": "    public function testchange_password()\n    {\n        $data = array(\n            'id'               => 1,\n            'password'         => 'strongPass',\n            'password_confirm' => 'strongPass',\n        );\n\n        $model = new \\Model_Client();\n        $model->loadBean(new \\DummyBean());\n\n        $dbMock = $this->getMockBuilder('\\Box_Database')->getMock();\n        $dbMock->expects($this->atLeastOnce())\n            ->method('getExistingModelById')->will($this->returnValue($model));\n\n        $dbMock->expects($this->atLeastOnce())\n            ->method('store')->will($this->returnValue(1));\n\n        $eventMock = $this->getMockBuilder('\\Box_EventManager')->getMock();\n        $eventMock->expects($this->atLeastOnce())->\n        method('fire');\n\n        $passwordMock = $this->getMockBuilder('\\Box_Password')->getMock();\n        $passwordMock->expects($this->atLeastOnce())\n            ->method('hashIt')\n            ->with($data['password']);\n\n        $profileService = $this->getMockBuilder('\\Box\\Mod\\Profile\\Service')->getMock();\n\n        $di                   = new \\Pimple\\Container();\n        $di['db']             = $dbMock;\n        $di['events_manager'] = $eventMock;\n        $di['logger']         = new \\Box_Log();\n        $di['password']       = $passwordMock;\n        $validatorMock = $this->getMockBuilder('\\FOSSBilling\\Validate')->disableOriginalConstructor()->getMock();\n        $validatorMock->expects($this->atLeastOnce())\n            ->method('checkRequiredParamsForArray')\n            ->will($this->returnValue(null));\n        $di['validator'] = $validatorMock;\n        $di['mod_service'] = $di->protect(function () use ($profileService) {\n            return $profileService;\n        });\n\n        $admin_Client = new \\Box\\Mod\\Client\\Api\\Admin();\n        $admin_Client->setDi($di);",
+  "function_modified_lines": {
+    "added": [
+      "        $profileService = $this->getMockBuilder('\\Box\\Mod\\Profile\\Service')->getMock();",
+      "        $di['mod_service'] = $di->protect(function () use ($profileService) {",
+      "            return $profileService;",
+      "        });"
+    ],
+    "deleted": []
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "Insufficient Session Expiration in GitHub repository fossbilling/fossbilling prior to 0.5.5.",
+  "id": 1571
+}
+]

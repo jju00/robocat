@@ -1,0 +1,1211 @@
+[
+{
+  "cve_id": "CVE-2015-7698",
+  "code_before_change": "\tprotected function connect() {\n\t\t$user = $this->getUser();\n\t\t$workgroup = null;\n\t\tif (strpos($user, '/')) {\n\t\t\tlist($workgroup, $user) = explode('/', $user);\n\t\t}\n\t\t$this->state->init($workgroup, $user, $this->getPassword());\n\t}",
+  "code_after_change": "\tprotected function connect() {\n\t\t$this->state->init($this->getWorkgroup(), $this->getUser(), $this->getPassword());\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$this->state->init($this->getWorkgroup(), $this->getUser(), $this->getPassword());"
+    ],
+    "deleted": [
+      "\t\t$user = $this->getUser();",
+      "\t\t$workgroup = null;",
+      "\t\tif (strpos($user, '/')) {",
+      "\t\t\tlist($workgroup, $user) = explode('/', $user);",
+      "\t\t}",
+      "\t\t$this->state->init($workgroup, $user, $this->getPassword());"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "icewind1991 SMB before 1.0.3 allows remote authenticated users to execute arbitrary SMB commands via shell metacharacters in the user argument in the (1) listShares function in Server.php or the (2) connect or (3) read function in Share.php.",
+  "id": 2668
+},
+{
+  "cve_id": "CVE-2015-7698",
+  "code_before_change": "\t\t\tlist($workgroup, $user) = explode('\\\\', $user);\n\t\t} else {\n\t\t\t$workgroup = null;\n\t\t}\n\t\t$this->state->init($workgroup, $user, $this->server->getPassword());\n\t}",
+  "code_after_change": "\t * Get the name of the share\n\t *\n\t * @return string\n\t */\n\tpublic function getName() {\n\t\treturn $this->name;",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "\t\t\tlist($workgroup, $user) = explode('\\\\', $user);",
+      "\t\t} else {",
+      "\t\t\t$workgroup = null;",
+      "\t\t}",
+      "\t\t$this->state->init($workgroup, $user, $this->server->getPassword());"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "icewind1991 SMB before 1.0.3 allows remote authenticated users to execute arbitrary SMB commands via shell metacharacters in the user argument in the (1) listShares function in Server.php or the (2) connect or (3) read function in Share.php.",
+  "id": 2669
+},
+{
+  "cve_id": "CVE-2015-7698",
+  "code_before_change": "\tprotected function connect() {\n\t\tif ($this->connection and $this->connection->isValid()) {\n\t\t\treturn;\n\t\t}\n\t\t$command = sprintf('%s --authentication-file=/proc/self/fd/3 //%s/%s',\n\t\t\tServer::CLIENT,\n\t\t\t$this->server->getHost(),\n\t\t\t$this->name\n\t\t);\n\t\t$this->connection = new Connection($command);\n\t\t$this->connection->writeAuthentication($this->server->getUser(), $this->server->getPassword());\n\t\tif (!$this->connection->isValid()) {\n\t\t\tthrow new ConnectionException();\n\t\t}\n\t}",
+  "code_after_change": "\tprotected function connect() {\n\t\tif ($this->connection and $this->connection->isValid()) {\n\t\t\treturn;\n\t\t}\n\t\t$workgroupArgument = ($this->server->getWorkgroup()) ? ' -W ' . escapeshellarg($this->server->getWorkgroup()) : '';\n\t\t$command = sprintf('%s %s --authentication-file=/proc/self/fd/3 //%s/%s',\n\t\t\tServer::CLIENT,\n\t\t\t$workgroupArgument,\n\t\t\t$this->server->getHost(),\n\t\t\t$this->name\n\t\t);\n\t\t$this->connection = new Connection($command);\n\t\t$this->connection->writeAuthentication($this->server->getUser(), $this->server->getPassword());\n\t\tif (!$this->connection->isValid()) {\n\t\t\tthrow new ConnectionException();\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$workgroupArgument = ($this->server->getWorkgroup()) ? ' -W ' . escapeshellarg($this->server->getWorkgroup()) : '';",
+      "\t\t$command = sprintf('%s %s --authentication-file=/proc/self/fd/3 //%s/%s',",
+      "\t\t\t$workgroupArgument,"
+    ],
+    "deleted": [
+      "\t\t$command = sprintf('%s --authentication-file=/proc/self/fd/3 //%s/%s',"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "icewind1991 SMB before 1.0.3 allows remote authenticated users to execute arbitrary SMB commands via shell metacharacters in the user argument in the (1) listShares function in Server.php or the (2) connect or (3) read function in Share.php.",
+  "id": 2670
+},
+{
+  "cve_id": "CVE-2015-7698",
+  "code_before_change": "\tpublic function read($source) {\n\t\t$source = $this->escapePath($source);\n\t\t// close the single quote, open a double quote where we put the single quote...\n\t\t$source = str_replace('\\'', '\\'\"\\'\"\\'', $source);\n\t\t// since returned stream is closed by the caller we need to create a new instance\n\t\t// since we can't re-use the same file descriptor over multiple calls\n\t\t$command = sprintf('%s --authentication-file=/proc/self/fd/3 //%s/%s -c \\'get %s /proc/self/fd/5\\'',\n\t\t\tServer::CLIENT,\n\t\t\t$this->server->getHost(),\n\t\t\t$this->name,\n\t\t\t$source\n\t\t);\n\t\t$connection = new Connection($command);\n\t\t$connection->writeAuthentication($this->server->getUser(), $this->server->getPassword());\n\t\t$fh = $connection->getFileOutputStream();\n\t\tstream_context_set_option($fh, 'file', 'connection', $connection);\n\t\treturn $fh;\n\t}",
+  "code_after_change": "\tpublic function read($source) {\n\t\t$source = $this->escapePath($source);\n\t\t// close the single quote, open a double quote where we put the single quote...\n\t\t$source = str_replace('\\'', '\\'\"\\'\"\\'', $source);\n\t\t// since returned stream is closed by the caller we need to create a new instance\n\t\t// since we can't re-use the same file descriptor over multiple calls\n\t\t$workgroupArgument = ($this->server->getWorkgroup()) ? ' -W ' . escapeshellarg($this->server->getWorkgroup()) : '';\n\t\t$command = sprintf('%s %s --authentication-file=/proc/self/fd/3 //%s/%s -c \\'get %s /proc/self/fd/5\\'',\n\t\t\tServer::CLIENT,\n\t\t\t$workgroupArgument,\n\t\t\t$this->server->getHost(),\n\t\t\t$this->name,\n\t\t\t$source\n\t\t);\n\t\t$connection = new Connection($command);\n\t\t$connection->writeAuthentication($this->server->getUser(), $this->server->getPassword());\n\t\t$fh = $connection->getFileOutputStream();\n\t\tstream_context_set_option($fh, 'file', 'connection', $connection);\n\t\treturn $fh;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$workgroupArgument = ($this->server->getWorkgroup()) ? ' -W ' . escapeshellarg($this->server->getWorkgroup()) : '';",
+      "\t\t$command = sprintf('%s %s --authentication-file=/proc/self/fd/3 //%s/%s -c \\'get %s /proc/self/fd/5\\'',",
+      "\t\t\t$workgroupArgument,"
+    ],
+    "deleted": [
+      "\t\t$command = sprintf('%s --authentication-file=/proc/self/fd/3 //%s/%s -c \\'get %s /proc/self/fd/5\\'',"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "icewind1991 SMB before 1.0.3 allows remote authenticated users to execute arbitrary SMB commands via shell metacharacters in the user argument in the (1) listShares function in Server.php or the (2) connect or (3) read function in Share.php.",
+  "id": 2671
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tprivate function LoadData()\n\t{\n\t\t$this->dataLoaded = true;\n\n\t\t$args = array();\n\t\t$args[] = '-s';\n\t\t$args[] = '-l';\n\t\t$args[] = $this->commitHash;\n\t\t$args[] = '--';\n\t\t$args[] = $this->path;\n\n\t\t$blamelines = explode(\"\\n\", $this->exe->Execute($this->project->GetPath(), GIT_BLAME, $args));\n\n\t\t$lastcommit = '';\n\t\tforeach ($blamelines as $line) {\n\t\t\tif (preg_match('/^([0-9a-fA-F]{40})(\\s+.+)?\\s+([0-9]+)\\)/', $line, $regs)) {\n\t\t\t\tif ($regs[1] != $lastcommit) {\n\t\t\t\t\t$this->blame[(int)($regs[3])] = $regs[1];\n\t\t\t\t\t$lastcommit = $regs[1];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}",
+  "code_after_change": "\tprivate function LoadData()\n\t{\n\t\t$this->dataLoaded = true;\n\n\t\t$args = array();\n\t\t$args[] = '-s';\n\t\t$args[] = '-l';\n\t\t$args[] = escapeshellarg($this->commitHash);\n\t\t$args[] = '--';\n\t\t$args[] = escapeshellarg($this->path);\n\n\t\t$blamelines = explode(\"\\n\", $this->exe->Execute($this->project->GetPath(), GIT_BLAME, $args));\n\n\t\t$lastcommit = '';\n\t\tforeach ($blamelines as $line) {\n\t\t\tif (preg_match('/^([0-9a-fA-F]{40})(\\s+.+)?\\s+([0-9]+)\\)/', $line, $regs)) {\n\t\t\t\tif ($regs[1] != $lastcommit) {\n\t\t\t\t\t$this->blame[(int)($regs[3])] = $regs[1];\n\t\t\t\t\t$lastcommit = $regs[1];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($this->commitHash);",
+      "\t\t$args[] = escapeshellarg($this->path);"
+    ],
+    "deleted": [
+      "\t\t$args[] = $this->commitHash;",
+      "\t\t$args[] = $this->path;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2672
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tprotected function LoadData()\n\t{\n\t\t$this->dataLoaded = true;\n\n\t\t$args = array();\n\t\t$args[] = $this->hash;\n\t\t$args[] = '--no-merges';\n\n\t\t$canSkip = true;\n\t\tif ($this->skip > 0)\n\t\t\t$canSkip = $this->exe->CanSkip();\n\n\t\tif ($canSkip) {\n\t\t\tif ($this->limit > 0) {\n\t\t\t\t$args[] = '--max-count=' . $this->limit;\n\t\t\t}\n\t\t\tif ($this->skip > 0) {\n\t\t\t\t$args[] = '--skip=' . $this->skip;\n\t\t\t}\n\t\t} else {\n\t\t\tif ($this->limit > 0) {\n\t\t\t\t$args[] = '--max-count=' . ($this->limit + $this->skip);\n\t\t\t}\n\t\t}",
+  "code_after_change": "\tprotected function LoadData()\n\t{\n\t\t$this->dataLoaded = true;\n\n\t\t$args = array();\n\t\t$args[] = $this->hash;\n\t\t$args[] = '--no-merges';\n\n\t\t$canSkip = true;\n\t\tif ($this->skip > 0)\n\t\t\t$canSkip = $this->exe->CanSkip();\n\n\t\tif ($canSkip) {\n\t\t\tif ($this->limit > 0) {\n\t\t\t\t$args[] = '--max-count=' . escapeshellarg($this->limit);\n\t\t\t}\n\t\t\tif ($this->skip > 0) {\n\t\t\t\t$args[] = '--skip=' . escapeshellarg($this->skip);\n\t\t\t}\n\t\t} else {\n\t\t\tif ($this->limit > 0) {\n\t\t\t\t$args[] = '--max-count=' . escapeshellarg($this->limit + $this->skip);\n\t\t\t}\n\t\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t$args[] = '--max-count=' . escapeshellarg($this->limit);",
+      "\t\t\t\t$args[] = '--skip=' . escapeshellarg($this->skip);",
+      "\t\t\t\t$args[] = '--max-count=' . escapeshellarg($this->limit + $this->skip);"
+    ],
+    "deleted": [
+      "\t\t\t\t$args[] = '--max-count=' . $this->limit;",
+      "\t\t\t\t$args[] = '--skip=' . $this->skip;",
+      "\t\t\t\t$args[] = '--max-count=' . ($this->limit + $this->skip);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2673
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tprivate function SearchFileContents()\n\t{\n\t\t$args = array();\n\t\t$args[] = '-I';\n\t\t$args[] = '--full-name';\n\t\t$args[] = '--ignore-case';\n\t\t$args[] = '-n';\n\t\t$args[] = '-e';\n\t\t$args[] = '\"' . addslashes($this->search) . '\"';\n\t\t$args[] = $this->treeHash;\n\n\t\t$lines = explode(\"\\n\", $this->exe->Execute($this->project->GetPath(), GIT_GREP, $args));\n\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match('/^[^:]+:([^:]+):([0-9]+):(.+)$/', $line, $regs)) {\n\t\t\t\t\n\t\t\t\tif (isset($this->allResults[$regs[1]])) {\n\n\t\t\t\t\t$result = $this->allResults[$regs[1]];\n\t\t\t\t\t$matchingLines = $result->GetMatchingLines();\n\t\t\t\t\t$matchingLines[(int)($regs[2])] = trim($regs[3], \"\\n\\r\\0\\x0B\");\n\t\t\t\t\t$result->SetMatchingLines($matchingLines);\n\n\t\t\t\t} else {\n\t\t\t\t\n\t\t\t\t\t$tree = $this->GetTree();\n\t\t\t\t\t$hash = $tree->PathToHash($regs[1]);\n\t\t\t\t\tif ($hash) {\n\t\t\t\t\t\t$blob = $this->project->GetObjectManager()->GetBlob($hash);\n\t\t\t\t\t\t$blob->SetPath($regs[1]);\n\t\t\t\t\t\t$result = new GitPHP_FileSearchResult($this->project, $blob, $regs[1]);\n\t\t\t\t\t\t$matchingLines = array();\n\t\t\t\t\t\t$matchingLines[(int)($regs[2])] = trim($regs[3], \"\\n\\r\\0\\x0B\");\n\t\t\t\t\t\t$result->SetMatchingLines($matchingLines);\n\t\t\t\t\t\t$this->allResults[$regs[1]] = $result;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\t\t}\n\t}",
+  "code_after_change": "\tprivate function SearchFileContents()\n\t{\n\t\t$args = array();\n\t\t$args[] = '-I';\n\t\t$args[] = '--full-name';\n\t\t$args[] = '--ignore-case';\n\t\t$args[] = '-n';\n\t\t$args[] = '-e';\n\t\t$args[] = escapeshellarg($this->search);\n\t\t$args[] = escapeshellarg($this->treeHash);\n\n\t\t$lines = explode(\"\\n\", $this->exe->Execute($this->project->GetPath(), GIT_GREP, $args));\n\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match('/^[^:]+:([^:]+):([0-9]+):(.+)$/', $line, $regs)) {\n\t\t\t\t\n\t\t\t\tif (isset($this->allResults[$regs[1]])) {\n\n\t\t\t\t\t$result = $this->allResults[$regs[1]];\n\t\t\t\t\t$matchingLines = $result->GetMatchingLines();\n\t\t\t\t\t$matchingLines[(int)($regs[2])] = trim($regs[3], \"\\n\\r\\0\\x0B\");\n\t\t\t\t\t$result->SetMatchingLines($matchingLines);\n\n\t\t\t\t} else {\n\t\t\t\t\n\t\t\t\t\t$tree = $this->GetTree();\n\t\t\t\t\t$hash = $tree->PathToHash($regs[1]);\n\t\t\t\t\tif ($hash) {\n\t\t\t\t\t\t$blob = $this->project->GetObjectManager()->GetBlob($hash);\n\t\t\t\t\t\t$blob->SetPath($regs[1]);\n\t\t\t\t\t\t$result = new GitPHP_FileSearchResult($this->project, $blob, $regs[1]);\n\t\t\t\t\t\t$matchingLines = array();\n\t\t\t\t\t\t$matchingLines[(int)($regs[2])] = trim($regs[3], \"\\n\\r\\0\\x0B\");\n\t\t\t\t\t\t$result->SetMatchingLines($matchingLines);\n\t\t\t\t\t\t$this->allResults[$regs[1]] = $result;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($this->search);",
+      "\t\t$args[] = escapeshellarg($this->treeHash);"
+    ],
+    "deleted": [
+      "\t\t$args[] = '\"' . addslashes($this->search) . '\"';",
+      "\t\t$args[] = $this->treeHash;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2674
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tprotected function LoadSize($blob)\n\t{\n\t\tif (!$blob)\n\t\t\treturn;\n\n\t\t$args = array();\n\t\t$args[] = '-s';\n\t\t$args[] = $blob->GetHash();\n\n\t\treturn $this->exe->Execute($blob->GetProject()->GetPath(), GIT_CAT_FILE, $args);\n\t}",
+  "code_after_change": "\tprotected function LoadSize($blob)\n\t{\n\t\tif (!$blob)\n\t\t\treturn;\n\n\t\t$args = array();\n\t\t$args[] = '-s';\n\t\t$args[] = escapeshellarg($blob->GetHash());\n\n\t\treturn $this->exe->Execute($blob->GetProject()->GetPath(), GIT_CAT_FILE, $args);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($blob->GetHash());"
+    ],
+    "deleted": [
+      "\t\t$args[] = $blob->GetHash();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2675
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tpublic function LoadContainingTag($commit)\n\t{\n\t\tif (!$commit)\n\t\t\treturn;\n\n\t\t$args = array();\n\t\t$args[] = '--tags';\n\t\t$args[] = $commit->GetHash();\n\t\t$revs = explode(\"\\n\", $this->exe->Execute($commit->GetProject()->GetPath(), GIT_NAME_REV, $args));\n\n\t\tforeach ($revs as $revline) {\n\t\t\tif (preg_match('/^([0-9a-fA-F]{40})\\s+tags\\/(.+)(\\^[0-9]+|\\~[0-9]+)$/', $revline, $regs)) {\n\t\t\t\tif ($regs[1] == $commit->GetHash()) {\n\t\t\t\t\treturn $regs[2];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}",
+  "code_after_change": "\tpublic function LoadContainingTag($commit)\n\t{\n\t\tif (!$commit)\n\t\t\treturn;\n\n\t\t$args = array();\n\t\t$args[] = '--tags';\n\t\t$args[] = escapeshellarg($commit->GetHash());\n\t\t$revs = explode(\"\\n\", $this->exe->Execute($commit->GetProject()->GetPath(), GIT_NAME_REV, $args));\n\n\t\tforeach ($revs as $revline) {\n\t\t\tif (preg_match('/^([0-9a-fA-F]{40})\\s+tags\\/(.+)(\\^[0-9]+|\\~[0-9]+)$/', $revline, $regs)) {\n\t\t\t\tif ($regs[1] == $commit->GetHash()) {\n\t\t\t\t\treturn $regs[2];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($commit->GetHash());"
+    ],
+    "deleted": [
+      "\t\t$args[] = $commit->GetHash();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2676
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tpublic function AbbreviateHash($project, $hash)\n\t{\n\t\tif (!$project)\n\t\t\treturn $hash;\n\n\t\tif (!(preg_match('/[0-9A-Fa-f]{40}/', $hash))) {\n\t\t\treturn $hash;\n\t\t}\n\n\t\t$args = array();\n\t\t$args[] = '-1';\n\t\t$args[] = '--format=format:%h';\n\t\t$args[] = $hash;\n\n\t\t$abbrevData = explode(\"\\n\", $this->exe->Execute($project->GetPath(), GIT_REV_LIST, $args));\n\t\tif (empty($abbrevData[0])) {\n\t\t\treturn $hash;\n\t\t}\n\t\tif (substr_compare(trim($abbrevData[0]), 'commit', 0, 6) !== 0) {\n\t\t\treturn $hash;\n\t\t}\n\n\t\tif (empty($abbrevData[1])) {\n\t\t\treturn $hash;\n\t\t}\n\n\t\treturn trim($abbrevData[1]);\n\t}",
+  "code_after_change": "\tpublic function AbbreviateHash($project, $hash)\n\t{\n\t\tif (!$project)\n\t\t\treturn $hash;\n\n\t\tif (!(preg_match('/[0-9A-Fa-f]{40}/', $hash))) {\n\t\t\treturn $hash;\n\t\t}\n\n\t\t$args = array();\n\t\t$args[] = '-1';\n\t\t$args[] = '--format=format:%h';\n\t\t$args[] = escapeshellarg($hash);\n\n\t\t$abbrevData = explode(\"\\n\", $this->exe->Execute($project->GetPath(), GIT_REV_LIST, $args));\n\t\tif (empty($abbrevData[0])) {\n\t\t\treturn $hash;\n\t\t}\n\t\tif (substr_compare(trim($abbrevData[0]), 'commit', 0, 6) !== 0) {\n\t\t\treturn $hash;\n\t\t}\n\n\t\tif (empty($abbrevData[1])) {\n\t\t\treturn $hash;\n\t\t}\n\n\t\treturn trim($abbrevData[1]);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($hash);"
+    ],
+    "deleted": [
+      "\t\t$args[] = $hash;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2677
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tpublic function ExpandHash($project, $abbrevHash)\n\t{\n\t\tif (!$project)\n\t\t\treturn $abbrevHash;\n\n\t\tif (!(preg_match('/[0-9A-Fa-f]{4,39}/', $abbrevHash))) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\n\t\t$args = array();\n\t\t$args[] = '-1';\n\t\t$args[] = '--format=format:%H';\n\t\t$args[] = $abbrevHash;\n\n\t\t$fullData = explode(\"\\n\", $this->exe->Execute($project->GetPath(), GIT_REV_LIST, $args));\n\t\tif (empty($fullData[0])) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\t\tif (substr_compare(trim($fullData[0]), 'commit', 0, 6) !== 0) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\n\t\tif (empty($fullData[1])) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\n\t\treturn trim($fullData[1]);\n\t}",
+  "code_after_change": "\tpublic function ExpandHash($project, $abbrevHash)\n\t{\n\t\tif (!$project)\n\t\t\treturn $abbrevHash;\n\n\t\tif (!(preg_match('/[0-9A-Fa-f]{4,39}/', $abbrevHash))) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\n\t\t$args = array();\n\t\t$args[] = '-1';\n\t\t$args[] = '--format=format:%H';\n\t\t$args[] = escapeshellarg($abbrevHash);\n\n\t\t$fullData = explode(\"\\n\", $this->exe->Execute($project->GetPath(), GIT_REV_LIST, $args));\n\t\tif (empty($fullData[0])) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\t\tif (substr_compare(trim($fullData[0]), 'commit', 0, 6) !== 0) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\n\t\tif (empty($fullData[1])) {\n\t\t\treturn $abbrevHash;\n\t\t}\n\n\t\treturn trim($fullData[1]);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($abbrevHash);"
+    ],
+    "deleted": [
+      "\t\t$args[] = $abbrevHash;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2678
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tprotected function GetOrderedRefs($refList, $type, $order, $count = 0, $skip = 0)\n\t{\n\t\tif (!$refList)\n\t\t\treturn;\n\n\t\tif (empty($type) || empty($order))\n\t\t\treturn null;\n\n\t\t$args = array();\n\t\t$args[] = '--sort=' . $order;\n\t\t$args[] = '--format=\"%(refname)\"';\n\t\tif ($count > 0) {\n\t\t\tif ($skip > 0) {\n\t\t\t\t$args[] = '--count=' . ($count + $skip);\n\t\t\t} else {\n\t\t\t\t$args[] = '--count=' . $count;\n\t\t\t}\n\t\t}",
+  "code_after_change": "\tprotected function GetOrderedRefs($refList, $type, $order, $count = 0, $skip = 0)\n\t{\n\t\tif (!$refList)\n\t\t\treturn;\n\n\t\tif (empty($type) || empty($order))\n\t\t\treturn null;\n\n\t\t$args = array();\n\t\t$args[] = '--sort=' . escapeshellarg($order);\n\t\t$args[] = '--format=\"%(refname)\"';\n\t\tif ($count > 0) {\n\t\t\tif ($skip > 0) {\n\t\t\t\t$args[] = '--count=' . escapeshellarg($count + $skip);\n\t\t\t} else {\n\t\t\t\t$args[] = '--count=' . escapeshellarg($count);\n\t\t\t}\n\t\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = '--sort=' . escapeshellarg($order);",
+      "\t\t\t\t$args[] = '--count=' . escapeshellarg($count + $skip);",
+      "\t\t\t\t$args[] = '--count=' . escapeshellarg($count);"
+    ],
+    "deleted": [
+      "\t\t$args[] = '--sort=' . $order;",
+      "\t\t\t\t$args[] = '--count=' . ($count + $skip);",
+      "\t\t\t\t$args[] = '--count=' . $count;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2679
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tprotected function GetRefs($refList, $type)\n\t{\n\t\tif (!$refList)\n\t\t\treturn;\n\n\t\tif (empty($type))\n\t\t\treturn;\n\n\t\t$args = array();\n\t\t$args[] = '--' . $type;\n\t\t$args[] = '--dereference';\n\t\t$ret = $this->exe->Execute($refList->GetProject()->GetPath(), GIT_SHOW_REF, $args);\n\n\t\t$lines = explode(\"\\n\", $ret);\n\n\t\t$refs = array();\n\t\t$commits = array();\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match('/^([0-9a-fA-F]{40}) refs\\/' . $type . '\\/([^^]+)(\\^{})?$/', $line, $regs)) {\n\t\t\t\tif (!empty($regs[3]) && ($regs[3] == '^{}')) {\n\t\t\t\t\t$commits[$regs[2]] = $regs[1];\n\t\t\t\t} else {\n\t\t\t\t\t$refs[$regs[2]] = $regs[1];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\treturn array($refs, $commits);\n\t}",
+  "code_after_change": "\tprotected function GetRefs($refList, $type)\n\t{\n\t\tif (!$refList)\n\t\t\treturn;\n\n\t\tif (empty($type))\n\t\t\treturn;\n\n\t\t$args = array();\n\t\t$args[] = '--' . escapeshellarg($type);\n\t\t$args[] = '--dereference';\n\t\t$ret = $this->exe->Execute($refList->GetProject()->GetPath(), GIT_SHOW_REF, $args);\n\n\t\t$lines = explode(\"\\n\", $ret);\n\n\t\t$refs = array();\n\t\t$commits = array();\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match('/^([0-9a-fA-F]{40}) refs\\/' . $type . '\\/([^^]+)(\\^{})?$/', $line, $regs)) {\n\t\t\t\tif (!empty($regs[3]) && ($regs[3] == '^{}')) {\n\t\t\t\t\t$commits[$regs[2]] = $regs[1];\n\t\t\t\t} else {\n\t\t\t\t\t$refs[$regs[2]] = $regs[1];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\treturn array($refs, $commits);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = '--' . escapeshellarg($type);"
+    ],
+    "deleted": [
+      "\t\t$args[] = '--' . $type;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2680
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\t\t\t$trimmed = trim($line);\n\n\t\t\tif ((strlen($trimmed) > 0) || ($readInitialData === true)) {\n\t\t\t\t$comment[] = $line;\n\t\t\t}\n\t\t\t$readInitialData = true;\n\n\t\t}\n\n\t\tswitch ($type) {\n\t\t\tcase 'commit':\n\t\t\t\t$object = $objectHash;\n\t\t\t\t$commitHash = $objectHash;\n\t\t\t\tbreak;\n\t\t\tcase 'tag':\n\t\t\t\t$args = array();\n\t\t\t\t$args[] = 'tag';\n\t\t\t\t$args[] = $objectHash;\n\t\t\t\t$ret = $this->exe->Execute($tag->GetProject()->GetPath(), GIT_CAT_FILE, $args);\n\t\t\t\t$lines = explode(\"\\n\", $ret);\n\t\t\t\tforeach ($lines as $i => $line) {\n\t\t\t\t\tif (preg_match('/^tag (.+)$/', $line, $regs)) {\n\t\t\t\t\t\t$name = trim($regs[1]);\n\t\t\t\t\t\t$object = $name;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 'blob':\n\t\t\t\t$object = $objectHash;\n\t\t\t\tbreak;\n\t\t}\n\n\t\treturn array(\n\t\t\t$type,\n\t\t\t$object,\n\t\t\t$commitHash,\n\t\t\t$tagger,\n\t\t\t$taggerEpoch,\n\t\t\t$taggerTimezone,\n\t\t\t$comment\n\t\t);\n\n\t}",
+  "code_after_change": "\t\t\t$trimmed = trim($line);\n\n\t\t\tif ((strlen($trimmed) > 0) || ($readInitialData === true)) {\n\t\t\t\t$comment[] = $line;\n\t\t\t}\n\t\t\t$readInitialData = true;\n\n\t\t}\n\n\t\tswitch ($type) {\n\t\t\tcase 'commit':\n\t\t\t\t$object = $objectHash;\n\t\t\t\t$commitHash = $objectHash;\n\t\t\t\tbreak;\n\t\t\tcase 'tag':\n\t\t\t\t$args = array();\n\t\t\t\t$args[] = 'tag';\n\t\t\t\t$args[] = escapeshellarg($objectHash);\n\t\t\t\t$ret = $this->exe->Execute($tag->GetProject()->GetPath(), GIT_CAT_FILE, $args);\n\t\t\t\t$lines = explode(\"\\n\", $ret);\n\t\t\t\tforeach ($lines as $i => $line) {\n\t\t\t\t\tif (preg_match('/^tag (.+)$/', $line, $regs)) {\n\t\t\t\t\t\t$name = trim($regs[1]);\n\t\t\t\t\t\t$object = $name;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 'blob':\n\t\t\t\t$object = $objectHash;\n\t\t\t\tbreak;\n\t\t}\n\n\t\treturn array(\n\t\t\t$type,\n\t\t\t$object,\n\t\t\t$commitHash,\n\t\t\t$tagger,\n\t\t\t$taggerEpoch,\n\t\t\t$taggerTimezone,\n\t\t\t$comment\n\t\t);\n\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t$args[] = escapeshellarg($objectHash);"
+    ],
+    "deleted": [
+      "\t\t\t\t$args[] = $objectHash;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2681
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tpublic function LoadHashPaths($tree)\n\t{\n\t\tif (!$tree)\n\t\t\treturn;\n\n\t\t$treePaths = array();\n\t\t$blobPaths = array();\n\n\t\t$args = array();\n\t\t$args[] = '--full-name';\n\t\t$args[] = '-r';\n\t\t$args[] = '-t';\n\t\t$args[] = $tree->GetHash();\n\n\t\t$lines = explode(\"\\n\", $this->exe->Execute($tree->GetProject()->GetPath(), GIT_LS_TREE, $args));\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match(\"/^([0-9]+) (.+) ([0-9a-fA-F]{40})\\t(.+)$/\", $line, $regs)) {\n\t\t\t\tswitch ($regs[2]) {\n\t\t\t\t\tcase 'tree':\n\t\t\t\t\t\t$treePaths[trim($regs[4])] = $regs[3];\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase 'blob';\n\t\t\t\t\t\t$blobPaths[trim($regs[4])] = $regs[3];\n\t\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\treturn array(\n\t\t\t$treePaths,\n\t\t\t$blobPaths\n\t\t);\n\t}",
+  "code_after_change": "\tpublic function LoadHashPaths($tree)\n\t{\n\t\tif (!$tree)\n\t\t\treturn;\n\n\t\t$treePaths = array();\n\t\t$blobPaths = array();\n\n\t\t$args = array();\n\t\t$args[] = '--full-name';\n\t\t$args[] = '-r';\n\t\t$args[] = '-t';\n\t\t$args[] = escapeshellarg($tree->GetHash());\n\n\t\t$lines = explode(\"\\n\", $this->exe->Execute($tree->GetProject()->GetPath(), GIT_LS_TREE, $args));\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match(\"/^([0-9]+) (.+) ([0-9a-fA-F]{40})\\t(.+)$/\", $line, $regs)) {\n\t\t\t\tswitch ($regs[2]) {\n\t\t\t\t\tcase 'tree':\n\t\t\t\t\t\t$treePaths[trim($regs[4])] = $regs[3];\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase 'blob';\n\t\t\t\t\t\t$blobPaths[trim($regs[4])] = $regs[3];\n\t\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\treturn array(\n\t\t\t$treePaths,\n\t\t\t$blobPaths\n\t\t);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($tree->GetHash());"
+    ],
+    "deleted": [
+      "\t\t$args[] = $tree->GetHash();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2682
+},
+{
+  "cve_id": "CVE-2017-1000214",
+  "code_before_change": "\tpublic function Load($tree)\n\t{\n\t\tif (!$tree)\n\t\t\treturn;\n\n\t\t$contents = array();\n\n\t\t$treePath = $tree->GetPath();\n\n\t\t$args = array();\n\t\t$args[] = '--full-name';\n\t\tif ($this->exe->CanShowSizeInTree())\n\t\t\t$args[] = '-l';\n\t\t$args[] = '-t';\n\t\t$args[] = $tree->GetHash();\n\t\t\n\t\t$lines = explode(\"\\n\", $this->exe->Execute($tree->GetProject()->GetPath(), GIT_LS_TREE, $args));\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match(\"/^([0-9]+) (.+) ([0-9a-fA-F]{40})(\\s+[0-9]+|\\s+-)?\\t(.+)$/\", $line, $regs)) {\n\t\t\t\tswitch($regs[2]) {\n\t\t\t\t\tcase 'tree':\n\t\t\t\t\t\t$data = array();\n\t\t\t\t\t\t$data['type'] = 'tree';\n\t\t\t\t\t\t$data['hash'] = $regs[3];\n\t\t\t\t\t\t$data['mode'] = $regs[1];\n\n\t\t\t\t\t\t$path = $regs[5];\n\t\t\t\t\t\tif (!empty($treePath))\n\t\t\t\t\t\t\t$path = $treePath . '/' . $path;\n\t\t\t\t\t\t$data['path'] = $path;\n\n\t\t\t\t\t\t$contents[] = $data;\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase 'blob':\n\t\t\t\t\t\t$data = array();\n\t\t\t\t\t\t$data['type'] = 'blob';\n\t\t\t\t\t\t$data['hash'] = $regs[3];\n\t\t\t\t\t\t$data['mode'] = $regs[1];\n\n\t\t\t\t\t\t$path = $regs[5];\n\t\t\t\t\t\tif (!empty($treePath))\n\t\t\t\t\t\t\t$path = $treePath . '/' . $path;\n\t\t\t\t\t\t$data['path'] = $path;\n\n\t\t\t\t\t\t$size = trim($regs[4]);\n\t\t\t\t\t\tif (!empty($size))\n\t\t\t\t\t\t\t$data['size'] = $size;\n\n\t\t\t\t\t\t$contents[] = $data;\n\t\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\treturn $contents;\n\t}",
+  "code_after_change": "\tpublic function Load($tree)\n\t{\n\t\tif (!$tree)\n\t\t\treturn;\n\n\t\t$contents = array();\n\n\t\t$treePath = $tree->GetPath();\n\n\t\t$args = array();\n\t\t$args[] = '--full-name';\n\t\tif ($this->exe->CanShowSizeInTree())\n\t\t\t$args[] = '-l';\n\t\t$args[] = '-t';\n\t\t$args[] = escapeshellarg($tree->GetHash());\n\t\t\n\t\t$lines = explode(\"\\n\", $this->exe->Execute($tree->GetProject()->GetPath(), GIT_LS_TREE, $args));\n\n\t\tforeach ($lines as $line) {\n\t\t\tif (preg_match(\"/^([0-9]+) (.+) ([0-9a-fA-F]{40})(\\s+[0-9]+|\\s+-)?\\t(.+)$/\", $line, $regs)) {\n\t\t\t\tswitch($regs[2]) {\n\t\t\t\t\tcase 'tree':\n\t\t\t\t\t\t$data = array();\n\t\t\t\t\t\t$data['type'] = 'tree';\n\t\t\t\t\t\t$data['hash'] = $regs[3];\n\t\t\t\t\t\t$data['mode'] = $regs[1];\n\n\t\t\t\t\t\t$path = $regs[5];\n\t\t\t\t\t\tif (!empty($treePath))\n\t\t\t\t\t\t\t$path = $treePath . '/' . $path;\n\t\t\t\t\t\t$data['path'] = $path;\n\n\t\t\t\t\t\t$contents[] = $data;\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase 'blob':\n\t\t\t\t\t\t$data = array();\n\t\t\t\t\t\t$data['type'] = 'blob';\n\t\t\t\t\t\t$data['hash'] = $regs[3];\n\t\t\t\t\t\t$data['mode'] = $regs[1];\n\n\t\t\t\t\t\t$path = $regs[5];\n\t\t\t\t\t\tif (!empty($treePath))\n\t\t\t\t\t\t\t$path = $treePath . '/' . $path;\n\t\t\t\t\t\t$data['path'] = $path;\n\n\t\t\t\t\t\t$size = trim($regs[4]);\n\t\t\t\t\t\tif (!empty($size))\n\t\t\t\t\t\t\t$data['size'] = $size;\n\n\t\t\t\t\t\t$contents[] = $data;\n\t\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\treturn $contents;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$args[] = escapeshellarg($tree->GetHash());"
+    ],
+    "deleted": [
+      "\t\t$args[] = $tree->GetHash();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "GitPHP by xiphux is vulnerable to OS Command Injections",
+  "id": 2683
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function sqlrequest($database,$sql,$id=false){\n\n\t// Get the global value\n\tglobal $database_host;\n\tglobal $database_username;\n\tglobal $database_password;\n\n\t$connexion = mysqli_connect($database_host, $database_username, $database_password, $database);\n\tif (!$connexion) {\n\t\techo \"<ul>\";\n\t\techo \"<li class='msg_title'>Alert EyesOfNetwork - Message EON-database connect</li>\";\n\t\techo \"<li class='msg'> Could not connect to database : $database ($database_host)</li>\";\n\t\techo \"</ul>\";\n\t\texit(1);\n\t}\n\n\tif ( $database == \"eonweb\" ) {\n\t\t// Force UTF-8\n\t\tmysqli_query($connexion, \"SET NAMES 'utf8'\");\n\t}\n\t$result=mysqli_query($connexion, \"$sql\");\n\n\tif($id==true)\n\t\t$result=mysqli_insert_id($connexion);\n\t\t\n\tmysqli_close($connexion);\n\treturn $result;\n}",
+  "code_after_change": "function sqlrequest($database,$sql,$id=false,$prepare=false){\n\n\t// Get the global value\n\tglobal $database_host;\n\tglobal $database_username;\n\tglobal $database_password;\n\n\t$connexion = mysqli_connect($database_host, $database_username, $database_password, $database);\n\tif (!$connexion) {\n\t\techo \"<ul>\";\n\t\techo \"<li class='msg_title'>Alert EyesOfNetwork - Message EON-database connect</li>\";\n\t\techo \"<li class='msg'> Could not connect to database : $database ($database_host)</li>\";\n\t\techo \"</ul>\";\n\t\texit(1);\n\t}\n\n\tif ( $database == \"eonweb\" ) {\n\t\t// Force UTF-8\n\t\tmysqli_query($connexion, \"SET NAMES 'utf8'\");\n\t}\n\t\n\tif(is_array($prepare)) {\n\t\t$stmt = mysqli_prepare($connexion,$sql);\n\t\t\n\t\tif(isset($prepare[0]) && isset($prepare[1])) {\n\t\t\t$ref = new ReflectionClass('mysqli_stmt');\n\t\t\t$method = $ref->getMethod(\"bind_param\");\n\t\t\t$method->invokeArgs($stmt,$prepare);\n\t\t}\n\t\t\n\t\tmysqli_stmt_execute($stmt);\n\t\t$result = mysqli_stmt_get_result($stmt);\n\t} else {\n\t\t$result=mysqli_query($connexion, \"$sql\");\n\t}\n\t\t\n\tif($id==true)\n\t\t$result=mysqli_insert_id($connexion);\n\t\t\n\tmysqli_close($connexion);\n\treturn $result;\n}",
+  "function_modified_lines": {
+    "added": [
+      "function sqlrequest($database,$sql,$id=false,$prepare=false){",
+      "\tif(is_array($prepare)) {",
+      "\t\t$stmt = mysqli_prepare($connexion,$sql);",
+      "\t\tif(isset($prepare[0]) && isset($prepare[1])) {",
+      "\t\t\t$ref = new ReflectionClass('mysqli_stmt');",
+      "\t\t\t$method = $ref->getMethod(\"bind_param\");",
+      "\t\t\t$method->invokeArgs($stmt,$prepare);",
+      "\t\t}",
+      "\t\tmysqli_stmt_execute($stmt);",
+      "\t\t$result = mysqli_stmt_get_result($stmt);",
+      "\t} else {",
+      "\t\t$result=mysqli_query($connexion, \"$sql\");",
+      "\t}"
+    ],
+    "deleted": [
+      "function sqlrequest($database,$sql,$id=false){",
+      "\t$result=mysqli_query($connexion, \"$sql\");"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2684
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function add_application($uniq_name_orig,$uniq_name,$process_name,$display,$url,$command,$type,$min_value,$bdd){\n\tif($type != 'MIN'){\n\t\t$min_value = \"\";\n\t}\n\t$sql = \"select count(*) from bp where name = '\" . $uniq_name . \"';\";\n\t$req = $bdd->query($sql);\n\t$bp_exist = $req->fetch();\n\n\t// add\n\tif($bp_exist[0] == 0 and empty($uniq_name_orig)){\n\t\t$sql = \"insert into bp (name,description,priority,type,command,url,min_value) values('\" . $uniq_name .\"','\" . $process_name .\"','\" . $display . \"','\" . $type . \"','\" . $command . \"','\" . $url . \"','\" . $min_value . \"')\";\n\t\t$bdd->exec($sql);\n\t}\n\t// uniq name modification\n\telseif($uniq_name_orig != $uniq_name) {\n\t\tif($bp_exist[0] != 0){\n\t\t\t// TODO QUENTIN\n\t\t} else {\n\t\t\t$sql = \"update bp set name = '\" . $uniq_name . \"',description = '\" . $process_name . \"',priority = '\" . $display . \"',type = '\" . $type . \"',command = '\" . $command . \"',url = '\" . $url . \"',min_value = '\" . $min_value . \"' where name = '\" . $uniq_name_orig . \"'\";\n\t\t\t$bdd->exec($sql);\n\t\t\t$sql = \"update bp_links set bp_name = '\" . $uniq_name . \"' where bp_name = '\" . $uniq_name_orig . \"'\";\n\t\t\t$bdd->exec($sql);\t\t\n\t\t\t$sql = \"update bp_links set bp_link = '\" . $uniq_name . \"' where bp_link = '\" . $uniq_name_orig . \"'\";\n\t\t\t$bdd->exec($sql);\n\t\t\t$sql = \"update bp_services set bp_name = '\" . $uniq_name . \"' where bp_name = '\" . $uniq_name_orig . \"'\";\t\t\t\t\t\n\t\t\t$bdd->exec($sql);\t\t\n\t\t}\n\t}\t\n\t// modification\n\telse{\n\t\t$sql = \"update bp set name = '\" . $uniq_name . \"',description = '\" . $process_name . \"',priority = '\" . $display . \"',type = '\" . $type . \"',command = '\" . $command . \"',url = '\" . $url . \"',min_value = '\" . $min_value . \"' where name = '\" . $uniq_name . \"'\";\n\t\t$bdd->exec($sql);\t\n\t}\n}",
+  "code_after_change": "function add_application($uniq_name_orig,$uniq_name,$process_name,$display,$url,$command,$type,$min_value,$bdd){\n\tif($type != 'MIN'){\n\t\t$min_value = \"\";\n\t}\n\t$sql = \"select count(*) from bp where name = ?;\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($uniq_name));\n\t$bp_exist = $req->fetch();\n\n\t// add\n\tif($bp_exist[0] == 0 and empty($uniq_name_orig)){\n\t\t$sql = \"insert into bp (name,description,priority,type,command,url,min_value) values(?,?,?,?,?,?,?)\";\n\t\t$req = $bdd->prepare($sql);\n\t\t$req->execute(array($uniq_name,$process_name,$display,$type,$command,$url,$min_value));\n\t}\n\t// uniq name modification\n\telseif($uniq_name_orig != $uniq_name) {\n\t\tif($bp_exist[0] != 0){\n\t\t\t// TODO QUENTIN\n\t\t} else {\n\t\t\t$sql = \"update bp set name = ?,description = ?,priority = ?,type = ?,command = ?,url = ?,min_value = ? where name = ?\";\n\t\t\t$req = $bdd->prepare($sql);\n\t\t\t$req->execute(array($uniq_name,$process_name,$display,$type,$command,$url,$min_value,$uniq_name_orig));\n\t\t\t$sql = \"update bp_links set bp_name = ? where bp_name = ?\";\n\t\t\t$req = $bdd->prepare($sql);\n\t\t\t$req->execute(array($uniq_name,$uniq_name_orig));\t\n\t\t\t$sql = \"update bp_links set bp_link = ? where bp_link = ?\";\n\t\t\t$req = $bdd->prepare($sql);\n\t\t\t$req->execute(array($uniq_name,$uniq_name_orig));\n\t\t\t$sql = \"update bp_services set bp_name = ? where bp_name = ?\";\t\t\t\t\t\n\t\t\t$req = $bdd->prepare($sql);\n\t\t\t$req->execute(array($uniq_name,$uniq_name_orig));\t\n\t\t}\n\t}\t\n\t// modification\n\telse{\n\t\t$sql = \"update bp set name = ?,description = ?,priority = ?,type = ?,command = ?,url = ?,min_value = ? where name = ?\";\n\t\t$req = $bdd->prepare($sql);\n\t\t$req->execute(array($uniq_name,$process_name,$display,$type,$command,$url,$min_value,$uniq_name));\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t$sql = \"select count(*) from bp where name = ?;\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($uniq_name));",
+      "\t\t$sql = \"insert into bp (name,description,priority,type,command,url,min_value) values(?,?,?,?,?,?,?)\";",
+      "\t\t$req = $bdd->prepare($sql);",
+      "\t\t$req->execute(array($uniq_name,$process_name,$display,$type,$command,$url,$min_value));",
+      "\t\t\t$sql = \"update bp set name = ?,description = ?,priority = ?,type = ?,command = ?,url = ?,min_value = ? where name = ?\";",
+      "\t\t\t$req = $bdd->prepare($sql);",
+      "\t\t\t$req->execute(array($uniq_name,$process_name,$display,$type,$command,$url,$min_value,$uniq_name_orig));",
+      "\t\t\t$sql = \"update bp_links set bp_name = ? where bp_name = ?\";",
+      "\t\t\t$req = $bdd->prepare($sql);",
+      "\t\t\t$req->execute(array($uniq_name,$uniq_name_orig));",
+      "\t\t\t$sql = \"update bp_links set bp_link = ? where bp_link = ?\";",
+      "\t\t\t$req = $bdd->prepare($sql);",
+      "\t\t\t$req->execute(array($uniq_name,$uniq_name_orig));",
+      "\t\t\t$sql = \"update bp_services set bp_name = ? where bp_name = ?\";",
+      "\t\t\t$req = $bdd->prepare($sql);",
+      "\t\t\t$req->execute(array($uniq_name,$uniq_name_orig));",
+      "\t\t$sql = \"update bp set name = ?,description = ?,priority = ?,type = ?,command = ?,url = ?,min_value = ? where name = ?\";",
+      "\t\t$req = $bdd->prepare($sql);",
+      "\t\t$req->execute(array($uniq_name,$process_name,$display,$type,$command,$url,$min_value,$uniq_name));"
+    ],
+    "deleted": [
+      "\t$sql = \"select count(*) from bp where name = '\" . $uniq_name . \"';\";",
+      "\t$req = $bdd->query($sql);",
+      "\t\t$sql = \"insert into bp (name,description,priority,type,command,url,min_value) values('\" . $uniq_name .\"','\" . $process_name .\"','\" . $display . \"','\" . $type . \"','\" . $command . \"','\" . $url . \"','\" . $min_value . \"')\";",
+      "\t\t$bdd->exec($sql);",
+      "\t\t\t$sql = \"update bp set name = '\" . $uniq_name . \"',description = '\" . $process_name . \"',priority = '\" . $display . \"',type = '\" . $type . \"',command = '\" . $command . \"',url = '\" . $url . \"',min_value = '\" . $min_value . \"' where name = '\" . $uniq_name_orig . \"'\";",
+      "\t\t\t$bdd->exec($sql);",
+      "\t\t\t$sql = \"update bp_links set bp_name = '\" . $uniq_name . \"' where bp_name = '\" . $uniq_name_orig . \"'\";",
+      "\t\t\t$bdd->exec($sql);",
+      "\t\t\t$sql = \"update bp_links set bp_link = '\" . $uniq_name . \"' where bp_link = '\" . $uniq_name_orig . \"'\";",
+      "\t\t\t$bdd->exec($sql);",
+      "\t\t\t$sql = \"update bp_services set bp_name = '\" . $uniq_name . \"' where bp_name = '\" . $uniq_name_orig . \"'\";",
+      "\t\t\t$bdd->exec($sql);",
+      "\t\t$sql = \"update bp set name = '\" . $uniq_name . \"',description = '\" . $process_name . \"',priority = '\" . $display . \"',type = '\" . $type . \"',command = '\" . $command . \"',url = '\" . $url . \"',min_value = '\" . $min_value . \"' where name = '\" . $uniq_name . \"'\";",
+      "\t\t$bdd->exec($sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2685
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function check_app_exists($uniq_name, $bdd)\n{\n\t$sql = \"select count(*) from bp where name = '\" . $uniq_name . \"';\";\n\t$req = $bdd->query($sql);\n\t$bp_exist = $req->fetch(PDO::FETCH_NUM);\n\t\n\tif($bp_exist[0] == 1){\n\t\techo \"true\";\n\t} else {\n\t\techo \"false\";\n\t}\n}",
+  "code_after_change": "function check_app_exists($uniq_name, $bdd)\n{\n\t$sql = \"select count(*) from bp where name = ?;\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($uniq_name));\n\t$bp_exist = $req->fetch(PDO::FETCH_NUM);\n\t\n\tif($bp_exist[0] == 1){\n\t\techo \"true\";\n\t} else {\n\t\techo \"false\";\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t$sql = \"select count(*) from bp where name = ?;\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($uniq_name));"
+    ],
+    "deleted": [
+      "\t$sql = \"select count(*) from bp where name = '\" . $uniq_name . \"';\";",
+      "\t$req = $bdd->query($sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2686
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function delete_bp($bp,$bdd){\n    $sql = \"delete from bp where name = '\" . $bp . \"'\";\n    $bdd->exec($sql);\n\n\t$sql = \"delete from bp_services where bp_name = '\" . $bp . \"'\";\n    $bdd->exec($sql);\n\n\t$sql = \"delete from bp_links where bp_name = '\" . $bp . \"'\";\n\t$bdd->exec($sql);\n\t\n\t$sql = \"delete from bp_links where bp_link = '\" . $bp . \"'\";\n\t$bdd->exec($sql);\n}",
+  "code_after_change": "function delete_bp($bp,$bdd){\n\t$sql = \"delete from bp where name = ?\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($bp));\n\n\t$sql = \"delete from bp_services where bp_name = ?\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($bp));\n\n\t$sql = \"delete from bp_links where bp_name = ?\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($bp));\n\t\n\t$sql = \"delete from bp_links where bp_link = ?\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($bp));\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t$sql = \"delete from bp where name = ?\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($bp));",
+      "\t$sql = \"delete from bp_services where bp_name = ?\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($bp));",
+      "\t$sql = \"delete from bp_links where bp_name = ?\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($bp));",
+      "\t$sql = \"delete from bp_links where bp_link = ?\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($bp));"
+    ],
+    "deleted": [
+      "    $sql = \"delete from bp where name = '\" . $bp . \"'\";",
+      "    $bdd->exec($sql);",
+      "\t$sql = \"delete from bp_services where bp_name = '\" . $bp . \"'\";",
+      "    $bdd->exec($sql);",
+      "\t$sql = \"delete from bp_links where bp_name = '\" . $bp . \"'\";",
+      "\t$bdd->exec($sql);",
+      "\t$sql = \"delete from bp_links where bp_link = '\" . $bp . \"'\";",
+      "\t$bdd->exec($sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2687
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "\t\t\t$bdd->exec($sql);\n\t\t}\n\t}\n}",
+  "code_after_change": "\tif(is_array($services)) {\n\t\tforeach($services as $values){\n\t\t\t$value = explode(\"::\", $values);\n\t\t\t$host = $value[0];",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "\t\t\t$bdd->exec($sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2688
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function info_application($bp_name, $bdd){\n\t$sql = \"select * from bp where name = '\" . $bp_name . \"'\";\n\t$req = $bdd->query($sql);\n\t$info = $req->fetch();\n\techo json_encode($info);\n}",
+  "code_after_change": "function info_application($bp_name, $bdd){\n\t$sql = \"select * from bp where name = ?\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($bp_name));\n\t$info = $req->fetch();\n\techo json_encode($info);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t$sql = \"select * from bp where name = ?\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($bp_name));"
+    ],
+    "deleted": [
+      "\t$sql = \"select * from bp where name = '\" . $bp_name . \"'\";",
+      "\t$req = $bdd->query($sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2689
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function list_process($bp,$display,$bdd){\n\t$sql = \"select name from bp where is_define = 1 and name!='\".$bp.\"' and priority = '\" . $display . \"'\";\n\t$req = $bdd->query($sql);\n\t$process = $req->fetchall();\n\n    echo json_encode($process);\n}",
+  "code_after_change": "function list_process($bp,$display,$bdd){\n\t$sql = \"select name from bp where is_define = 1 and name!=? and priority = ?\";\n\t$req = $bdd->prepare($sql);\n\t$req->execute(array($bp,$display));\n\t$process = $req->fetchall();\n\n    echo json_encode($process);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t$sql = \"select name from bp where is_define = 1 and name!=? and priority = ?\";",
+      "\t$req = $bdd->prepare($sql);",
+      "\t$req->execute(array($bp,$display));"
+    ],
+    "deleted": [
+      "\t$sql = \"select name from bp where is_define = 1 and name!='\".$bp.\"' and priority = '\" . $display . \"'\";",
+      "\t$req = $bdd->query($sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2690
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function advancedFilterSearch($queue, $filter)\n{\n\tglobal $database_ged;\n\t$datas = array();\n\n\tif($filter == \"description\"){\n\t\techo json_encode($datas);\n\t\treturn false;\n\t}\n\n\t$gedsql_result1=sqlrequest($database_ged,\"SELECT pkt_type_id,pkt_type_name FROM pkt_type WHERE pkt_type_id!='0' AND pkt_type_id<'100';\");\n\t\n\t\n\twhile($ged_type = mysqli_fetch_assoc($gedsql_result1)){\n\t\t$sql = \"SELECT DISTINCT $filter FROM \".$ged_type[\"pkt_type_name\"].\"_queue_\".$queue;\n\n\t\t$results = sqlrequest($database_ged, $sql);\n\t\twhile($result = mysqli_fetch_array($results)){\n\t\t\tif( !in_array($result[$filter], $datas) && $result[$filter] != \"\" ){\n\t\t\t\tarray_push($datas, $result[$filter]);\n\t\t\t}\n\t\t}\n\t}\n\n\techo json_encode($datas);\n}",
+  "code_after_change": "function advancedFilterSearch($queue, $filter)\n{\n\tglobal $array_ged_packets;\n\tglobal $array_ged_queues;\n\tglobal $database_ged;\n\t$datas = array();\n\t\n\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }\n\n\tif($filter == \"description\"){\n\t\techo json_encode($datas);\n\t\treturn false;\n\t}\n\n\t$gedsql_result1=sqlrequest($database_ged,\"SELECT pkt_type_id,pkt_type_name FROM pkt_type WHERE pkt_type_id!='0' AND pkt_type_id<'100';\");\n\t\n\tif(isset($array_ged_packets[$filter])) {\n\t\twhile($ged_type = mysqli_fetch_assoc($gedsql_result1)){\n\t\t\t$sql = \"SELECT DISTINCT $filter FROM \".$ged_type[\"pkt_type_name\"].\"_queue_\".$queue;\n\n\t\t\t$results = sqlrequest($database_ged, $sql);\n\t\t\twhile($result = mysqli_fetch_array($results)){\n\t\t\t\tif( !in_array($result[$filter], $datas) && $result[$filter] != \"\" ){\n\t\t\t\t\tarray_push($datas, $result[$filter]);\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\techo json_encode($datas);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tglobal $array_ged_packets;",
+      "\tglobal $array_ged_queues;",
+      "\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }",
+      "\tif(isset($array_ged_packets[$filter])) {",
+      "\t\twhile($ged_type = mysqli_fetch_assoc($gedsql_result1)){",
+      "\t\t\t$sql = \"SELECT DISTINCT $filter FROM \".$ged_type[\"pkt_type_name\"].\"_queue_\".$queue;",
+      "\t\t\t$results = sqlrequest($database_ged, $sql);",
+      "\t\t\twhile($result = mysqli_fetch_array($results)){",
+      "\t\t\t\tif( !in_array($result[$filter], $datas) && $result[$filter] != \"\" ){",
+      "\t\t\t\t\tarray_push($datas, $result[$filter]);",
+      "\t\t\t\t}"
+    ],
+    "deleted": [
+      "\twhile($ged_type = mysqli_fetch_assoc($gedsql_result1)){",
+      "\t\t$sql = \"SELECT DISTINCT $filter FROM \".$ged_type[\"pkt_type_name\"].\"_queue_\".$queue;",
+      "\t\t$results = sqlrequest($database_ged, $sql);",
+      "\t\twhile($result = mysqli_fetch_array($results)){",
+      "\t\t\tif( !in_array($result[$filter], $datas) && $result[$filter] != \"\" ){",
+      "\t\t\t\tarray_push($datas, $result[$filter]);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2691
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function createWhereClause($owner, $filter, $search, $daterange, $ok, $warning, $critical, $unknown)\n{\n\t$where_clause = \"\";\n\t\n\t// owner\n\tif($owner == \"owned\"){ $where_clause .= \" AND owner != ''\"; }\n\telseif($owner == \"not owned\"){ $where_clause .= \" AND owner = ''\"; }\n\n\t// advanced search (with *)\n\tif($search != \"\"){\n\t\t$like = \"\";\n\t\tif( substr($search, 0, 1) === '*' ){\n\t\t\t$like .= \"%\";\n\t\t}\n\t\t$like .= trim($search, '*');\n\t\tif ( substr($search, -1) === '*' ) {\n\t\t\t$like .= \"%\";\n\t\t}\n\n\t\t$where_clause .= \" AND $filter LIKE '$like'\";\n\t}\n\n\t// daterange\n\tif($daterange != \"\"){\n\t\t$daterange_parts = explode(\" - \", $daterange);\n\t\t$start = $daterange_parts[0];\n\t\t$end = $daterange_parts[1];\n\n\t\t// modify start and end timestamp (1 Jan 1970 = -3600).\n\t\t// perhaps a little bug from DateRangePicker\n\t\t$start = strtotime($start);\n\t\t$start += 3600;\n\t\t$end = strtotime($end);\n\t\t$end += 86400 + 3600;\n\t\t$where_clause .= \" AND o_sec > $start AND o_sec < $end\";\n\t}\n\n\t// states\n\t$states_list = \"\";\n\tif($ok != \"\")\t\t{ $states_list .= \"0,\"; }\n\tif($warning != \"\")\t{ $states_list .= \"1,\"; }\n\tif($critical != \"\")\t{ $states_list .= \"2,\"; }\n\tif($unknown != \"\")\t{ $states_list .= \"3,\"; }\n\t$states_list = trim($states_list, \",\");\n\t\n\tif($states_list != \"\"){\n\t\t$where_clause .= \" AND state IN ($states_list)\";\n\t}\n\n\t$where_clause .= \" ORDER BY o_sec DESC LIMIT 500\";\n\treturn $where_clause;\n}",
+  "code_after_change": "function createWhereClause($owner, $filter, $search, $daterange, $ok, $warning, $critical, $unknown)\n{\n\t\n\tglobal $mysqli_prepare;\n\t\n\t$where_clause = \"\";\n\t\n\t// owner\n\tif($owner == \"owned\"){ $where_clause .= \" AND owner != ''\"; }\n\telseif($owner == \"not owned\"){ $where_clause .= \" AND owner = ''\"; }\n\n\t// advanced search (with *)\n\tif($search != \"\"){\n\t\t$like = \"\";\n\t\tif( substr($search, 0, 1) === '*' ){\n\t\t\t$like .= \"%\";\n\t\t}\n\t\t$like .= trim($search, '*');\n\t\tif ( substr($search, -1) === '*' ) {\n\t\t\t$like .= \"%\";\n\t\t}\n\n\t\t$where_clause .= \" AND $filter LIKE ?\";\n\t\t$mysqli_prepare[0].=\"s\";\n\t\t$mysqli_prepare[]=(string)$like;\n\t}\n\n\t// daterange\n\tif($daterange != \"\"){\n\t\t$daterange_parts = explode(\" - \", $daterange);\n\t\t$start = $daterange_parts[0];\n\t\t$end = $daterange_parts[1];\n\n\t\t// modify start and end timestamp (1 Jan 1970 = -3600).\n\t\t// perhaps a little bug from DateRangePicker\n\t\t$start = strtotime($start);\n\t\t$start += 3600;\n\t\t$end = strtotime($end);\n\t\t$end += 86400 + 3600;\n\t\t$where_clause .= \" AND o_sec > ? AND o_sec < ?\";\n\t\t$mysqli_prepare[0].=\"ii\";\n\t\t$mysqli_prepare[]=(int)$start;\n\t\t$mysqli_prepare[]=(int)$end;\n\t}\n\n\t// states\n\t$states_list = \"\";\n\tif($ok != \"\")\t\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=0; }\n\tif($warning != \"\")\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=1; }\n\tif($critical != \"\")\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=2; }\n\tif($unknown != \"\")\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=3; }\n\t$states_list = trim($states_list, \",\");\n\t\n\tif($states_list != \"\"){\n\t\t$where_clause .= \" AND state IN ($states_list)\";\n\t}\n\n\t$where_clause .= \" ORDER BY o_sec DESC LIMIT 500\";\n\treturn $where_clause;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tglobal $mysqli_prepare;",
+      "\t\t$where_clause .= \" AND $filter LIKE ?\";",
+      "\t\t$mysqli_prepare[0].=\"s\";",
+      "\t\t$mysqli_prepare[]=(string)$like;",
+      "\t\t$where_clause .= \" AND o_sec > ? AND o_sec < ?\";",
+      "\t\t$mysqli_prepare[0].=\"ii\";",
+      "\t\t$mysqli_prepare[]=(int)$start;",
+      "\t\t$mysqli_prepare[]=(int)$end;",
+      "\tif($ok != \"\")\t\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=0; }",
+      "\tif($warning != \"\")\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=1; }",
+      "\tif($critical != \"\")\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=2; }",
+      "\tif($unknown != \"\")\t{ $states_list .= \"?,\"; $mysqli_prepare[0].=\"i\"; $mysqli_prepare[]=3; }"
+    ],
+    "deleted": [
+      "\t\t$where_clause .= \" AND $filter LIKE '$like'\";",
+      "\t\t$where_clause .= \" AND o_sec > $start AND o_sec < $end\";",
+      "\tif($ok != \"\")\t\t{ $states_list .= \"0,\"; }",
+      "\tif($warning != \"\")\t{ $states_list .= \"1,\"; }",
+      "\tif($critical != \"\")\t{ $states_list .= \"2,\"; }",
+      "\tif($unknown != \"\")\t{ $states_list .= \"3,\"; }"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2692
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function details($selected_events, $queue)\n{\n\tglobal $database_ged;\n\n\t// get all needed infos into variables\n\t$value_parts = explode(\":\", $selected_events);\n\t$id = $value_parts[0];\n\t$ged_type = $value_parts[1];\n\n\t$sql = \"SELECT * FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = $id\";\n\t$result = sqlrequest($database_ged, $sql);\n\t$event = mysqli_fetch_assoc($result);\n\n\t// display event's details\n\techo '<table class=\"table table-hover table-condensed\">';\n\t\techo '<tbody>';\n\t\t\tcreateDetailRow($event, \"equipment\", \"label.host\");\n\t\t\tcreateDetailRow($event, \"host_alias\", \"label.host_alias\");\n\t\t\tcreateDetailRow($event, \"ip_address\", \"label.ip_address\");\n\t\t\tcreateDetailRow($event, \"service\", \"label.service\");\n\t\t\tcreateDetailRow($event, \"state\", \"label.state\");\n\t\t\tcreateDetailRow($event, \"description\", \"label.desc\");\n\t\t\tcreateDetailRow($event, \"occ\", \"label.occurence\");\n\t\t\tcreateDetailRow($event, \"o_sec\", \"label.o_time\");\n\t\t\tcreateDetailRow($event, \"l_sec\", \"label.l_time\");\n\t\t\tcreateDetailRow($event, \"a_sec\", \"label.a_time\");\n\t\t\tcreateDetailRow($event, \"hostgroups\", \"label.hostgroups\");\n\t\t\tcreateDetailRow($event, \"servicegroups\", \"label.servicegroups\");\n\t\t\tcreateDetailRow($event, \"src\", \"label.source\");\n\t\t\tcreateDetailRow($event, \"owner\", \"label.owner\");\n\t\t\tcreateDetailRow($event, \"comments\", \"label.comments\");\n\t\techo '</tbody>';\n\techo '</table>';\n}",
+  "code_after_change": "function details($selected_events, $queue)\n{\n\tglobal $array_ged_queues; \n\tglobal $database_ged;\n\n\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }\n\n\t// get all needed infos into variables\n\t$value_parts = explode(\":\", $selected_events);\n\t$id = $value_parts[0];\n\t$ged_type = $value_parts[1];\n\n\t$sql = \"SELECT * FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = ?\";\n\t$result = sqlrequest($database_ged, $sql, false, array(\"s\",(string)$id));\n\t$event = mysqli_fetch_assoc($result);\n\n\t// display event's details\n\techo '<table class=\"table table-hover table-condensed\">';\n\t\techo '<tbody>';\n\t\t\tcreateDetailRow($event, \"equipment\", \"label.host\");\n\t\t\tcreateDetailRow($event, \"host_alias\", \"label.host_alias\");\n\t\t\tcreateDetailRow($event, \"ip_address\", \"label.ip_address\");\n\t\t\tcreateDetailRow($event, \"service\", \"label.service\");\n\t\t\tcreateDetailRow($event, \"state\", \"label.state\");\n\t\t\tcreateDetailRow($event, \"description\", \"label.desc\");\n\t\t\tcreateDetailRow($event, \"occ\", \"label.occurence\");\n\t\t\tcreateDetailRow($event, \"o_sec\", \"label.o_time\");\n\t\t\tcreateDetailRow($event, \"l_sec\", \"label.l_time\");\n\t\t\tcreateDetailRow($event, \"a_sec\", \"label.a_time\");\n\t\t\tcreateDetailRow($event, \"hostgroups\", \"label.hostgroups\");\n\t\t\tcreateDetailRow($event, \"servicegroups\", \"label.servicegroups\");\n\t\t\tcreateDetailRow($event, \"src\", \"label.source\");\n\t\t\tcreateDetailRow($event, \"owner\", \"label.owner\");\n\t\t\tcreateDetailRow($event, \"comments\", \"label.comments\");\n\t\techo '</tbody>';\n\techo '</table>';\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tglobal $array_ged_queues;",
+      "\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }",
+      "\t$sql = \"SELECT * FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = ?\";",
+      "\t$result = sqlrequest($database_ged, $sql, false, array(\"s\",(string)$id));"
+    ],
+    "deleted": [
+      "\t$sql = \"SELECT * FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = $id\";",
+      "\t$result = sqlrequest($database_ged, $sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2693
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function edit($selected_events, $queue)\n{\n\tglobal $database_ged;\n\n\t// get all needed infos into variables\n\t$value_parts = explode(\":\", $selected_events);\n\t$id = $value_parts[0];\n\t$ged_type = $value_parts[1];\n\n\t$sql = \"SELECT comments FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = $id\";\n\t$result = sqlrequest($database_ged, $sql);\n\t$event = mysqli_fetch_assoc($result);\n\n\t$event[\"comments\"] = str_replace(\"\\'\", \"'\", $event[\"comments\"]);\n\t$event[\"comments\"] = str_replace(\"\\#\", \"#'\", $event[\"comments\"]);\n\n\techo \"\n\t<form id='edit-event-form'>\n\t\t<div class='form-group'>\n\t\t\t<label>\".getLabel(\"label.add_comment\").\"</label>\n\t\t\t<textarea id='event-comments' class='form-control textarea' rows='10'>\".$event[\"comments\"].\"</textarea>\n\t\t</div>\n\t</form>\";\n}",
+  "code_after_change": "function edit($selected_events, $queue)\n{\n\tglobal $array_ged_queues; \n\tglobal $database_ged;\n\n\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }\n\n\t// get all needed infos into variables\n\t$value_parts = explode(\":\", $selected_events);\n\t$id = $value_parts[0];\n\t$ged_type = $value_parts[1];\n\n\t$sql = \"SELECT comments FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = ?\";\n\t$result = sqlrequest($database_ged, $sql, false, array(\"s\",(string)$id));\n\t$event = mysqli_fetch_assoc($result);\n\n\techo \"\n\t<form id='edit-event-form'>\n\t\t<div class='form-group'>\n\t\t\t<label>\".getLabel(\"label.add_comment\").\"</label>\n\t\t\t<textarea id='event-comments' class='form-control textarea' rows='10'>\".$event[\"comments\"].\"</textarea>\n\t\t</div>\n\t</form>\";\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tglobal $array_ged_queues;",
+      "\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }",
+      "\t$sql = \"SELECT comments FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = ?\";",
+      "\t$result = sqlrequest($database_ged, $sql, false, array(\"s\",(string)$id));"
+    ],
+    "deleted": [
+      "\t$sql = \"SELECT comments FROM \".$ged_type.\"_queue_\".$queue.\" WHERE id = $id\";",
+      "\t$result = sqlrequest($database_ged, $sql);",
+      "\t$event[\"comments\"] = str_replace(\"\\'\", \"'\", $event[\"comments\"]);",
+      "\t$event[\"comments\"] = str_replace(\"\\#\", \"#'\", $event[\"comments\"]);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2694
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "function editEvent($selected_events, $queue, $comments)\n{\n\tglobal $database_ged;\n\n\t// get all needed infos into variables\n\t$value_parts = explode(\":\", $selected_events);\n\t$id = $value_parts[0];\n\t$ged_type = $value_parts[1];\n\n\t// format comment string to avoid errors\n\t$comments = str_replace(\"'\", \"\\'\", $comments);\n\t$comments = str_replace(\"#\", \"\\#\", $comments);\n\n\t$sql = \"UPDATE \".$ged_type.\"_queue_\".$queue.\" SET comments='$comments' WHERE id = $id\";\n\t$result = sqlrequest($database_ged, $sql);\n\tif($result){\n\t\tmessage(11, \" : \".getLabel(\"message.event_edited\"), \"ok\");\n\t} else {\n\t\tmessage(11, \" : \".getLabel(\"message.event_edited_error\"), \"danger\");\n\t}\n}",
+  "code_after_change": "function editEvent($selected_events, $queue, $comments)\n{\n\tglobal $array_ged_queues;\n\tglobal $database_ged;\n\n\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }\n\t\n\t// get all needed infos into variables\n\t$value_parts = explode(\":\", $selected_events);\n\t$id = $value_parts[0];\n\t$ged_type = $value_parts[1];\n\n\t$sql = \"UPDATE \".$ged_type.\"_queue_\".$queue.\" SET comments=? WHERE id = ?\";\n\t$result = sqlrequest($database_ged, $sql, false, array(\"ss\",(string)$comments,(string)$id));\n\tif($result){\n\t\tmessage(11, \" : \".getLabel(\"message.event_edited\"), \"ok\");\n\t} else {\n\t\tmessage(11, \" : \".getLabel(\"message.event_edited_error\"), \"danger\");\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tglobal $array_ged_queues;",
+      "\tif(!in_array($queue,$array_ged_queues)) { $queue=$array_ged_queues[0]; }",
+      "\t$sql = \"UPDATE \".$ged_type.\"_queue_\".$queue.\" SET comments=? WHERE id = ?\";",
+      "\t$result = sqlrequest($database_ged, $sql, false, array(\"ss\",(string)$comments,(string)$id));"
+    ],
+    "deleted": [
+      "\t// format comment string to avoid errors",
+      "\t$comments = str_replace(\"'\", \"\\'\", $comments);",
+      "\t$comments = str_replace(\"#\", \"\\#\", $comments);",
+      "\t$sql = \"UPDATE \".$ged_type.\"_queue_\".$queue.\" SET comments='$comments' WHERE id = $id\";",
+      "\t$result = sqlrequest($database_ged, $sql);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2695
+},
+{
+  "cve_id": "CVE-2017-6087",
+  "code_before_change": "\t\t$event = mysqli_fetch_assoc($result);\n\n\t\tif($queue == \"active\"){\n\t\t\t$ged_command = \"-drop -type $ged_type_nbr -queue $queue \";\n\t\t\tforeach ($array_ged_packets as $key => $value) {\n\t\t\t\tif($value[\"key\"] == true){\n\t\t\t\t\t$ged_command .= \"\\\"\".$event[$key].\"\\\" \";\n\t\t\t\t}\n\t\t\t}\n\t\t\t$ged_command = trim($ged_command, \" \");\n\n\t\t\tshell_exec($path_ged_bin.\" \".$ged_command);\n\t\t\tlogging(\"ged_update\",$ged_command);\n\t\t} else {\n\t\t\t$id_list .= $id.\",\";\n\t\t}\n\t}\n\n\tif($queue == \"history\"){\n\t\t$id_list = trim($id_list, \",\");\n\t\t$ged_command = \"-drop -id \".$id_list.\" -queue history\";\n\n\t\tshell_exec($path_ged_bin.\" \".$ged_command);\n\t\tlogging(\"ged_update\",$ged_command);\n\t}\n}",
+  "code_after_change": "\t\t$event = mysqli_fetch_assoc($result);\n\n\t\tif($queue == \"active\"){\n\t\t\t$ged_command = \"-drop -type $ged_type_nbr -queue $queue \";\n\t\t\tforeach ($array_ged_packets as $key => $value) {\n\t\t\t\tif($value[\"key\"] == true){\n\t\t\t\t\t$ged_command .= \"\\\"\".$event[$key].\"\\\" \";\n\t\t\t\t}\n\t\t\t}\n\t\t\t$ged_command = trim($ged_command, \" \");\n\t\t\t$ged_command=escapeshellcmd($ged_command);\n\t\t\t\t\t\n\t\t\tshell_exec($path_ged_bin.\" \".$ged_command);\n\t\t\tlogging(\"ged_update\",$ged_command);\n\t\t} else {\n\t\t\t$id_list .= $id.\",\";\n\t\t}\n\t}\n\n\tif($queue == \"history\"){\n\t\t$id_list = trim($id_list, \",\");\n\t\t$ged_command = \"-drop -id \".$id_list.\" -queue history\";\n\t\t$ged_command=escapeshellcmd($ged_command);\n\t\t\n\t\tshell_exec($path_ged_bin.\" \".$ged_command);\n\t\tlogging(\"ged_update\",$ged_command);\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t$ged_command=escapeshellcmd($ged_command);",
+      "\t\t$ged_command=escapeshellcmd($ged_command);"
+    ],
+    "deleted": []
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "EyesOfNetwork (\"EON\") 5.0 and earlier allows remote authenticated users to execute arbitrary code via shell metacharacters in the selected_events[] parameter in the (1) acknowledge, (2) delete, or (3) ownDisown function in module/monitoring_ged/ged_functions.php or the (4) module parameter to module/index.php.",
+  "id": 2696
+},
+{
+  "cve_id": "CVE-2019-15715",
+  "code_before_change": "\tfunction output( $p_format = 'dot', $p_headers = false ) {\n\t\t# Check if it is a recognized format.\n\t\tif( !isset( $this->formats[$p_format] ) ) {\n\t\t\ttrigger_error( ERROR_GENERIC, ERROR );\n\t\t}\n\n\t\t$t_binary = $this->formats[$p_format]['binary'];\n\t\t$t_type = $this->formats[$p_format]['type'];\n\t\t$t_mime = $this->formats[$p_format]['mime'];\n\n\t\t# Send Content-Type header, if requested.\n\t\tif( $p_headers ) {\n\t\t\theader( 'Content-Type: ' . $t_mime );\n\t\t}\n\t\t# Retrieve the source dot document into a buffer\n\t\tob_start();\n\t\t$this->generate();\n\t\t$t_dot_source = ob_get_contents();\n\t\tob_end_clean();\n\n\t\t# Start dot process\n\n\t\t$t_command = $this->graphviz_tool . ' -T' . $p_format;\n\t\t$t_descriptors = array(\n\t\t\t0 => array( 'pipe', 'r', ),\n\t\t\t1 => array( 'pipe', 'w', ),\n\t\t\t2 => array( 'file', 'php://stderr', 'w', ),\n\t\t\t);\n\n\t\t$t_pipes = array();\n\t\t$t_process = proc_open( $t_command, $t_descriptors, $t_pipes );\n\n\t\tif( is_resource( $t_process ) ) {\n\t\t\t# Filter generated output through dot\n\t\t\tfwrite( $t_pipes[0], $t_dot_source );\n\t\t\tfclose( $t_pipes[0] );\n\n\t\t\tif( $p_headers ) {\n\t\t\t\t# Headers were requested, use another output buffer to\n\t\t\t\t# retrieve the size for Content-Length.\n\t\t\t\tob_start();\n\t\t\t\twhile( !feof( $t_pipes[1] ) ) {\n\t\t\t\t\techo fgets( $t_pipes[1], 1024 );\n\t\t\t\t}\n\t\t\t\theader( 'Content-Length: ' . ob_get_length() );\n\t\t\t\tob_end_flush();\n\t\t\t} else {\n\t\t\t\t# No need for headers, send output directly.\n\t\t\t\twhile( !feof( $t_pipes[1] ) ) {\n\t\t\t\t\tprint( fgets( $t_pipes[1], 1024 ) );\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfclose( $t_pipes[1] );\n\t\t\tproc_close( $t_process );\n\t\t}\n\t}",
+  "code_after_change": "\tfunction output( $p_format = 'dot', $p_headers = false ) {\n\t\t# Check if it is a recognized format.\n\t\tif( !isset( $this->formats[$p_format] ) ) {\n\t\t\ttrigger_error( ERROR_GENERIC, ERROR );\n\t\t}\n\n\t\t$t_binary = $this->formats[$p_format]['binary'];\n\t\t$t_type = $this->formats[$p_format]['type'];\n\t\t$t_mime = $this->formats[$p_format]['mime'];\n\n\t\t# Send Content-Type header, if requested.\n\t\tif( $p_headers ) {\n\t\t\theader( 'Content-Type: ' . $t_mime );\n\t\t}\n\t\t# Retrieve the source dot document into a buffer\n\t\tob_start();\n\t\t$this->generate();\n\t\t$t_dot_source = ob_get_contents();\n\t\tob_end_clean();\n\n\t\t# Start dot process\n\n\t\t$t_command = escapeshellcmd( $this->graphviz_tool . ' -T' . $p_format );\n\t\t$t_descriptors = array(\n\t\t\t0 => array( 'pipe', 'r', ),\n\t\t\t1 => array( 'pipe', 'w', ),\n\t\t\t2 => array( 'file', 'php://stderr', 'w', ),\n\t\t\t);\n\n\t\t$t_pipes = array();\n\t\t$t_process = proc_open( $t_command, $t_descriptors, $t_pipes );\n\n\t\tif( is_resource( $t_process ) ) {\n\t\t\t# Filter generated output through dot\n\t\t\tfwrite( $t_pipes[0], $t_dot_source );\n\t\t\tfclose( $t_pipes[0] );\n\n\t\t\tif( $p_headers ) {\n\t\t\t\t# Headers were requested, use another output buffer to\n\t\t\t\t# retrieve the size for Content-Length.\n\t\t\t\tob_start();\n\t\t\t\twhile( !feof( $t_pipes[1] ) ) {\n\t\t\t\t\techo fgets( $t_pipes[1], 1024 );\n\t\t\t\t}\n\t\t\t\theader( 'Content-Length: ' . ob_get_length() );\n\t\t\t\tob_end_flush();\n\t\t\t} else {\n\t\t\t\t# No need for headers, send output directly.\n\t\t\t\twhile( !feof( $t_pipes[1] ) ) {\n\t\t\t\t\tprint( fgets( $t_pipes[1], 1024 ) );\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfclose( $t_pipes[1] );\n\t\t\tproc_close( $t_process );\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$t_command = escapeshellcmd( $this->graphviz_tool . ' -T' . $p_format );"
+    ],
+    "deleted": [
+      "\t\t$t_command = $this->graphviz_tool . ' -T' . $p_format;"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "MantisBT before 1.3.20 and 2.22.1 allows Post Authentication Command Injection, leading to Remote Code Execution.",
+  "id": 2697
+},
+{
+  "cve_id": "CVE-2020-19316",
+  "code_before_change": "    public function link($target, $link)\n    {\n        if (! windows_os()) {\n            return symlink($target, $link);\n        }\n\n        $mode = $this->isDirectory($target) ? 'J' : 'H';\n\n        exec(\"mklink /{$mode} \\\"{$link}\\\" \\\"{$target}\\\"\");\n    }",
+  "code_after_change": "    public function link($target, $link)\n    {\n        if (! windows_os()) {\n            return symlink($target, $link);\n        }\n\n        $mode = $this->isDirectory($target) ? 'J' : 'H';\n\n        exec(\"mklink /{$mode} \".escapeshellarg($link).\" \".escapeshellarg($target));\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        exec(\"mklink /{$mode} \".escapeshellarg($link).\" \".escapeshellarg($target));"
+    ],
+    "deleted": [
+      "        exec(\"mklink /{$mode} \\\"{$link}\\\" \\\"{$target}\\\"\");"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "OS Command injection vulnerability in function link in Filesystem.php in Laravel Framework before 5.8.17.",
+  "id": 2698
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\t\t\t$this->_writeCsv($plugin, $tmpDir . $plugin . DS);\n\t\t}\n\t\t/* site_configsの編集 (email / google_analytics_id / version) */\n\t\t$targets = ['email', 'google_analytics_id', 'version'];\n\t\t$path = $tmpDir . 'site_configs.csv';\n\t\t$fp = fopen($path, 'a+');\n\t\t$records = [];\n\t\twhile(($record = fgetcsvReg($fp, 10240)) !== false) {\n\t\t\tif (in_array($record[1], $targets)) {\n\t\t\t\t$record[2] = '';\n\t\t\t}\n\t\t\t$records[] = '\"' . implode('\",\"', $record) . '\"';\n\t\t}\n\t\tftruncate($fp, 0);\n\t\tfwrite($fp, implode(\"\\n\", $records));\n\t\t/* ZIPに固めてダウンロード */\n\t\t$fileName = 'default';\n\t\t$Simplezip = new Simplezip();\n\t\t$Simplezip->addFolder($tmpDir);\n\t\t$Simplezip->download($fileName);\n\t\temptyFolder($tmpDir);\n\t\texit();\n\t}",
+  "code_after_change": "\t\t\t$this->_writeCsv($plugin, $tmpDir . $plugin . DS);\n\t\t}\n\t\t/* site_configsの編集 (email / google_analytics_id / version) */\n\t\t$targets = ['email', 'google_analytics_id', 'version'];\n\t\t$path = $tmpDir . 'site_configs.csv';\n\t\t$fp = fopen($path, 'a+');\n\t\t$records = [];\n\t\twhile(($record = fgetcsvReg($fp, 10240)) !== false) {\n\t\t\tif (in_array($record[1], $targets)) {\n\t\t\t\t$record[2] = '';\n\t\t\t}\n\t\t\t$records[] = '\"' . implode('\",\"', $record) . '\"';\n\t\t}\n\t\tftruncate($fp, 0);\n\t\tfwrite($fp, implode(\"\\n\", $records));\n\t\t\n\t\t/* ZIPに固めてダウンロード */\n\t\t$bcZip = new BcZip();\n\t\t$bcZip->create($tmpDir, $distPath);\n\t\t\n\t\theader(\"Cache-Control: no-store\");\n\t\theader(\"Content-Type: application/zip\");\n\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");\n\t\theader(\"Content-Length: \" . filesize($distPath));\n\t\twhile (ob_get_level()) { ob_end_clean(); }\n\t\techo readfile($distPath);\n\t\t\n\t\temptyFolder($tmpDir);\n\t\tunlink($distPath);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$bcZip = new BcZip();",
+      "\t\t$bcZip->create($tmpDir, $distPath);",
+      "\t\theader(\"Cache-Control: no-store\");",
+      "\t\theader(\"Content-Type: application/zip\");",
+      "\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");",
+      "\t\theader(\"Content-Length: \" . filesize($distPath));",
+      "\t\twhile (ob_get_level()) { ob_end_clean(); }",
+      "\t\techo readfile($distPath);",
+      "\t\tunlink($distPath);"
+    ],
+    "deleted": [
+      "\t\t$fileName = 'default';",
+      "\t\t$Simplezip = new Simplezip();",
+      "\t\t$Simplezip->addFolder($tmpDir);",
+      "\t\t$Simplezip->download($fileName);",
+      "\t\texit();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2699
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tpublic function admin_add()\n\t{\n\t\t$this->pageTitle = __d('baser', 'テーマアップロード');\n\t\t$this->subMenuElements = ['themes'];\n\t\tif (!$this->request->is(['post', 'put'])) {\n\t\t\treturn;\n\t\t}\n\n\t\tif ($this->Theme->isOverPostSize()) {\n\t\t\t$this->BcMessage->setError(\n\t\t\t\t__d(\n\t\t\t\t\t'baser',\n\t\t\t\t\t'送信できるデータ量を超えています。合計で %s 以内のデータを送信してください。',\n\t\t\t\t\tini_get('post_max_size')\n\t\t\t\t)\n\t\t\t);\n\t\t}\n\t\tif (empty($this->request->data['Theme']['file']['tmp_name'])) {\n\t\t\t$message = __d('baser', 'ファイルのアップロードに失敗しました。');\n\t\t\tif (!empty($this->request->data['Theme']['file']['error']) && $this->request->data['Theme']['file']['error'] == 1) {\n\t\t\t\t$message .= __d('baser', 'サーバに設定されているサイズ制限を超えています。');\n\t\t\t}\n\t\t\t$this->BcMessage->setError($message);\n\t\t\treturn;\n\t\t}\n\n\t\t$name = $this->request->data['Theme']['file']['name'];\n\t\tmove_uploaded_file($this->request->data['Theme']['file']['tmp_name'], TMP . $name);\n\t\tApp::uses('BcZip', 'Lib');\n\t\t$BcZip = new BcZip();\n\t\tif (!$BcZip->extract(TMP . $name, BASER_THEMES)) {\n\t\t\t$msg = __d('baser', 'アップロードしたZIPファイルの展開に失敗しました。');\n\t\t\t$msg .= \"\\n\" . $BcZip->error;\n\t\t\t$this->BcMessage->setError($msg);\n\t\t\treturn;\n\t\t}\n\t\tunlink(TMP . $name);\n\t\t$this->BcMessage->setInfo('テーマファイル「' . $name . '」を追加しました。');\n\t\t$this->redirect(['action' => 'index']);\n\t}",
+  "code_after_change": "\tpublic function admin_add()\n\t{\n\t\t$this->pageTitle = __d('baser', 'テーマアップロード');\n\t\t$this->subMenuElements = ['themes'];\n\t\tif (!$this->request->is(['post', 'put'])) {\n\t\t\treturn;\n\t\t}\n\n\t\tif ($this->Theme->isOverPostSize()) {\n\t\t\t$this->BcMessage->setError(\n\t\t\t\t__d(\n\t\t\t\t\t'baser',\n\t\t\t\t\t'送信できるデータ量を超えています。合計で %s 以内のデータを送信してください。',\n\t\t\t\t\tini_get('post_max_size')\n\t\t\t\t)\n\t\t\t);\n\t\t}\n\t\tif (empty($this->request->data['Theme']['file']['tmp_name'])) {\n\t\t\t$message = __d('baser', 'ファイルのアップロードに失敗しました。');\n\t\t\tif (!empty($this->request->data['Theme']['file']['error']) && $this->request->data['Theme']['file']['error'] == 1) {\n\t\t\t\t$message .= __d('baser', 'サーバに設定されているサイズ制限を超えています。');\n\t\t\t}\n\t\t\t$this->BcMessage->setError($message);\n\t\t\treturn;\n\t\t}\n\n\t\t$name = $this->request->data['Theme']['file']['name'];\n\t\tmove_uploaded_file($this->request->data['Theme']['file']['tmp_name'], TMP . $name);\n\t\t$BcZip = new BcZip();\n\t\tif (!$BcZip->extract(TMP . $name, BASER_THEMES)) {\n\t\t\t$msg = __d('baser', 'アップロードしたZIPファイルの展開に失敗しました。');\n\t\t\t$msg .= \"\\n\" . $BcZip->error;\n\t\t\t$this->BcMessage->setError($msg);\n\t\t\treturn;\n\t\t}\n\t\tunlink(TMP . $name);\n\t\t$this->BcMessage->setInfo('テーマファイル「' . $name . '」を追加しました。');\n\t\t$this->redirect(['action' => 'index']);\n\t}\n",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "\t\tApp::uses('BcZip', 'Lib');"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2700
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tpublic function admin_download()\n\t{\n\t\t$this->autoRender = false;\n\t\t$tmpDir = TMP . 'theme' . DS;\n\t\t$Folder = new Folder();\n\t\t$Folder->create($tmpDir);\n\t\t$path = BASER_THEMES . $this->siteConfigs['theme'] . DS;\n\t\t$Folder->copy([\n\t\t\t'from' => $path,\n\t\t\t'to' => $tmpDir . $this->siteConfigs['theme'],\n\t\t\t'chmod' => 0777\n\t\t]);\n\t\t$Simplezip = new Simplezip();\n\t\t$Simplezip->addFolder($tmpDir);\n\t\t$Simplezip->download($this->siteConfigs['theme']);\n\t\t$Folder->delete($tmpDir);\n\t}",
+  "code_after_change": "\tpublic function admin_download()\n\t{\n\t\tif (!extension_loaded('zip')) {\n\t\t\t$this->notFound();\n\t\t}\n\t\t\n\t\t$this->autoRender = false;\n\t\t$tmpDir = TMP . 'theme' . DS;\n\t\t$orgPath = BASER_THEMES . $this->siteConfigs['theme'] . DS;\n\t\t$sourcePath = $tmpDir . $this->siteConfigs['theme'];\n\t\t$distPath = $sourcePath . '.zip';\n\t\t\n\t\t$Folder = new Folder();\n\t\t$Folder->create($tmpDir);\n\t\t$Folder->copy([\n\t\t\t'from' => $orgPath,\n\t\t\t'to' => $sourcePath,\n\t\t\t'chmod' => 0777\n\t\t]);\n\t\t$bcZip = new BcZip();\n\t\t$bcZip->create($sourcePath, $distPath);\n\t\t\n\t\theader(\"Cache-Control: no-store\");\n\t\theader(\"Content-Type: application/zip\");\n\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");\n\t\theader(\"Content-Length: \" . filesize($distPath));\n\t\twhile (ob_get_level()) { ob_end_clean(); }\n\t\techo readfile($distPath);\n\t\t\n\t\t$Folder->delete($tmpDir);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif (!extension_loaded('zip')) {",
+      "\t\t\t$this->notFound();",
+      "\t\t}",
+      "\t\t$orgPath = BASER_THEMES . $this->siteConfigs['theme'] . DS;",
+      "\t\t$sourcePath = $tmpDir . $this->siteConfigs['theme'];",
+      "\t\t$distPath = $sourcePath . '.zip';",
+      "\t\t\t'from' => $orgPath,",
+      "\t\t\t'to' => $sourcePath,",
+      "\t\t$bcZip = new BcZip();",
+      "\t\t$bcZip->create($sourcePath, $distPath);",
+      "\t\theader(\"Cache-Control: no-store\");",
+      "\t\theader(\"Content-Type: application/zip\");",
+      "\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");",
+      "\t\theader(\"Content-Length: \" . filesize($distPath));",
+      "\t\twhile (ob_get_level()) { ob_end_clean(); }",
+      "\t\techo readfile($distPath);"
+    ],
+    "deleted": [
+      "\t\t$path = BASER_THEMES . $this->siteConfigs['theme'] . DS;",
+      "\t\t\t'from' => $path,",
+      "\t\t\t'to' => $tmpDir . $this->siteConfigs['theme'],",
+      "\t\t$Simplezip = new Simplezip();",
+      "\t\t$Simplezip->addFolder($tmpDir);",
+      "\t\t$Simplezip->download($this->siteConfigs['theme']);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2701
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tprotected function _downloadErrorLog()\n\t{\n\t\t$tmpDir = TMP . 'logs' . DS;\n\t\t$Folder = new Folder($tmpDir);\n\t\t$files = $Folder->read(true, true, false);\n\t\tif (count($files[0]) === 0 && count($files[1]) === 0) {\n\t\t\treturn false;\n\t\t}\n\t\t// ZIP圧縮して出力\n\t\t$fileName = 'basercms_logs_' . date('Ymd_His');\n\t\t$Simplezip = new Simplezip();\n\t\t$Simplezip->addFolder($tmpDir);\n\t\t$Simplezip->download($fileName);\n\t\treturn true;\n\t}",
+  "code_after_change": "\tprotected function _downloadErrorLog()\n\t{\n\t\tset_time_limit(0);\n\t\t\n\t\t$tmpDir = TMP . 'logs' . DS;\n\t\t$distPath = TMP . 'basercms_logs_' . date('Ymd_His') . '.zip';\n\t\t$Folder = new Folder($tmpDir);\n\t\t$files = $Folder->read(true, true, false);\n\t\tif (count($files[0]) === 0 && count($files[1]) === 0) {\n\t\t\treturn false;\n\t\t}\n\t\t// ZIP圧縮して出力\n\t\t$bcZip = new BcZip();\n\t\t$bcZip->create($tmpDir, $distPath);\n\t\t\n\t\theader(\"Cache-Control: no-store\");\n\t\theader(\"Content-Type: application/zip\");\n\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");\n\t\theader(\"Content-Length: \" . filesize($distPath));\n\t\twhile (ob_get_level()) { ob_end_clean(); }\n\t\techo readfile($distPath);\n\t\t\n\t\tunlink($distPath);\n\t\treturn true;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tset_time_limit(0);",
+      "\t\t$distPath = TMP . 'basercms_logs_' . date('Ymd_His') . '.zip';",
+      "\t\t$bcZip = new BcZip();",
+      "\t\t$bcZip->create($tmpDir, $distPath);",
+      "\t\theader(\"Cache-Control: no-store\");",
+      "\t\theader(\"Content-Type: application/zip\");",
+      "\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");",
+      "\t\theader(\"Content-Length: \" . filesize($distPath));",
+      "\t\twhile (ob_get_level()) { ob_end_clean(); }",
+      "\t\techo readfile($distPath);",
+      "\t\tunlink($distPath);"
+    ],
+    "deleted": [
+      "\t\t$fileName = 'basercms_logs_' . date('Ymd_His');",
+      "\t\t$Simplezip = new Simplezip();",
+      "\t\t$Simplezip->addFolder($tmpDir);",
+      "\t\t$Simplezip->download($fileName);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2702
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tprotected function _restoreDb($data)\n\t{\n\n\t\tif (empty($data['Tool']['backup']['tmp_name'])) {\n\t\t\treturn false;\n\t\t}\n\n\t\t$tmpPath = TMP . 'schemas' . DS;\n\t\t$targetPath = $tmpPath . $data['Tool']['backup']['name'];\n\n\t\tif (!move_uploaded_file($data['Tool']['backup']['tmp_name'], $targetPath)) {\n\t\t\treturn false;\n\t\t}\n\n\t\t/* ZIPファイルを解凍する */\n\t\t$Simplezip = new Simplezip();\n\t\tif (!$Simplezip->unzip($targetPath, $tmpPath)) {\n\t\t\treturn false;\n\t\t}\n\t\t@unlink($targetPath);\n\n\t\t$result = true;\n\t\t$db = ConnectionManager::getDataSource('default');\n\t\t$db->begin();\n\t\tif (!$this->_loadBackup($tmpPath . 'core' . DS, $data['Tool']['encoding'])) {\n\t\t\t$result = false;\n\t\t}\n\t\tif (!$this->_loadBackup($tmpPath . 'plugin' . DS, $data['Tool']['encoding'])) {\n\t\t\t$result = false;\n\t\t}\n\t\tif ($result) {\n\t\t\t$db->commit();\n\t\t} else {\n\t\t\t$db->rollback();\n\t\t}\n\t\t$this->_resetTmpSchemaFolder();\n\t\tclearAllCache();\n\n\t\treturn $result;\n\t}",
+  "code_after_change": "\tprotected function _restoreDb($data)\n\t{\n\n\t\tif (empty($data['Tool']['backup']['tmp_name'])) {\n\t\t\treturn false;\n\t\t}\n\n\t\t$tmpPath = TMP . 'schemas' . DS;\n\t\t$targetPath = $tmpPath . $data['Tool']['backup']['name'];\n\n\t\tif (!move_uploaded_file($data['Tool']['backup']['tmp_name'], $targetPath)) {\n\t\t\treturn false;\n\t\t}\n\t\t\n\t\t/* ZIPファイルを解凍する */\n\t\t$bcZip = new BcZip();\n\t\tif (!$bcZip->extract($targetPath, $tmpPath)) {\n\t\t\treturn false;\n\t\t}\n\t\t@unlink($targetPath);\n\n\t\t$result = true;\n\t\t$db = ConnectionManager::getDataSource('default');\n\t\t$db->begin();\n\t\tif (!$this->_loadBackup($tmpPath . 'core' . DS, $data['Tool']['encoding'])) {\n\t\t\t$result = false;\n\t\t}\n\t\tif (!$this->_loadBackup($tmpPath . 'plugin' . DS, $data['Tool']['encoding'])) {\n\t\t\t$result = false;\n\t\t}\n\t\tif ($result) {\n\t\t\t$db->commit();\n\t\t} else {\n\t\t\t$db->rollback();\n\t\t}\n\t\t$this->_resetTmpSchemaFolder();\n\t\tclearAllCache();\n\n\t\treturn $result;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$bcZip = new BcZip();",
+      "\t\tif (!$bcZip->extract($targetPath, $tmpPath)) {"
+    ],
+    "deleted": [
+      "\t\t$Simplezip = new Simplezip();",
+      "\t\tif (!$Simplezip->unzip($targetPath, $tmpPath)) {"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2703
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\t\t\t\t$this->_writeBackup($tmpDir . 'plugin' . DS, $plugin['Plugin']['name'], $encoding);\n\t\t\t}\n\t\t}\n\t\t// ZIP圧縮して出力\n\t\t$fileName = 'baserbackup_' . $version . '_' . date('Ymd_His');\n\t\t$Simplezip = new Simplezip();\n\t\t$Simplezip->addFolder($tmpDir);\n\t\t$Simplezip->download($fileName);\n\t\t$this->_resetTmpSchemaFolder();\n\t\texit();\n\t}",
+  "code_after_change": "\t\t\t\t$this->_writeBackup($tmpDir . 'plugin' . DS, $plugin['Plugin']['name'], $encoding);\n\t\t\t}\n\t\t}\n\t\t\n\t\t// ZIP圧縮して出力\n\t\t$bcZip = new BcZip();\n\t\t$bcZip->create($tmpDir, $distPath);\n\t\t\n\t\theader(\"Cache-Control: no-store\");\n\t\theader(\"Content-Type: application/zip\");\n\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");\n\t\theader(\"Content-Length: \" . filesize($distPath));\n\t\twhile (ob_get_level()) { ob_end_clean(); }\n\t\techo readfile($distPath);\n\t\t\n\t\tunlink($distPath);\n\t\t$this->_resetTmpSchemaFolder();\n\t\treturn true;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$bcZip = new BcZip();",
+      "\t\t$bcZip->create($tmpDir, $distPath);",
+      "\t\theader(\"Cache-Control: no-store\");",
+      "\t\theader(\"Content-Type: application/zip\");",
+      "\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");",
+      "\t\theader(\"Content-Length: \" . filesize($distPath));",
+      "\t\twhile (ob_get_level()) { ob_end_clean(); }",
+      "\t\techo readfile($distPath);",
+      "\t\tunlink($distPath);",
+      "\t\treturn true;"
+    ],
+    "deleted": [
+      "\t\t$fileName = 'baserbackup_' . $version . '_' . date('Ymd_His');",
+      "\t\t$Simplezip = new Simplezip();",
+      "\t\t$Simplezip->addFolder($tmpDir);",
+      "\t\t$Simplezip->download($fileName);",
+      "\t\texit();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2704
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tpublic function admin_log($mode = '')\n\t{\n\t\t$errorLogPath = TMP . 'logs' . DS . 'error.log';\n\t\tswitch($mode) {\n\t\t\tcase 'download':\n\t\t\t\tset_time_limit(0);\n\t\t\t\tif ($this->_downloadErrorLog()) {\n\t\t\t\t\texit();\n\t\t\t\t}\n\t\t\t\t$this->BcMessage->setInfo('エラーログが存在しません。');\n\t\t\t\t$this->redirect(['action' => 'log']);\n\t\t\t\tbreak;\n\t\t\tcase 'delete':\n\t\t\t\t$this->_checkSubmitToken();\n\t\t\t\tif (file_exists($errorLogPath)) {\n\t\t\t\t\tif (unlink($errorLogPath)) {\n\t\t\t\t\t\t$messages[] = __d('baser', 'エラーログを削除しました。');\n\t\t\t\t\t\t$error = false;\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$messages[] = __d('baser', 'エラーログが削除できませんでした。');\n\t\t\t\t\t\t$error = true;\n\t\t\t\t\t}\n\t\t\t\t} else {\n\t\t\t\t\t$messages[] = __d('baser', 'エラーログが存在しません。');\n\t\t\t\t\t$error = false;\n\t\t\t\t}\n\n\t\t\t\tif ($messages) {\n\t\t\t\t\t$this->BcMessage->set(implode(\"\\n\", $messages), $error);\n\t\t\t\t}\n\t\t\t\t$this->redirect(['action' => 'log']);\n\t\t\t\tbreak;\n\n\t\t}\n\n\t\t$fileSize = 0;\n\t\tif (file_exists($errorLogPath)) {\n\t\t\t$fileSize = filesize($errorLogPath);\n\t\t}\n\n\t\t$this->pageTitle = __d('baser', 'データメンテナンス');\n\t\t$this->help = 'tools_log';\n\t\t$this->set('fileSize', $fileSize);\n\t}",
+  "code_after_change": "\tpublic function admin_log($mode = '')\n\t{\n\t\t$zipEnable = extension_loaded('zip');\n\t\t$errorLogPath = TMP . 'logs' . DS . 'error.log';\n\t\tswitch($mode) {\n\t\t\tcase 'download':\n\t\t\t\tif (!$zipEnable) {\n\t\t\t\t\t$this->notFound();\n\t\t\t\t}\n\t\t\t\t$this->autoRender = false;\n\t\t\t\tif ($this->_downloadErrorLog()) {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\t$this->BcMessage->setInfo('エラーログが存在しません。');\n\t\t\t\t$this->redirect(['action' => 'log']);\n\t\t\t\tbreak;\n\t\t\tcase 'delete':\n\t\t\t\t$this->_checkSubmitToken();\n\t\t\t\tif (file_exists($errorLogPath)) {\n\t\t\t\t\tif (unlink($errorLogPath)) {\n\t\t\t\t\t\t$messages[] = __d('baser', 'エラーログを削除しました。');\n\t\t\t\t\t\t$error = false;\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$messages[] = __d('baser', 'エラーログが削除できませんでした。');\n\t\t\t\t\t\t$error = true;\n\t\t\t\t\t}\n\t\t\t\t} else {\n\t\t\t\t\t$messages[] = __d('baser', 'エラーログが存在しません。');\n\t\t\t\t\t$error = false;\n\t\t\t\t}\n\n\t\t\t\tif ($messages) {\n\t\t\t\t\t$this->BcMessage->set(implode(\"\\n\", $messages), $error);\n\t\t\t\t}\n\t\t\t\t$this->redirect(['action' => 'log']);\n\t\t\t\tbreak;\n\n\t\t}\n\n\t\t$fileSize = 0;\n\t\tif (file_exists($errorLogPath)) {\n\t\t\t$fileSize = filesize($errorLogPath);\n\t\t}\n\n\t\t$this->pageTitle = __d('baser', 'データメンテナンス');\n\t\t$this->help = 'tools_log';\n\t\t$this->set('zipEnable', $zipEnable);\n\t\t$this->set('fileSize', $fileSize);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$zipEnable = extension_loaded('zip');",
+      "\t\t\t\tif (!$zipEnable) {",
+      "\t\t\t\t\t$this->notFound();",
+      "\t\t\t\t}",
+      "\t\t\t\t$this->autoRender = false;",
+      "\t\t\t\t\treturn;",
+      "\t\t$this->set('zipEnable', $zipEnable);"
+    ],
+    "deleted": [
+      "\t\t\t\tset_time_limit(0);",
+      "\t\t\t\t\texit();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2705
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tpublic function admin_maintenance($mode = '')\n\t{\n\t\t$this->_checkReferer();\n\t\tswitch($mode) {\n\t\t\tcase 'backup':\n\t\t\t\tset_time_limit(0);\n\t\t\t\t$this->_backupDb($this->request->query['backup_encoding']);\n\t\t\t\tbreak;\n\t\t\tcase 'restore':\n\t\t\t\tset_time_limit(0);\n\t\t\t\t$messages = [];\n\t\t\t\tif (!$this->request->data) {\n\t\t\t\t\tif ($this->Tool->isOverPostSize()) {\n\t\t\t\t\t\t$messages[] = __d('baser', '送信できるデータ量を超えています。合計で %s 以内のデータを送信してください。', ini_get('post_max_size'));\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$this->notFound();\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif ($this->_restoreDb($this->request->data)) {\n\t\t\t\t\t$messages[] = __d('baser', 'データの復元が完了しました。');\n\t\t\t\t\t$error = false;\n\t\t\t\t} else {\n\t\t\t\t\t$messages[] = __d('baser', 'データの復元に失敗しました。ログの確認を行なって下さい。');\n\t\t\t\t\t$error = true;\n\t\t\t\t}\n\t\t\t\t// Pageモデルがレストア処理でAppModelで初期化されClassRegistryにセットされている為\n\t\t\t\tClassRegistry::flush();\n\t\t\t\tBcSite::flash();\n\t\t\t\tif (!$error && !$this->Page->createAllPageTemplate()) {\n\t\t\t\t\t$messages[] = __d('baser', \"ページテンプレートの生成に失敗しました。\\n表示できないページはページ管理より更新処理を行ってください。\");\n\t\t\t\t}\n\t\t\t\tif ($messages) {\n\t\t\t\t\tif ($error) {\n\t\t\t\t\t\t$this->BcMessage->setError(implode(\"\\n\", $messages));\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$this->BcMessage->setInfo(implode(\"\\n\", $messages));\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tclearAllCache();\n\t\t\t\t$this->redirect(['action' => 'maintenance']);\n\t\t\t\tbreak;\n\t\t}\n\t\t$this->pageTitle = __d('baser', 'データメンテナンス');\n\t\t$this->help = 'tools_maintenance';\n\t}",
+  "code_after_change": "\tpublic function admin_maintenance($mode = '')\n\t{\n\t\t$this->_checkReferer();\n\t\t$zipEnable = extension_loaded('zip');\n\t\tif (!$zipEnable) {\n\t\t\t$this->notFound();\n\t\t}\n\t\t\n\t\tswitch($mode) {\n\t\t\tcase 'backup':\n\t\t\t\t$this->_backupDb($this->request->query['backup_encoding']);\n\t\t\t\tbreak;\n\t\t\tcase 'restore':\n\t\t\t\tset_time_limit(0);\n\t\t\t\t$messages = [];\n\t\t\t\tif (!$this->request->data) {\n\t\t\t\t\tif ($this->Tool->isOverPostSize()) {\n\t\t\t\t\t\t$messages[] = __d('baser', '送信できるデータ量を超えています。合計で %s 以内のデータを送信してください。', ini_get('post_max_size'));\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$this->notFound();\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif ($this->_restoreDb($this->request->data)) {\n\t\t\t\t\t$messages[] = __d('baser', 'データの復元が完了しました。');\n\t\t\t\t\t$error = false;\n\t\t\t\t} else {\n\t\t\t\t\t$messages[] = __d('baser', 'データの復元に失敗しました。ログの確認を行なって下さい。');\n\t\t\t\t\t$error = true;\n\t\t\t\t}\n\t\t\t\t// Pageモデルがレストア処理でAppModelで初期化されClassRegistryにセットされている為\n\t\t\t\tClassRegistry::flush();\n\t\t\t\tBcSite::flash();\n\t\t\t\tif (!$error && !$this->Page->createAllPageTemplate()) {\n\t\t\t\t\t$messages[] = __d('baser', \"ページテンプレートの生成に失敗しました。\\n表示できないページはページ管理より更新処理を行ってください。\");\n\t\t\t\t}\n\t\t\t\tif ($messages) {\n\t\t\t\t\tif ($error) {\n\t\t\t\t\t\t$this->BcMessage->setError(implode(\"\\n\", $messages));\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$this->BcMessage->setInfo(implode(\"\\n\", $messages));\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tclearAllCache();\n\t\t\t\t$this->redirect(['action' => 'maintenance']);\n\t\t\t\tbreak;\n\t\t}\n\t\t$this->pageTitle = __d('baser', 'データメンテナンス');\n\t\t$this->help = 'tools_maintenance';\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$zipEnable = extension_loaded('zip');",
+      "\t\tif (!$zipEnable) {",
+      "\t\t\t$this->notFound();",
+      "\t\t}"
+    ],
+    "deleted": [
+      "\t\t\t\tset_time_limit(0);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2706
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tpublic function admin_write_schema()\n\t{\n\t\t$path = TMP . 'schemas' . DS;\n\n\t\t/* 表示設定 */\n\t\t$this->pageTitle = __d('baser', 'スキーマファイル生成');\n\t\t$this->help = 'tools_write_schema';\n\n\t\tif (!$this->request->data) {\n\t\t\t$this->request->data['Tool']['connection'] = 'core';\n\t\t\treturn;\n\t\t}\n\n\t\tif (empty($this->request->data['Tool'])) {\n\t\t\t$this->BcMessage->setError(__d('baser', 'テーブルを選択してください。'));\n\t\t\treturn;\n\t\t}\n\n\t\tif (!$this->_resetTmpSchemaFolder()) {\n\t\t\t$this->BcMessage->setError('フォルダ：' . $path . ' が存在するか確認し、存在する場合は、削除するか書込権限を与えてください。');\n\t\t\t$this->redirect(['action' => 'write_schema']);\n\t\t}\n\t\tif (!$this->Tool->writeSchema($this->request->data, $path)) {\n\t\t\t$this->BcMessage->setError(__d('baser', 'スキーマファイルの生成に失敗しました。'));\n\t\t\treturn;\n\t\t}\n\n\t\t$Simplezip = new Simplezip();\n\t\t$Simplezip->addFolder($path);\n\t\t$Simplezip->download('schemas');\n\t\texit();\n\t}",
+  "code_after_change": "\tpublic function admin_write_schema()\n\t{\n\t\t$path = TMP . 'schemas' . DS;\n\t\t$distPath = TMP . 'schemas.zip';\n\n\t\t/* 表示設定 */\n\t\t$this->pageTitle = __d('baser', 'スキーマファイル生成');\n\t\t$this->help = 'tools_write_schema';\n\n\t\tif (!$this->request->data) {\n\t\t\t$this->request->data['Tool']['connection'] = 'core';\n\t\t\treturn;\n\t\t}\n\n\t\tif (empty($this->request->data['Tool'])) {\n\t\t\t$this->BcMessage->setError(__d('baser', 'テーブルを選択してください。'));\n\t\t\treturn;\n\t\t}\n\n\t\tif (!$this->_resetTmpSchemaFolder()) {\n\t\t\t$this->BcMessage->setError('フォルダ：' . $path . ' が存在するか確認し、存在する場合は、削除するか書込権限を与えてください。');\n\t\t\t$this->redirect(['action' => 'write_schema']);\n\t\t}\n\t\tif (!$this->Tool->writeSchema($this->request->data, $path)) {\n\t\t\t$this->BcMessage->setError(__d('baser', 'スキーマファイルの生成に失敗しました。'));\n\t\t\treturn;\n\t\t}\n\n\t\t// ZIP圧縮して出力\n\t\tset_time_limit(0);\n\t\t$this->autoRender = false;\n\t\t\n\t\t// 不要ディレクトリの削除\n\t\trmdir($path . 'core');\n\t\trmdir($path . 'plugin');\n\t\t\n\t\t$bcZip = new BcZip();\n\t\t$bcZip->create($path, $distPath);\n\t\t\n\t\theader(\"Cache-Control: no-store\");\n\t\theader(\"Content-Type: application/zip\");\n\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");\n\t\theader(\"Content-Length: \" . filesize($distPath));\n\t\twhile (ob_get_level()) { ob_end_clean(); }\n\t\techo readfile($distPath);\n\t\t\n\t\tunlink($distPath);\n\t\treturn true;\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$distPath = TMP . 'schemas.zip';",
+      "\t\t// ZIP圧縮して出力",
+      "\t\tset_time_limit(0);",
+      "\t\t$this->autoRender = false;",
+      "\t\t// 不要ディレクトリの削除",
+      "\t\trmdir($path . 'core');",
+      "\t\trmdir($path . 'plugin');",
+      "\t\t$bcZip = new BcZip();",
+      "\t\t$bcZip->create($path, $distPath);",
+      "\t\theader(\"Cache-Control: no-store\");",
+      "\t\theader(\"Content-Type: application/zip\");",
+      "\t\theader(\"Content-Disposition: attachment; filename=\" . basename($distPath) . \";\");",
+      "\t\theader(\"Content-Length: \" . filesize($distPath));",
+      "\t\twhile (ob_get_level()) { ob_end_clean(); }",
+      "\t\techo readfile($distPath);",
+      "\t\tunlink($distPath);",
+      "\t\treturn true;"
+    ],
+    "deleted": [
+      "\t\t$Simplezip = new Simplezip();",
+      "\t\t$Simplezip->addFolder($path);",
+      "\t\t$Simplezip->download('schemas');",
+      "\t\texit();"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2707
+},
+{
+  "cve_id": "CVE-2021-41243",
+  "code_before_change": "\tpublic function __destruct()\n\t{\n\t\tif (class_exists('ZipArchive')) {\n\t\t\t$this->Zip->close();\n\t\t}\n\t}",
+  "code_after_change": "\t *\n\t * @param $path\n\t * @return string\n\t */\n\tprotected function _escapePath($path)\n\t{",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "\tpublic function __destruct()",
+      "\t{",
+      "\t\tif (class_exists('ZipArchive')) {",
+      "\t\t\t$this->Zip->close();",
+      "\t\t}",
+      "\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "There is a Potential Zip Slip Vulnerability and OS Command Injection Vulnerability on the management system of baserCMS. Users with permissions to upload files may upload crafted zip files which may execute arbitrary commands on the host operating system. This is a vulnerability that needs to be addressed when the management system is used by an unspecified number of users. If you are eligible, please update to the new version as soon as possible.",
+  "id": 2708
+},
+{
+  "cve_id": "CVE-2022-0848",
+  "code_before_change": "function uploadFile($file_array, $destination_directory, $destination_filename = null)\n{\n    if ((! isset($file_array['name'])) || (! isset($file_array['tmp_name'])) || (! isset($file_array['error']))) {\n        throw new Exception(_('Ungültiges Array übergeben!'));\n    }\n\n    //Dont allow to upload a PHP file.\n    if(strpos($file_array['name'], \".php\") != false\n        || strpos($destination_filename, \".php\") != false)\n    {\n        throw new \\Exception(_(\"Es ist nicht erlaubt PHP Dateien hochzuladen!\"));\n    }\n\n    if ($destination_filename == null) {\n        $destination_filename = $file_array['name'];\n    }\n\n    $destination = $destination_directory.$destination_filename;\n\n    if ((mb_substr($destination_directory, -1, 1) != '/') || (! isPathabsoluteAndUnix($destination_directory, false))) {\n        throw new Exception(sprintf(_('\"%s\" ist kein gültiges Verzeichnis!'), $destination_directory));\n    }\n\n    try {\n        createPath($destination_directory);\n    } catch (Exception $ex) {\n        throw new Exception(_(\"Das Verzeichniss konnte nicht angelegt werden!\"));\n    }\n\n    if (! is_writable($destination_directory)) {\n        throw new Exception(_('Sie haben keine Schreibrechte im Verzeichnis \"').$destination_directory.'\"!');\n    }\n\n    if (file_exists($destination)) {\n        // there is already a file with the same filename, check if it is exactly the same file\n        $new_file_md5 = md5_file($file_array['tmp_name']);\n        $existing_file_md5 = md5_file($destination);\n\n        if (($new_file_md5 == $existing_file_md5) && ($new_file_md5 != false)) {\n            return $destination;\n        } // it's exactly the same file, we don't need to upload it again, re-use it!\n\n        throw new Exception(_('Es existiert bereits eine Datei mit dem Dateinamen \"').$destination.'\"!');\n    }\n\n    switch ($file_array['error']) {\n        case UPLOAD_ERR_OK:\n            // all OK, upload was successfully\n            break;\n        case UPLOAD_ERR_INI_SIZE:\n            throw new Exception(_('Die maximal mögliche Dateigrösse für Uploads wurde überschritten (\"upload_max_filesize\" in \"php.ini\")! ').\n                '<a target=\"_blank\" href=\"'._(\"https://github.com/Part-DB/Part-DB/wiki/Anforderungen\").'>'._(\"Hilfe\").'</a>');\n        case UPLOAD_ERR_FORM_SIZE:\n            throw new Exception(_('Die maximal mögliche Dateigrösse für Uploads wurde überschritten!'));\n        case UPLOAD_ERR_PARTIAL:\n            throw new Exception(_('Die Datei wurde nur teilweise hochgeladen!'));\n        case UPLOAD_ERR_NO_FILE:\n            throw new Exception(_('Es wurde keine Datei hochgeladen!'));\n        case UPLOAD_ERR_NO_TMP_DIR:\n            throw new Exception(_('Es gibt keinen temporären Ordner für hochgeladene Dateien!'));\n        case UPLOAD_ERR_CANT_WRITE:\n            throw new Exception(_('Das Speichern der Datei auf die Festplatte ist fehlgeschlagen!'));\n        case UPLOAD_ERR_EXTENSION:\n            throw new Exception(_('Eine PHP Erweiterung hat den Upload der Datei gestoppt!'));\n        default:\n            throw new Exception(_('Beim Hochladen der Datei trat ein unbekannter Fehler auf!'));\n    }\n\n    if (! move_uploaded_file($file_array['tmp_name'], $destination)) {\n        throw new Exception(_('Beim Hochladen der Datei trat ein unbekannter Fehler auf!'));\n    }\n\n    return $destination;\n}",
+  "code_after_change": "function uploadFile($file_array, $destination_directory, $destination_filename = null)\n{\n    $unsafe_extensions = ['php', 'phtml', 'php3', 'ph3', 'php4', 'ph4', 'php5', 'ph5', 'phtm', 'sh', 'asp', 'cgi', 'py', 'pl', 'exe', 'aspx'];\n\n    if ((! isset($file_array['name'])) || (! isset($file_array['tmp_name'])) || (! isset($file_array['error']))) {\n        throw new Exception(_('Ungültiges Array übergeben!'));\n    }\n\n    //Dont allow upload of files with potentially dangerous extension\n    if (in_array(getExtensionFromFileName($file_array['name']), $unsafe_extensions)\n        || in_array(getExtensionFromFileName($destination_filename), $unsafe_extensions))\n    {\n        throw new \\Exception(_(\"Es ist nicht erlaubt PHP Dateien hochzuladen!\"));\n    }\n\n    if ($destination_filename == null) {\n        $destination_filename = $file_array['name'];\n    }\n\n    $destination = $destination_directory.$destination_filename;\n\n    if ((mb_substr($destination_directory, -1, 1) != '/') || (! isPathabsoluteAndUnix($destination_directory, false))) {\n        throw new Exception(sprintf(_('\"%s\" ist kein gültiges Verzeichnis!'), $destination_directory));\n    }\n\n    try {\n        createPath($destination_directory);\n    } catch (Exception $ex) {\n        throw new Exception(_(\"Das Verzeichniss konnte nicht angelegt werden!\"));\n    }\n\n    if (! is_writable($destination_directory)) {\n        throw new Exception(_('Sie haben keine Schreibrechte im Verzeichnis \"').$destination_directory.'\"!');\n    }\n\n    if (file_exists($destination)) {\n        // there is already a file with the same filename, check if it is exactly the same file\n        $new_file_md5 = md5_file($file_array['tmp_name']);\n        $existing_file_md5 = md5_file($destination);\n\n        if (($new_file_md5 == $existing_file_md5) && ($new_file_md5 != false)) {\n            return $destination;\n        } // it's exactly the same file, we don't need to upload it again, re-use it!\n\n        throw new Exception(_('Es existiert bereits eine Datei mit dem Dateinamen \"').$destination.'\"!');\n    }\n\n    switch ($file_array['error']) {\n        case UPLOAD_ERR_OK:\n            // all OK, upload was successfully\n            break;\n        case UPLOAD_ERR_INI_SIZE:\n            throw new Exception(_('Die maximal mögliche Dateigrösse für Uploads wurde überschritten (\"upload_max_filesize\" in \"php.ini\")! ').\n                '<a target=\"_blank\" href=\"'._(\"https://github.com/Part-DB/Part-DB/wiki/Anforderungen\").'>'._(\"Hilfe\").'</a>');\n        case UPLOAD_ERR_FORM_SIZE:\n            throw new Exception(_('Die maximal mögliche Dateigrösse für Uploads wurde überschritten!'));\n        case UPLOAD_ERR_PARTIAL:\n            throw new Exception(_('Die Datei wurde nur teilweise hochgeladen!'));\n        case UPLOAD_ERR_NO_FILE:\n            throw new Exception(_('Es wurde keine Datei hochgeladen!'));\n        case UPLOAD_ERR_NO_TMP_DIR:\n            throw new Exception(_('Es gibt keinen temporären Ordner für hochgeladene Dateien!'));\n        case UPLOAD_ERR_CANT_WRITE:\n            throw new Exception(_('Das Speichern der Datei auf die Festplatte ist fehlgeschlagen!'));\n        case UPLOAD_ERR_EXTENSION:\n            throw new Exception(_('Eine PHP Erweiterung hat den Upload der Datei gestoppt!'));\n        default:\n            throw new Exception(_('Beim Hochladen der Datei trat ein unbekannter Fehler auf!'));\n    }\n\n    if (! move_uploaded_file($file_array['tmp_name'], $destination)) {\n        throw new Exception(_('Beim Hochladen der Datei trat ein unbekannter Fehler auf!'));\n    }\n\n    return $destination;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    $unsafe_extensions = ['php', 'phtml', 'php3', 'ph3', 'php4', 'ph4', 'php5', 'ph5', 'phtm', 'sh', 'asp', 'cgi', 'py', 'pl', 'exe', 'aspx'];",
+      "    //Dont allow upload of files with potentially dangerous extension",
+      "    if (in_array(getExtensionFromFileName($file_array['name']), $unsafe_extensions)",
+      "        || in_array(getExtensionFromFileName($destination_filename), $unsafe_extensions))"
+    ],
+    "deleted": [
+      "    //Dont allow to upload a PHP file.",
+      "    if(strpos($file_array['name'], \".php\") != false",
+      "        || strpos($destination_filename, \".php\") != false)"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "OS Command Injection in GitHub repository part-db/part-db prior to 0.5.11.",
+  "id": 2709
+},
+{
+  "cve_id": "CVE-2022-2550",
+  "code_before_change": "\tpublic function install(array $options = null, &$status=null)\n\t{\n\t\tparent::install($options);\n\t\tparent::setup($options);\n\t\t\t\n\t\t//check if ssl is enabled \n        $this->appcontext->run('v-list-web-domain', [$this->appcontext->user(), $this->domain, 'json'], $status);\n\t\t$sslEnabled = ($status->json[$this->domain]['SSL'] == 'no' ? 0 : 1);\n\n\t\t$webDomain = ($sslEnabled ? \"https://\" : \"http://\") . $this->domain . \"/\";\n\t\t\n\t\t$this->appcontext->runUser('v-copy-fs-directory',[\n\t\t\t$this->getDocRoot($this->extractsubdir . \"/dokuwiki-release_stable_2020-07-29/.\"),\n\t\t\t$this->getDocRoot()], $status);\n\n\t\t// enable htaccess\n\t\t$this->appcontext->runUser('v-move-fs-file', [$this->getDocRoot(\".htaccess.dist\"), $this->getDocRoot(\".htaccess\")], $status);\n\n\t\t$installUrl = $webDomain . \"install.php\";\n\n\t\t$cmd = \"curl --request POST \"\n\t\t  . ($sslEnabled ? \"\" : \"--insecure \" )",
+  "code_after_change": "\tpublic function install(array $options = null, &$status=null)\n\t{\n\t\tparent::install($options);\n\t\tparent::setup($options);\n\t\t\t\n\t\t//check if ssl is enabled \n        $this->appcontext->run('v-list-web-domain', [$this->appcontext->user(), $this->domain, 'json'], $status);\n\t\t$sslEnabled = ($status->json[$this->domain]['SSL'] == 'no' ? 0 : 1);\n\n\t\t$webDomain = ($sslEnabled ? \"https://\" : \"http://\") . $this->domain . \"/\";\n\t\t\n\t\t$this->appcontext->runUser('v-copy-fs-directory',[\n\t\t\t$this->getDocRoot($this->extractsubdir . \"/dokuwiki-release_stable_2020-07-29/.\"),\n\t\t\t$this->getDocRoot()], $status);\n\n\t\t// enable htaccess\n\t\t$this->appcontext->runUser('v-move-fs-file', [$this->getDocRoot(\".htaccess.dist\"), $this->getDocRoot(\".htaccess\")], $status);\n\n\t\t$installUrl = $webDomain . \"install.php\";\n\n\t\t$cmd = implode(\" \", array(\n\t\t\t\"curl\",\n\t\t\t\"--request POST\",\n\t\t\t($sslEnabled ? \"\" : \"--insecure \"),\n\t\t\t\"--url \" . escapeshellarg($installUrl),\n\t\t\t\"--header 'Content-Type: application/x-www-form-urlencoded'\",\n\t\t\t'--data-binary ' . escapeshellarg(http_build_query(array(\n\t\t\t\t\"l\" => \"en\",\n\t\t\t\t\"d\" => array(\n\t\t\t\t\t\"title\" => $options['wiki_name'],\n\t\t\t\t\t'acl' => 'on',\n\t\t\t\t\t'superuser' => $options['superuser'],\n\t\t\t\t\t'fullname' => $options['real_name'],\n\t\t\t\t\t'email' => $options['email'],\n\t\t\t\t\t'password' => $options['password'],\n\t\t\t\t\t'confirm' => $options['password'],\n\t\t\t\t\t'policy' => substr($options['initial_ACL_policy'], 0, 1),\n\t\t\t\t\t'license' => explode(\":\", $options['content_license'])[0]\n\t\t\t\t),\n\t\t\t\t'submit' => ''\n\t\t\t)))\n\t\t));\n\n\t\texec($cmd, $output, $return_var);\n\t\tif($return_var > 0){\n\t\t\tthrow new \\Exception(implode( PHP_EOL, $output));\n\t\t}\n\n\t\t// remove temp folder\n\t\t$this->appcontext->runUser('v-delete-fs-file', [$this->getDocRoot(\"install.php\")], $status);\n\t\t$this->cleanup();\n\n\t\treturn ($status->code === 0);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$cmd = implode(\" \", array(",
+      "\t\t\t\"curl\",",
+      "\t\t\t\"--request POST\",",
+      "\t\t\t($sslEnabled ? \"\" : \"--insecure \"),",
+      "\t\t\t\"--url \" . escapeshellarg($installUrl),",
+      "\t\t\t\"--header 'Content-Type: application/x-www-form-urlencoded'\",",
+      "\t\t\t'--data-binary ' . escapeshellarg(http_build_query(array(",
+      "\t\t\t\t\"l\" => \"en\",",
+      "\t\t\t\t\"d\" => array(",
+      "\t\t\t\t\t\"title\" => $options['wiki_name'],",
+      "\t\t\t\t\t'acl' => 'on',",
+      "\t\t\t\t\t'superuser' => $options['superuser'],",
+      "\t\t\t\t\t'fullname' => $options['real_name'],",
+      "\t\t\t\t\t'email' => $options['email'],",
+      "\t\t\t\t\t'password' => $options['password'],",
+      "\t\t\t\t\t'confirm' => $options['password'],",
+      "\t\t\t\t\t'policy' => substr($options['initial_ACL_policy'], 0, 1),",
+      "\t\t\t\t\t'license' => explode(\":\", $options['content_license'])[0]",
+      "\t\t\t\t),",
+      "\t\t\t\t'submit' => ''",
+      "\t\t\t)))",
+      "\t\t));"
+    ],
+    "deleted": [
+      "\t\t$cmd = \"curl --request POST \"",
+      "\t\t  . ($sslEnabled ? \"\" : \"--insecure \" )"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "OS Command Injection in GitHub repository hestiacp/hestiacp prior to 1.6.5.",
+  "id": 2710
+},
+{
+  "cve_id": "CVE-2022-46169",
+  "code_before_change": "\t\t\t\tcacti_log(\"LOGIN FAILED: Local Login Failed for user '\" . $username . \"' from IP Address '\" . get_client_addr('') . \"'.\", false, 'AUTH');\n\n\t\t\t\t$error     = true;\n\t\t\t\t$error_msg = __('Access Denied!  Login Failed.');\n\t\t\t}\n\t\t}\n\t}",
+  "code_after_change": "\t\t\t\tcacti_log(\"LOGIN FAILED: Local Login Failed for user '\" . $username . \"' from IP Address '\" . get_client_addr() . \"'.\", false, 'AUTH');\n\n\t\t\t\t$error     = true;\n\t\t\t\t$error_msg = __('Access Denied!  Login Failed.');\n\t\t\t}\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\tcacti_log(\"LOGIN FAILED: Local Login Failed for user '\" . $username . \"' from IP Address '\" . get_client_addr() . \"'.\", false, 'AUTH');"
+    ],
+    "deleted": [
+      "\t\t\t\tcacti_log(\"LOGIN FAILED: Local Login Failed for user '\" . $username . \"' from IP Address '\" . get_client_addr('') . \"'.\", false, 'AUTH');"
+    ]
+  },
+  "cwe": [
+    "CWE-78",
+    "CWE-863"
+  ],
+  "cve_description": "Cacti is an open source platform which provides a robust and extensible operational monitoring and fault management framework for users. In affected versions a command injection vulnerability allows an unauthenticated user to execute arbitrary code on a server running Cacti, if a specific data source was selected for any monitored device. The vulnerability resides in the `remote_agent.php` file. This file can be accessed without authentication. This function retrieves the IP address of the client via `get_client_addr` and resolves this IP address to the corresponding hostname via `gethostbyaddr`. After this, it is verified that an entry within the `poller` table exists, where the hostname corresponds to the resolved hostname. If such an entry was found, the function returns `true` and the client is authorized. This authorization can be bypassed due to the implementation of the `get_client_addr` function. The function is defined in the file `lib/functions.php` and checks serval `$_SERVER` variables to determine the IP address of the client. The variables beginning with `HTTP_` can be arbitrarily set by an attacker. Since there is a default entry in the `poller` table with the hostname of the server running Cacti, an attacker can bypass the authentication e.g. by providing the header `Forwarded-For: <TARGETIP>`. This way the function `get_client_addr` returns the IP address of the server running Cacti. The following call to `gethostbyaddr` will resolve this IP address to the hostname of the server, which will pass the `poller` hostname check because of the default entry. After the authorization of the `remote_agent.php` file is bypassed, an attacker can trigger different actions. One of these actions is called `polldata`. The called function `poll_for_data` retrieves a few request parameters and loads the corresponding `poller_item` entries from the database. If the `action` of a `poller_item` equals `POLLER_ACTION_SCRIPT_PHP`, the function `proc_open` is used to execute a PHP script. The attacker-controlled parameter `$poller_id` is retrieved via the function `get_nfilter_request_var`, which allows arbitrary strings. This variable is later inserted into the string passed to `proc_open`, which leads to a command injection vulnerability. By e.g. providing the `poller_id=;id` the `id` command is executed. In order to reach the vulnerable call, the attacker must provide a `host_id` and `local_data_id`, where the `action` of the corresponding `poller_item` is set to `POLLER_ACTION_SCRIPT_PHP`. Both of these ids (`host_id` and `local_data_id`) can easily be bruteforced. The only requirement is that a `poller_item` with an `POLLER_ACTION_SCRIPT_PHP` action exists. This is very likely on a productive instance because this action is added by some predefined templates like `Device - Uptime` or `Device - Polling Time`.\n\nThis command injection vulnerability allows an unauthenticated user to execute arbitrary commands if a `poller_item` with the `action` type `POLLER_ACTION_SCRIPT_PHP` (`2`) is configured. The authorization bypass should be prevented by not allowing an attacker to make `get_client_addr` (file `lib/functions.php`) return an arbitrary IP address. This could be done by not honoring the `HTTP_...` `$_SERVER` variables. If these should be kept for compatibility reasons it should at least be prevented to fake the IP address of the server running Cacti. This vulnerability has been addressed in both the 1.2.x and 1.3.x release branches with `1.2.23` being the first release containing the patch.",
+  "id": 2711
+},
+{
+  "cve_id": "CVE-2022-46169",
+  "code_before_change": "function check_auth_cookie() {\n\tif (isset($_COOKIE['cacti_remembers']) &&\n\t\tread_config_option('auth_cache_enabled') == 'on' &&\n\t\tdb_table_exists('user_auth_cache')) {\n\n\t\t$parts = explode(',', $_COOKIE['cacti_remembers']);\n\n\t\tif (cacti_sizeof($parts) == 2) {\n\t\t\t$user_id  = $parts[0];\n\t\t\t$realm_id = -1;\n\t\t\t$token    = $parts[1];\n\t\t} else {\n\t\t\t$user_id  = $parts[0];\n\t\t\t$realm_id = $parts[1];\n\t\t\t$token    = $parts[2];\n\t\t}\n\n\t\tif (!is_numeric($user_id)) {\n\t\t\t$user_id = db_fetch_cell_prepared('SELECT id\n\t\t\t\tFROM user_auth\n\t\t\t\tWHERE username = ?',\n\t\t\t\tarray($user_id));\n\t\t}\n\n\t\tif ($user_id > 0 && $user_id !== get_guest_account()) {\n\t\t\tif ($realm_id == -1) {\n\t\t\t\t$user_info = db_fetch_row_prepared('SELECT id, realm, username\n\t\t\t\t\tFROM user_auth\n\t\t\t\t\tWHERE id = ?',\n\t\t\t\t\tarray($user_id));\n\t\t\t} else {\n\t\t\t\t$user_info = db_fetch_row_prepared('SELECT id, realm, username\n\t\t\t\t\tFROM user_auth\n\t\t\t\t\tWHERE id = ?\n\t\t\t\t\tAND realm = ?',\n\t\t\t\t\tarray($user_id, $realm_id));\n\t\t\t}\n\n\t\t\tif (cacti_sizeof($user_info)) {\n\t\t\t\t$secret = hash('sha512', $token, false);\n\n\t\t\t\t$found  = db_fetch_cell_prepared('SELECT user_id\n\t\t\t\t\tFROM user_auth_cache\n\t\t\t\t\tWHERE user_id = ?\n\t\t\t\t\tAND token = ?',\n\t\t\t\t\tarray($user_info['id'], $secret)\n\t\t\t\t);\n\n\t\t\t\tif (empty($found)) {\n\t\t\t\t\treturn false;\n\t\t\t\t} else {\n\t\t\t\t\tset_auth_cookie($user_info);\n\n\t\t\t\t\tcacti_log(\"LOGIN: User '\" . $user_info['username'] . \"' Authenticated via Authentication Cookie\", false, 'AUTH');\n\n\t\t\t\t\tdb_execute_prepared('INSERT IGNORE INTO user_log\n\t\t\t\t\t\t(username, user_id, result, ip, time)\n\t\t\t\t\t\tVALUES\n\t\t\t\t\t\t(?, ?, 2, ?, NOW())',\n\t\t\t\t\t\tarray($user_info['username'], $user_info['id'], get_client_addr(''))\n\t\t\t\t\t);\n\n\t\t\t\t\treturn $user_info['id'];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\treturn false;\n}",
+  "code_after_change": "function check_auth_cookie() {\n\tif (isset($_COOKIE['cacti_remembers']) &&\n\t\tread_config_option('auth_cache_enabled') == 'on' &&\n\t\tdb_table_exists('user_auth_cache')) {\n\n\t\t$parts = explode(',', $_COOKIE['cacti_remembers']);\n\n\t\tif (cacti_sizeof($parts) == 2) {\n\t\t\t$user_id  = $parts[0];\n\t\t\t$realm_id = -1;\n\t\t\t$token    = $parts[1];\n\t\t} else {\n\t\t\t$user_id  = $parts[0];\n\t\t\t$realm_id = $parts[1];\n\t\t\t$token    = $parts[2];\n\t\t}\n\n\t\tif (!is_numeric($user_id)) {\n\t\t\t$user_id = db_fetch_cell_prepared('SELECT id\n\t\t\t\tFROM user_auth\n\t\t\t\tWHERE username = ?',\n\t\t\t\tarray($user_id));\n\t\t}\n\n\t\tif ($user_id > 0 && $user_id !== get_guest_account()) {\n\t\t\tif ($realm_id == -1) {\n\t\t\t\t$user_info = db_fetch_row_prepared('SELECT id, realm, username\n\t\t\t\t\tFROM user_auth\n\t\t\t\t\tWHERE id = ?',\n\t\t\t\t\tarray($user_id));\n\t\t\t} else {\n\t\t\t\t$user_info = db_fetch_row_prepared('SELECT id, realm, username\n\t\t\t\t\tFROM user_auth\n\t\t\t\t\tWHERE id = ?\n\t\t\t\t\tAND realm = ?',\n\t\t\t\t\tarray($user_id, $realm_id));\n\t\t\t}\n\n\t\t\tif (cacti_sizeof($user_info)) {\n\t\t\t\t$secret = hash('sha512', $token, false);\n\n\t\t\t\t$found  = db_fetch_cell_prepared('SELECT user_id\n\t\t\t\t\tFROM user_auth_cache\n\t\t\t\t\tWHERE user_id = ?\n\t\t\t\t\tAND token = ?',\n\t\t\t\t\tarray($user_info['id'], $secret)\n\t\t\t\t);\n\n\t\t\t\tif (empty($found)) {\n\t\t\t\t\treturn false;\n\t\t\t\t} else {\n\t\t\t\t\tset_auth_cookie($user_info);\n\n\t\t\t\t\tcacti_log(\"LOGIN: User '\" . $user_info['username'] . \"' Authenticated via Authentication Cookie\", false, 'AUTH');\n\n\t\t\t\t\tdb_execute_prepared('INSERT IGNORE INTO user_log\n\t\t\t\t\t\t(username, user_id, result, ip, time)\n\t\t\t\t\t\tVALUES\n\t\t\t\t\t\t(?, ?, 2, ?, NOW())',\n\t\t\t\t\t\tarray($user_info['username'], $user_info['id'], get_client_addr())\n\t\t\t\t\t);\n\n\t\t\t\t\treturn $user_info['id'];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\treturn false;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t\t\tarray($user_info['username'], $user_info['id'], get_client_addr())"
+    ],
+    "deleted": [
+      "\t\t\t\t\t\tarray($user_info['username'], $user_info['id'], get_client_addr(''))"
+    ]
+  },
+  "cwe": [
+    "CWE-78",
+    "CWE-863"
+  ],
+  "cve_description": "Cacti is an open source platform which provides a robust and extensible operational monitoring and fault management framework for users. In affected versions a command injection vulnerability allows an unauthenticated user to execute arbitrary code on a server running Cacti, if a specific data source was selected for any monitored device. The vulnerability resides in the `remote_agent.php` file. This file can be accessed without authentication. This function retrieves the IP address of the client via `get_client_addr` and resolves this IP address to the corresponding hostname via `gethostbyaddr`. After this, it is verified that an entry within the `poller` table exists, where the hostname corresponds to the resolved hostname. If such an entry was found, the function returns `true` and the client is authorized. This authorization can be bypassed due to the implementation of the `get_client_addr` function. The function is defined in the file `lib/functions.php` and checks serval `$_SERVER` variables to determine the IP address of the client. The variables beginning with `HTTP_` can be arbitrarily set by an attacker. Since there is a default entry in the `poller` table with the hostname of the server running Cacti, an attacker can bypass the authentication e.g. by providing the header `Forwarded-For: <TARGETIP>`. This way the function `get_client_addr` returns the IP address of the server running Cacti. The following call to `gethostbyaddr` will resolve this IP address to the hostname of the server, which will pass the `poller` hostname check because of the default entry. After the authorization of the `remote_agent.php` file is bypassed, an attacker can trigger different actions. One of these actions is called `polldata`. The called function `poll_for_data` retrieves a few request parameters and loads the corresponding `poller_item` entries from the database. If the `action` of a `poller_item` equals `POLLER_ACTION_SCRIPT_PHP`, the function `proc_open` is used to execute a PHP script. The attacker-controlled parameter `$poller_id` is retrieved via the function `get_nfilter_request_var`, which allows arbitrary strings. This variable is later inserted into the string passed to `proc_open`, which leads to a command injection vulnerability. By e.g. providing the `poller_id=;id` the `id` command is executed. In order to reach the vulnerable call, the attacker must provide a `host_id` and `local_data_id`, where the `action` of the corresponding `poller_item` is set to `POLLER_ACTION_SCRIPT_PHP`. Both of these ids (`host_id` and `local_data_id`) can easily be bruteforced. The only requirement is that a `poller_item` with an `POLLER_ACTION_SCRIPT_PHP` action exists. This is very likely on a productive instance because this action is added by some predefined templates like `Device - Uptime` or `Device - Polling Time`.\n\nThis command injection vulnerability allows an unauthenticated user to execute arbitrary commands if a `poller_item` with the `action` type `POLLER_ACTION_SCRIPT_PHP` (`2`) is configured. The authorization bypass should be prevented by not allowing an attacker to make `get_client_addr` (file `lib/functions.php`) return an arbitrary IP address. This could be done by not honoring the `HTTP_...` `$_SERVER` variables. If these should be kept for compatibility reasons it should at least be prevented to fake the IP address of the server running Cacti. This vulnerability has been addressed in both the 1.2.x and 1.3.x release branches with `1.2.23` being the first release containing the patch.",
+  "id": 2712
+},
+{
+  "cve_id": "CVE-2022-46169",
+  "code_before_change": "function set_auth_cookie($user) {\n\tglobal $config;\n\n\tif (db_table_exists('user_auth_cache')) {\n\t\tclear_auth_cookie();\n\n\t\t$nssecret = md5($_SERVER['REQUEST_TIME'] .  mt_rand(10000,10000000)) . md5(get_client_addr(''));\n\n\t\t$secret = hash('sha512', $nssecret, false);\n\n\t\tdb_execute_prepared('REPLACE INTO user_auth_cache\n\t\t\t(user_id, hostname, last_update, token)\n\t\t\tVALUES\n\t\t\t(?, ?, NOW(), ?);',\n\t\t\tarray($user['id'], get_client_addr(''), $secret));\n\n\t\tcacti_cookie_session_set($user['id'], $user['realm'], $nssecret);\n\t}\n}",
+  "code_after_change": "function set_auth_cookie($user) {\n\tglobal $config;\n\n\tif (db_table_exists('user_auth_cache')) {\n\t\tclear_auth_cookie();\n\n\t\t$nssecret = md5($_SERVER['REQUEST_TIME'] .  mt_rand(10000,10000000)) . md5(get_client_addr());\n\n\t\t$secret = hash('sha512', $nssecret, false);\n\n\t\tdb_execute_prepared('REPLACE INTO user_auth_cache\n\t\t\t(user_id, hostname, last_update, token)\n\t\t\tVALUES\n\t\t\t(?, ?, NOW(), ?);',\n\t\t\tarray($user['id'], get_client_addr(), $secret));\n\n\t\tcacti_cookie_session_set($user['id'], $user['realm'], $nssecret);\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$nssecret = md5($_SERVER['REQUEST_TIME'] .  mt_rand(10000,10000000)) . md5(get_client_addr());",
+      "\t\t\tarray($user['id'], get_client_addr(), $secret));"
+    ],
+    "deleted": [
+      "\t\t$nssecret = md5($_SERVER['REQUEST_TIME'] .  mt_rand(10000,10000000)) . md5(get_client_addr(''));",
+      "\t\t\tarray($user['id'], get_client_addr(''), $secret));"
+    ]
+  },
+  "cwe": [
+    "CWE-78",
+    "CWE-863"
+  ],
+  "cve_description": "Cacti is an open source platform which provides a robust and extensible operational monitoring and fault management framework for users. In affected versions a command injection vulnerability allows an unauthenticated user to execute arbitrary code on a server running Cacti, if a specific data source was selected for any monitored device. The vulnerability resides in the `remote_agent.php` file. This file can be accessed without authentication. This function retrieves the IP address of the client via `get_client_addr` and resolves this IP address to the corresponding hostname via `gethostbyaddr`. After this, it is verified that an entry within the `poller` table exists, where the hostname corresponds to the resolved hostname. If such an entry was found, the function returns `true` and the client is authorized. This authorization can be bypassed due to the implementation of the `get_client_addr` function. The function is defined in the file `lib/functions.php` and checks serval `$_SERVER` variables to determine the IP address of the client. The variables beginning with `HTTP_` can be arbitrarily set by an attacker. Since there is a default entry in the `poller` table with the hostname of the server running Cacti, an attacker can bypass the authentication e.g. by providing the header `Forwarded-For: <TARGETIP>`. This way the function `get_client_addr` returns the IP address of the server running Cacti. The following call to `gethostbyaddr` will resolve this IP address to the hostname of the server, which will pass the `poller` hostname check because of the default entry. After the authorization of the `remote_agent.php` file is bypassed, an attacker can trigger different actions. One of these actions is called `polldata`. The called function `poll_for_data` retrieves a few request parameters and loads the corresponding `poller_item` entries from the database. If the `action` of a `poller_item` equals `POLLER_ACTION_SCRIPT_PHP`, the function `proc_open` is used to execute a PHP script. The attacker-controlled parameter `$poller_id` is retrieved via the function `get_nfilter_request_var`, which allows arbitrary strings. This variable is later inserted into the string passed to `proc_open`, which leads to a command injection vulnerability. By e.g. providing the `poller_id=;id` the `id` command is executed. In order to reach the vulnerable call, the attacker must provide a `host_id` and `local_data_id`, where the `action` of the corresponding `poller_item` is set to `POLLER_ACTION_SCRIPT_PHP`. Both of these ids (`host_id` and `local_data_id`) can easily be bruteforced. The only requirement is that a `poller_item` with an `POLLER_ACTION_SCRIPT_PHP` action exists. This is very likely on a productive instance because this action is added by some predefined templates like `Device - Uptime` or `Device - Polling Time`.\n\nThis command injection vulnerability allows an unauthenticated user to execute arbitrary commands if a `poller_item` with the `action` type `POLLER_ACTION_SCRIPT_PHP` (`2`) is configured. The authorization bypass should be prevented by not allowing an attacker to make `get_client_addr` (file `lib/functions.php`) return an arbitrary IP address. This could be done by not honoring the `HTTP_...` `$_SERVER` variables. If these should be kept for compatibility reasons it should at least be prevented to fake the IP address of the server running Cacti. This vulnerability has been addressed in both the 1.2.x and 1.3.x release branches with `1.2.23` being the first release containing the patch.",
+  "id": 2713
+},
+{
+  "cve_id": "CVE-2022-46169",
+  "code_before_change": "function get_client_addr($client_addr = false, $restrictive = false) {\n\tif (!$restrictive) {\n\t\t$http_addr_headers = array(\n\t\t\t'X-Forwarded-For',\n\t\t\t'X-Client-IP',\n\t\t\t'X-Real-IP',\n\t\t\t'X-ProxyUser-Ip',\n\t\t\t'CF-Connecting-IP',\n\t\t\t'True-Client-IP',\n\t\t\t'HTTP_X_FORWARDED',\n\t\t\t'HTTP_X_FORWARDED_FOR',\n\t\t\t'HTTP_X_CLUSTER_CLIENT_IP',\n\t\t\t'HTTP_FORWARDED_FOR',\n\t\t\t'HTTP_FORWARDED',\n\t\t\t'HTTP_CLIENT_IP',\n\t\t\t'REMOTE_ADDR',\n\t\t);\n\t} else {\n\t\t$http_addr_headers = array(\n\t\t\t'X-Forwarded-For',\n\t\t\t'X-Client-IP',\n\t\t\t'X-Real-IP',\n\t\t\t'X-ProxyUser-Ip',\n\t\t\t'CF-Connecting-IP',\n\t\t\t'True-Client-IP',\n\t\t\t'REMOTE_ADDR',\n\t\t);\n\t}\n\n\t$client_addr = false;\n\tforeach ($http_addr_headers as $header) {\n\t\tif (!empty($_SERVER[$header])) {\n\t\t\t$header_ips = explode(',', $_SERVER[$header]);\n\t\t\tforeach ($header_ips as $header_ip) {\n\t\t\t\tif (!empty($header_ip)) {\n\t\t\t\t\tif (!filter_var($header_ip, FILTER_VALIDATE_IP)) {\n\t\t\t\t\t\tcacti_log('ERROR: Invalid remote client IP Address found in header (' . $header . ').', false, 'AUTH', POLLER_VERBOSITY_DEBUG);\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$client_addr = $header_ip;\n\t\t\t\t\t\tcacti_log('DEBUG: Using remote client IP Address found in header (' . $header . '): ' . $client_addr . ' (' . $_SERVER[$header] . ')', false, 'AUTH', POLLER_VERBOSITY_DEBUG);\n\t\t\t\t\t\tbreak 2;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\treturn $client_addr;\n}",
+  "code_after_change": "function get_client_addr() {\n\tglobal $config, $allowed_proxy_headers;\n\n\t$proxy_headers = $config['proxy_headers'] ?? null;\n\tif ($proxy_headers === null) {\n\t\t$last_time = read_config_option('proxy_alert');\n\t\tif (empty($last_time)) {\n\t\t\t$last_time = date('Y-m-d');\n\t\t}\n\n\t\t$last_date = new DateTime($last_time);\n\t\t$this_date = new Datetime();\n\n\t\t$this_diff = $this_date->diff($last_date);\n\t\t$this_days = $this_diff->format('%a');\n\n\t\tif ($this_days) {\n\t\t\tcacti_log('WARNING: Configuration option \"proxy_headers\" will be automatically false in future releases.  Please set if you require proxy IPs to be used', false, 'AUTH');\n\t\t\tset_config_option('proxy_alert', date('Y-m-d'));\n\t\t}\n\n\t\t$proxy_headers = true;\n\t}\n\n\t/* If proxy_headers is true, allow all known headers -- NOT advised\n\t * If proxy_headers is false, allow only REMOTE_ADDR\n\t * IF proxy_headers is an array, filter by known headers\n\t */\n\tif ($proxy_headers === true) {\n\t\t$proxy_headers = $allowed_proxy_headers;\n\t} elseif (is_array($proxy_headers)) {\n\t\t$proxy_headers = array_intersect($proxy_headers, $allowed_proxy_headers);\n\t}\n\n\tif (!is_array($proxy_headers)) {\n\t\t$proxy_headers = [];\n\t}\n\n\tif (!in_array('REMOTE_ADDR', $proxy_headers)) {\n\t\t$proxy_headers[] = 'REMOTE_ADDR';\n\t}\n\n\t$client_addr = false;\n\tforeach ($proxy_headers as $header) {\n\t\tif (!empty($_SERVER[$header])) {\n\t\t\t$header_ips = explode(',', $_SERVER[$header]);\n\t\t\tforeach ($header_ips as $header_ip) {\n\t\t\t\tif (!empty($header_ip)) {\n\t\t\t\t\tif (!filter_var($header_ip, FILTER_VALIDATE_IP)) {",
+  "function_modified_lines": {
+    "added": [
+      "function get_client_addr() {",
+      "\tglobal $config, $allowed_proxy_headers;",
+      "\t$proxy_headers = $config['proxy_headers'] ?? null;",
+      "\tif ($proxy_headers === null) {",
+      "\t\t$last_time = read_config_option('proxy_alert');",
+      "\t\tif (empty($last_time)) {",
+      "\t\t\t$last_time = date('Y-m-d');",
+      "\t\t}",
+      "\t\t$last_date = new DateTime($last_time);",
+      "\t\t$this_date = new Datetime();",
+      "\t\t$this_diff = $this_date->diff($last_date);",
+      "\t\t$this_days = $this_diff->format('%a');",
+      "\t\tif ($this_days) {",
+      "\t\t\tcacti_log('WARNING: Configuration option \"proxy_headers\" will be automatically false in future releases.  Please set if you require proxy IPs to be used', false, 'AUTH');",
+      "\t\t\tset_config_option('proxy_alert', date('Y-m-d'));",
+      "\t\t}",
+      "\t\t$proxy_headers = true;",
+      "\t}",
+      "\t/* If proxy_headers is true, allow all known headers -- NOT advised",
+      "\t * If proxy_headers is false, allow only REMOTE_ADDR",
+      "\t * IF proxy_headers is an array, filter by known headers",
+      "\t */",
+      "\tif ($proxy_headers === true) {",
+      "\t\t$proxy_headers = $allowed_proxy_headers;",
+      "\t} elseif (is_array($proxy_headers)) {",
+      "\t\t$proxy_headers = array_intersect($proxy_headers, $allowed_proxy_headers);",
+      "\t}",
+      "\tif (!is_array($proxy_headers)) {",
+      "\t\t$proxy_headers = [];",
+      "\t}",
+      "\tif (!in_array('REMOTE_ADDR', $proxy_headers)) {",
+      "\t\t$proxy_headers[] = 'REMOTE_ADDR';",
+      "\tforeach ($proxy_headers as $header) {"
+    ],
+    "deleted": [
+      "function get_client_addr($client_addr = false, $restrictive = false) {",
+      "\tif (!$restrictive) {",
+      "\t\t$http_addr_headers = array(",
+      "\t\t\t'X-Forwarded-For',",
+      "\t\t\t'X-Client-IP',",
+      "\t\t\t'X-Real-IP',",
+      "\t\t\t'X-ProxyUser-Ip',",
+      "\t\t\t'CF-Connecting-IP',",
+      "\t\t\t'True-Client-IP',",
+      "\t\t\t'HTTP_X_FORWARDED',",
+      "\t\t\t'HTTP_X_FORWARDED_FOR',",
+      "\t\t\t'HTTP_X_CLUSTER_CLIENT_IP',",
+      "\t\t\t'HTTP_FORWARDED_FOR',",
+      "\t\t\t'HTTP_FORWARDED',",
+      "\t\t\t'HTTP_CLIENT_IP',",
+      "\t\t\t'REMOTE_ADDR',",
+      "\t\t);",
+      "\t} else {",
+      "\t\t$http_addr_headers = array(",
+      "\t\t\t'X-Forwarded-For',",
+      "\t\t\t'X-Client-IP',",
+      "\t\t\t'X-Real-IP',",
+      "\t\t\t'X-ProxyUser-Ip',",
+      "\t\t\t'CF-Connecting-IP',",
+      "\t\t\t'True-Client-IP',",
+      "\t\t\t'REMOTE_ADDR',",
+      "\t\t);",
+      "\tforeach ($http_addr_headers as $header) {"
+    ]
+  },
+  "cwe": [
+    "CWE-78",
+    "CWE-863"
+  ],
+  "cve_description": "Cacti is an open source platform which provides a robust and extensible operational monitoring and fault management framework for users. In affected versions a command injection vulnerability allows an unauthenticated user to execute arbitrary code on a server running Cacti, if a specific data source was selected for any monitored device. The vulnerability resides in the `remote_agent.php` file. This file can be accessed without authentication. This function retrieves the IP address of the client via `get_client_addr` and resolves this IP address to the corresponding hostname via `gethostbyaddr`. After this, it is verified that an entry within the `poller` table exists, where the hostname corresponds to the resolved hostname. If such an entry was found, the function returns `true` and the client is authorized. This authorization can be bypassed due to the implementation of the `get_client_addr` function. The function is defined in the file `lib/functions.php` and checks serval `$_SERVER` variables to determine the IP address of the client. The variables beginning with `HTTP_` can be arbitrarily set by an attacker. Since there is a default entry in the `poller` table with the hostname of the server running Cacti, an attacker can bypass the authentication e.g. by providing the header `Forwarded-For: <TARGETIP>`. This way the function `get_client_addr` returns the IP address of the server running Cacti. The following call to `gethostbyaddr` will resolve this IP address to the hostname of the server, which will pass the `poller` hostname check because of the default entry. After the authorization of the `remote_agent.php` file is bypassed, an attacker can trigger different actions. One of these actions is called `polldata`. The called function `poll_for_data` retrieves a few request parameters and loads the corresponding `poller_item` entries from the database. If the `action` of a `poller_item` equals `POLLER_ACTION_SCRIPT_PHP`, the function `proc_open` is used to execute a PHP script. The attacker-controlled parameter `$poller_id` is retrieved via the function `get_nfilter_request_var`, which allows arbitrary strings. This variable is later inserted into the string passed to `proc_open`, which leads to a command injection vulnerability. By e.g. providing the `poller_id=;id` the `id` command is executed. In order to reach the vulnerable call, the attacker must provide a `host_id` and `local_data_id`, where the `action` of the corresponding `poller_item` is set to `POLLER_ACTION_SCRIPT_PHP`. Both of these ids (`host_id` and `local_data_id`) can easily be bruteforced. The only requirement is that a `poller_item` with an `POLLER_ACTION_SCRIPT_PHP` action exists. This is very likely on a productive instance because this action is added by some predefined templates like `Device - Uptime` or `Device - Polling Time`.\n\nThis command injection vulnerability allows an unauthenticated user to execute arbitrary commands if a `poller_item` with the `action` type `POLLER_ACTION_SCRIPT_PHP` (`2`) is configured. The authorization bypass should be prevented by not allowing an attacker to make `get_client_addr` (file `lib/functions.php`) return an arbitrary IP address. This could be done by not honoring the `HTTP_...` `$_SERVER` variables. If these should be kept for compatibility reasons it should at least be prevented to fake the IP address of the server running Cacti. This vulnerability has been addressed in both the 1.2.x and 1.3.x release branches with `1.2.23` being the first release containing the patch.",
+  "id": 2714
+},
+{
+  "cve_id": "CVE-2022-46169",
+  "code_before_change": "\t\t\t$items = db_fetch_assoc_prepared('SELECT *\n\t\t\t\tFROM poller_item\n\t\t\t\tWHERE host_id = ?\n\t\t\t\tAND local_data_id = ?',\n\t\t\t\tarray($host_id, $local_data_id));\n\n\t\t\t$script_server_calls = db_fetch_cell_prepared('SELECT COUNT(*)\n\t\t\t\tFROM poller_item\n\t\t\t\tWHERE host_id = ?\n\t\t\t\tAND local_data_id = ?\n\t\t\t\tAND action = 2',\n\t\t\t\tarray($host_id, $local_data_id));\n\n\t\t\tif (cacti_sizeof($items)) {\n\t\t\t\tforeach($items as $item) {\n\t\t\t\t\tswitch ($item['action']) {\n\t\t\t\t\tcase POLLER_ACTION_SNMP: /* snmp */\n\t\t\t\t\t\tif (($item['snmp_version'] == 0) || (($item['snmp_community'] == '') && ($item['snmp_version'] != 3))) {\n\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t$host = db_fetch_row_prepared('SELECT ping_retries, max_oids FROM host WHERE hostname = ?', array($item['hostname']));\n\t\t\t\t\t\t\t$session = cacti_snmp_session($item['hostname'], $item['snmp_community'], $item['snmp_version'],\n\t\t\t\t\t\t\t\t$item['snmp_username'], $item['snmp_password'], $item['snmp_auth_protocol'], $item['snmp_priv_passphrase'],\n\t\t\t\t\t\t\t\t$item['snmp_priv_protocol'], $item['snmp_context'], $item['snmp_engine_id'], $item['snmp_port'],\n\t\t\t\t\t\t\t\t$item['snmp_timeout'], $host['ping_retries'], $host['max_oids']);\n\n\t\t\t\t\t\t\tif ($session === false) {\n\t\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t$output = cacti_snmp_session_get($session, $item['arg1']);\n\t\t\t\t\t\t\t\t$session->close();\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\tif (prepare_validate_result($output) === false) {\n\t\t\t\t\t\t\t\tif (strlen($output) > 20) {\n\t\t\t\t\t\t\t\t\t$strout = 20;\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\t$strout = strlen($output);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t$return[$i]['value']         = $output;\n\t\t\t\t\t\t$return[$i]['rrd_name']      = $item['rrd_name'];\n\t\t\t\t\t\t$return[$i]['local_data_id'] = $local_data_id;\n\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase POLLER_ACTION_SCRIPT: /* script (popen) */\n\t\t\t\t\t\t$output = trim(exec_poll($item['arg1']));\n\n\t\t\t\t\t\tif (prepare_validate_result($output) === false) {\n\t\t\t\t\t\t\tif (strlen($output) > 20) {\n\t\t\t\t\t\t\t\t$strout = 20;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t$strout = strlen($output);\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t$return[$i]['value']         = $output;\n\t\t\t\t\t\t$return[$i]['rrd_name']      = $item['rrd_name'];\n\t\t\t\t\t\t$return[$i]['local_data_id'] = $local_data_id;\n\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase POLLER_ACTION_SCRIPT_PHP: /* script (php script server) */\n\t\t\t\t\t\t$cactides = array(\n\t\t\t\t\t\t\t0 => array('pipe', 'r'), // stdin is a pipe that the child will read from\n\t\t\t\t\t\t\t1 => array('pipe', 'w'), // stdout is a pipe that the child will write to\n\t\t\t\t\t\t\t2 => array('pipe', 'w')  // stderr is a pipe to write to\n\t\t\t\t\t\t);\n\n\t\t\t\t\t\tif (function_exists('proc_open')) {\n\t\t\t\t\t\t\t$cactiphp = proc_open(read_config_option('path_php_binary') . ' -q ' . $config['base_path'] . '/script_server.php realtime ' . $poller_id, $cactides, $pipes);\n\t\t\t\t\t\t\t$output = fgets($pipes[1], 1024);\n\t\t\t\t\t\t\t$using_proc_function = true;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t$using_proc_function = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tif ($using_proc_function == true) {\n\t\t\t\t\t\t\t$output = trim(str_replace(\"\\n\", '', exec_poll_php($item['arg1'], $using_proc_function, $pipes, $cactiphp)));\n\n\t\t\t\t\t\t\tif (prepare_validate_result($output) === false) {\n\t\t\t\t\t\t\t\tif (strlen($output) > 20) {\n\t\t\t\t\t\t\t\t\t$strout = 20;\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\t$strout = strlen($output);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t$return[$i]['value']         = $output;\n\t\t\t\t\t\t$return[$i]['rrd_name']      = $item['rrd_name'];\n\t\t\t\t\t\t$return[$i]['local_data_id'] = $local_data_id;\n\n\t\t\t\t\t\tif (($using_proc_function == true) && ($script_server_calls > 0)) {\n\t\t\t\t\t\t\t/* close php server process */\n\t\t\t\t\t\t\tfwrite($pipes[0], \"quit\\r\\n\");\n\t\t\t\t\t\t\tfclose($pipes[0]);\n\t\t\t\t\t\t\tfclose($pipes[1]);\n\t\t\t\t\t\t\tfclose($pipes[2]);\n\n\t\t\t\t\t\t\t$return_value = proc_close($cactiphp);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t}\n\n\t\t\t\t\t$i++;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}",
+  "code_after_change": "\t\t\t$items = db_fetch_assoc_prepared('SELECT *\n\t\t\t\tFROM poller_item\n\t\t\t\tWHERE host_id = ?\n\t\t\t\tAND local_data_id = ?',\n\t\t\t\tarray($host_id, $local_data_id));\n\n\t\t\t$script_server_calls = db_fetch_cell_prepared('SELECT COUNT(*)\n\t\t\t\tFROM poller_item\n\t\t\t\tWHERE host_id = ?\n\t\t\t\tAND local_data_id = ?\n\t\t\t\tAND action = 2',\n\t\t\t\tarray($host_id, $local_data_id));\n\n\t\t\tif (cacti_sizeof($items)) {\n\t\t\t\tforeach($items as $item) {\n\t\t\t\t\tswitch ($item['action']) {\n\t\t\t\t\tcase POLLER_ACTION_SNMP: /* snmp */\n\t\t\t\t\t\tif (($item['snmp_version'] == 0) || (($item['snmp_community'] == '') && ($item['snmp_version'] != 3))) {\n\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t$host = db_fetch_row_prepared('SELECT ping_retries, max_oids FROM host WHERE hostname = ?', array($item['hostname']));\n\t\t\t\t\t\t\t$session = cacti_snmp_session($item['hostname'], $item['snmp_community'], $item['snmp_version'],\n\t\t\t\t\t\t\t\t$item['snmp_username'], $item['snmp_password'], $item['snmp_auth_protocol'], $item['snmp_priv_passphrase'],\n\t\t\t\t\t\t\t\t$item['snmp_priv_protocol'], $item['snmp_context'], $item['snmp_engine_id'], $item['snmp_port'],\n\t\t\t\t\t\t\t\t$item['snmp_timeout'], $host['ping_retries'], $host['max_oids']);\n\n\t\t\t\t\t\t\tif ($session === false) {\n\t\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t$output = cacti_snmp_session_get($session, $item['arg1']);\n\t\t\t\t\t\t\t\t$session->close();\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\tif (prepare_validate_result($output) === false) {\n\t\t\t\t\t\t\t\tif (strlen($output) > 20) {\n\t\t\t\t\t\t\t\t\t$strout = 20;\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\t$strout = strlen($output);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t$return[$i]['value']         = $output;\n\t\t\t\t\t\t$return[$i]['rrd_name']      = $item['rrd_name'];\n\t\t\t\t\t\t$return[$i]['local_data_id'] = $local_data_id;\n\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase POLLER_ACTION_SCRIPT: /* script (popen) */\n\t\t\t\t\t\t$output = trim(exec_poll($item['arg1']));\n\n\t\t\t\t\t\tif (prepare_validate_result($output) === false) {\n\t\t\t\t\t\t\tif (strlen($output) > 20) {\n\t\t\t\t\t\t\t\t$strout = 20;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t$strout = strlen($output);\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t$return[$i]['value']         = $output;\n\t\t\t\t\t\t$return[$i]['rrd_name']      = $item['rrd_name'];\n\t\t\t\t\t\t$return[$i]['local_data_id'] = $local_data_id;\n\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tcase POLLER_ACTION_SCRIPT_PHP: /* script (php script server) */\n\t\t\t\t\t\t$cactides = array(\n\t\t\t\t\t\t\t0 => array('pipe', 'r'), // stdin is a pipe that the child will read from\n\t\t\t\t\t\t\t1 => array('pipe', 'w'), // stdout is a pipe that the child will write to\n\t\t\t\t\t\t\t2 => array('pipe', 'w')  // stderr is a pipe to write to\n\t\t\t\t\t\t);\n\n\t\t\t\t\t\tif (function_exists('proc_open')) {\n\t\t\t\t\t\t\t$cactiphp = proc_open(read_config_option('path_php_binary') . ' -q ' . $config['base_path'] . '/script_server.php realtime ' . cacti_escapeshellarg($poller_id), $cactides, $pipes);\n\t\t\t\t\t\t\t$output = fgets($pipes[1], 1024);\n\t\t\t\t\t\t\t$using_proc_function = true;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t$using_proc_function = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tif ($using_proc_function == true) {\n\t\t\t\t\t\t\t$output = trim(str_replace(\"\\n\", '', exec_poll_php($item['arg1'], $using_proc_function, $pipes, $cactiphp)));\n\n\t\t\t\t\t\t\tif (prepare_validate_result($output) === false) {\n\t\t\t\t\t\t\t\tif (strlen($output) > 20) {\n\t\t\t\t\t\t\t\t\t$strout = 20;\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\t$strout = strlen($output);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t$output = 'U';\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t$return[$i]['value']         = $output;\n\t\t\t\t\t\t$return[$i]['rrd_name']      = $item['rrd_name'];\n\t\t\t\t\t\t$return[$i]['local_data_id'] = $local_data_id;\n\n\t\t\t\t\t\tif (($using_proc_function == true) && ($script_server_calls > 0)) {\n\t\t\t\t\t\t\t/* close php server process */\n\t\t\t\t\t\t\tfwrite($pipes[0], \"quit\\r\\n\");\n\t\t\t\t\t\t\tfclose($pipes[0]);\n\t\t\t\t\t\t\tfclose($pipes[1]);\n\t\t\t\t\t\t\tfclose($pipes[2]);\n\n\t\t\t\t\t\t\t$return_value = proc_close($cactiphp);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t}\n\n\t\t\t\t\t$i++;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t\t\t\t$cactiphp = proc_open(read_config_option('path_php_binary') . ' -q ' . $config['base_path'] . '/script_server.php realtime ' . cacti_escapeshellarg($poller_id), $cactides, $pipes);"
+    ],
+    "deleted": [
+      "\t\t\t\t\t\t\t$cactiphp = proc_open(read_config_option('path_php_binary') . ' -q ' . $config['base_path'] . '/script_server.php realtime ' . $poller_id, $cactides, $pipes);"
+    ]
+  },
+  "cwe": [
+    "CWE-78",
+    "CWE-863"
+  ],
+  "cve_description": "Cacti is an open source platform which provides a robust and extensible operational monitoring and fault management framework for users. In affected versions a command injection vulnerability allows an unauthenticated user to execute arbitrary code on a server running Cacti, if a specific data source was selected for any monitored device. The vulnerability resides in the `remote_agent.php` file. This file can be accessed without authentication. This function retrieves the IP address of the client via `get_client_addr` and resolves this IP address to the corresponding hostname via `gethostbyaddr`. After this, it is verified that an entry within the `poller` table exists, where the hostname corresponds to the resolved hostname. If such an entry was found, the function returns `true` and the client is authorized. This authorization can be bypassed due to the implementation of the `get_client_addr` function. The function is defined in the file `lib/functions.php` and checks serval `$_SERVER` variables to determine the IP address of the client. The variables beginning with `HTTP_` can be arbitrarily set by an attacker. Since there is a default entry in the `poller` table with the hostname of the server running Cacti, an attacker can bypass the authentication e.g. by providing the header `Forwarded-For: <TARGETIP>`. This way the function `get_client_addr` returns the IP address of the server running Cacti. The following call to `gethostbyaddr` will resolve this IP address to the hostname of the server, which will pass the `poller` hostname check because of the default entry. After the authorization of the `remote_agent.php` file is bypassed, an attacker can trigger different actions. One of these actions is called `polldata`. The called function `poll_for_data` retrieves a few request parameters and loads the corresponding `poller_item` entries from the database. If the `action` of a `poller_item` equals `POLLER_ACTION_SCRIPT_PHP`, the function `proc_open` is used to execute a PHP script. The attacker-controlled parameter `$poller_id` is retrieved via the function `get_nfilter_request_var`, which allows arbitrary strings. This variable is later inserted into the string passed to `proc_open`, which leads to a command injection vulnerability. By e.g. providing the `poller_id=;id` the `id` command is executed. In order to reach the vulnerable call, the attacker must provide a `host_id` and `local_data_id`, where the `action` of the corresponding `poller_item` is set to `POLLER_ACTION_SCRIPT_PHP`. Both of these ids (`host_id` and `local_data_id`) can easily be bruteforced. The only requirement is that a `poller_item` with an `POLLER_ACTION_SCRIPT_PHP` action exists. This is very likely on a productive instance because this action is added by some predefined templates like `Device - Uptime` or `Device - Polling Time`.\n\nThis command injection vulnerability allows an unauthenticated user to execute arbitrary commands if a `poller_item` with the `action` type `POLLER_ACTION_SCRIPT_PHP` (`2`) is configured. The authorization bypass should be prevented by not allowing an attacker to make `get_client_addr` (file `lib/functions.php`) return an arbitrary IP address. This could be done by not honoring the `HTTP_...` `$_SERVER` variables. If these should be kept for compatibility reasons it should at least be prevented to fake the IP address of the server running Cacti. This vulnerability has been addressed in both the 1.2.x and 1.3.x release branches with `1.2.23` being the first release containing the patch.",
+  "id": 2715
+},
+{
+  "cve_id": "CVE-2022-46169",
+  "code_before_change": "function run_remote_discovery() {\n\tglobal $config;\n\n\t$poller_id = $config['poller_id'];\n\t$network   = get_filter_request_var('network');\n\t$php       = cacti_escapeshellcmd(read_config_option('path_php_binary'));\n\t$path      = cacti_escapeshellarg(read_config_option('path_webroot') . '/poller_automation.php');\n\n\t$options   = ' --poller=' . $poller_id . ' --network=' . $network . ' --force';\n\tif (isset_request_var('debug')) {\n\t\t$options .= ' --debug';\n\t}\n\n\texec_background($php, '-q ' . $path . $options);\n\n\tsleep(2);\n\n\treturn;\n}",
+  "code_after_change": "function run_remote_discovery() {\n\tglobal $config;\n\n\t$poller_id = cacti_escapeshellarg($config['poller_id']);\n\t$network   = cacti_escapeshellarg(get_filter_request_var('network'));\n\t$php       = cacti_escapeshellcmd(read_config_option('path_php_binary'));\n\t$path      = cacti_escapeshellarg(read_config_option('path_webroot') . '/poller_automation.php');\n\n\t$options   = ' --poller=' . $poller_id . ' --network=' . $network . ' --force';\n\tif (isset_request_var('debug')) {\n\t\t$options .= ' --debug';\n\t}\n\n\texec_background($php, '-q ' . $path . $options);\n\n\tsleep(2);\n\n\treturn;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t$poller_id = cacti_escapeshellarg($config['poller_id']);",
+      "\t$network   = cacti_escapeshellarg(get_filter_request_var('network'));"
+    ],
+    "deleted": [
+      "\t$poller_id = $config['poller_id'];",
+      "\t$network   = get_filter_request_var('network');"
+    ]
+  },
+  "cwe": [
+    "CWE-78",
+    "CWE-863"
+  ],
+  "cve_description": "Cacti is an open source platform which provides a robust and extensible operational monitoring and fault management framework for users. In affected versions a command injection vulnerability allows an unauthenticated user to execute arbitrary code on a server running Cacti, if a specific data source was selected for any monitored device. The vulnerability resides in the `remote_agent.php` file. This file can be accessed without authentication. This function retrieves the IP address of the client via `get_client_addr` and resolves this IP address to the corresponding hostname via `gethostbyaddr`. After this, it is verified that an entry within the `poller` table exists, where the hostname corresponds to the resolved hostname. If such an entry was found, the function returns `true` and the client is authorized. This authorization can be bypassed due to the implementation of the `get_client_addr` function. The function is defined in the file `lib/functions.php` and checks serval `$_SERVER` variables to determine the IP address of the client. The variables beginning with `HTTP_` can be arbitrarily set by an attacker. Since there is a default entry in the `poller` table with the hostname of the server running Cacti, an attacker can bypass the authentication e.g. by providing the header `Forwarded-For: <TARGETIP>`. This way the function `get_client_addr` returns the IP address of the server running Cacti. The following call to `gethostbyaddr` will resolve this IP address to the hostname of the server, which will pass the `poller` hostname check because of the default entry. After the authorization of the `remote_agent.php` file is bypassed, an attacker can trigger different actions. One of these actions is called `polldata`. The called function `poll_for_data` retrieves a few request parameters and loads the corresponding `poller_item` entries from the database. If the `action` of a `poller_item` equals `POLLER_ACTION_SCRIPT_PHP`, the function `proc_open` is used to execute a PHP script. The attacker-controlled parameter `$poller_id` is retrieved via the function `get_nfilter_request_var`, which allows arbitrary strings. This variable is later inserted into the string passed to `proc_open`, which leads to a command injection vulnerability. By e.g. providing the `poller_id=;id` the `id` command is executed. In order to reach the vulnerable call, the attacker must provide a `host_id` and `local_data_id`, where the `action` of the corresponding `poller_item` is set to `POLLER_ACTION_SCRIPT_PHP`. Both of these ids (`host_id` and `local_data_id`) can easily be bruteforced. The only requirement is that a `poller_item` with an `POLLER_ACTION_SCRIPT_PHP` action exists. This is very likely on a productive instance because this action is added by some predefined templates like `Device - Uptime` or `Device - Polling Time`.\n\nThis command injection vulnerability allows an unauthenticated user to execute arbitrary commands if a `poller_item` with the `action` type `POLLER_ACTION_SCRIPT_PHP` (`2`) is configured. The authorization bypass should be prevented by not allowing an attacker to make `get_client_addr` (file `lib/functions.php`) return an arbitrary IP address. This could be done by not honoring the `HTTP_...` `$_SERVER` variables. If these should be kept for compatibility reasons it should at least be prevented to fake the IP address of the server running Cacti. This vulnerability has been addressed in both the 1.2.x and 1.3.x release branches with `1.2.23` being the first release containing the patch.",
+  "id": 2716
+}
+]

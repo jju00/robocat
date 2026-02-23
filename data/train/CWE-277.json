@@ -1,0 +1,21 @@
+[
+{
+  "cve_id": "CVE-2021-41170",
+  "code_before_change": "    private static function retrieveClosurePattern($pure, $closureName)\n    {\n        $pattern = '/';\n        if (!$pure) {\n            $pattern .= preg_quote(self::$registeredDelimiters[0]) . \"\\s*\";\n        }\n        $pattern .= \"$closureName\\(([a-z0-9,\\.\\s]+)\\)\";\n        if (!$pure) {\n            $pattern .= \"\\s*\" . preg_quote(self::$registeredDelimiters[1]);\n        }\n        return $pattern . \"/i\";\n    }",
+  "code_after_change": "    private static function retrieveClosurePattern($pure, $closureName)\n    {\n        $pattern = '/';\n        if (!$pure) {\n            $pattern .= preg_quote(self::$registeredDelimiters[0]) . \"\\s*\";\n        }\n        $pattern .= \"$closureName\\(([a-z0-9,\\.\\s_]+)\\)\";\n        if (!$pure) {\n            $pattern .= \"\\s*\" . preg_quote(self::$registeredDelimiters[1]);\n        }\n        return $pattern . \"/i\";\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $pattern .= \"$closureName\\(([a-z0-9,\\.\\s_]+)\\)\";"
+    ],
+    "deleted": [
+      "        $pattern .= \"$closureName\\(([a-z0-9,\\.\\s]+)\\)\";"
+    ]
+  },
+  "cwe": [
+    "CWE-74",
+    "CWE-277"
+  ],
+  "cve_description": "neoan3-apps/template is a neoan3 minimal template engine. Versions prior to 1.1.1 have allowed for passing in closures directly into the template engine. As a result values that are callable are executed by the template engine. The issue arises if a value has the same name as a method or function in scope and can therefore be executed either by mistake or maliciously. In theory all users of the package are affected as long as they either deal with direct user input or database values. A multi-step attack on is therefore plausible. Version 1.1.1 has addressed this vulnerability. Unfortunately only working with hardcoded values is safe in prior versions. As this likely defeats the purpose of a template engine, please upgrade.",
+  "id": 690
+}
+]

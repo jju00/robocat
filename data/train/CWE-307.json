@@ -1,0 +1,282 @@
+[
+{
+  "cve_id": "CVE-2019-18985",
+  "code_before_change": "    public function twoFactorAuthenticationAction(Request $request)\n    {\n        $view = $this->buildLoginPageViewModel();\n\n        if ($request->hasSession()) {\n            $session = $request->getSession();\n            $authException = $session->get(Security::AUTHENTICATION_ERROR);\n            if ($authException instanceof AuthenticationException) {\n                $session->remove(Security::AUTHENTICATION_ERROR);\n\n                $view->error = $authException->getMessage();\n            }\n        } else {\n            $view->error = 'No session available, it either timed out or cookies are not enabled.';\n        }\n\n        return $view;\n    }",
+  "code_after_change": "    public function twoFactorAuthenticationAction(Request $request, BruteforceProtectionHandler $bruteforceProtectionHandler)\n    {\n        $view = $this->buildLoginPageViewModel();\n\n        if ($request->hasSession()) {\n\n            // we have to call the check here manually, because BruteforceProtectionListener uses the 'username' from the request\n            $bruteforceProtectionHandler->checkProtection($this->getAdminUser()->getName(), $request);\n\n            $session = $request->getSession();\n            $authException = $session->get(Security::AUTHENTICATION_ERROR);\n            if ($authException instanceof AuthenticationException) {\n                $session->remove(Security::AUTHENTICATION_ERROR);\n\n                $view->error = $authException->getMessage();\n\n                $bruteforceProtectionHandler->addEntry($this->getAdminUser()->getName(), $request);\n            }\n        } else {\n            $view->error = 'No session available, it either timed out or cookies are not enabled.';\n        }\n\n        return $view;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function twoFactorAuthenticationAction(Request $request, BruteforceProtectionHandler $bruteforceProtectionHandler)",
+      "            // we have to call the check here manually, because BruteforceProtectionListener uses the 'username' from the request",
+      "            $bruteforceProtectionHandler->checkProtection($this->getAdminUser()->getName(), $request);",
+      "                $bruteforceProtectionHandler->addEntry($this->getAdminUser()->getName(), $request);"
+    ],
+    "deleted": [
+      "    public function twoFactorAuthenticationAction(Request $request)"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "Pimcore before 6.2.2 lacks brute force protection for the 2FA token.",
+  "id": 751
+},
+{
+  "cve_id": "CVE-2019-18985",
+  "code_before_change": "    public function renew2FaSecretAction(Request $request)\n    {\n        $this->checkCsrfToken($request);\n\n        $user = $this->getAdminUser();\n        $proxyUser = $this->getAdminUser(true);\n\n        $twoFactorService = $this->get('scheb_two_factor.security.google_authenticator');\n        $newSecret = $twoFactorService->generateSecret();\n        $user->setTwoFactorAuthentication('enabled', true);\n        $user->setTwoFactorAuthentication('type', 'google');\n        $user->setTwoFactorAuthentication('secret', $newSecret);\n        $user->save();\n\n        Tool\\Session::useSession(function (AttributeBagInterface $adminSession) {\n            Tool\\Session::regenerateId();\n            $adminSession->set('2fa_required', true);\n        });\n\n        $twoFactorService = $this->get('scheb_two_factor.security.google_authenticator');\n        $url = $twoFactorService->getQRContent($proxyUser);\n\n        $code = new \\Endroid\\QrCode\\QrCode;\n        $code->setWriterByName('png');\n        $code->setText($url);\n        $code->setSize(200);\n\n        $qrCodeFile = PIMCORE_PRIVATE_VAR . '/qr-code-' . uniqid() . '.png';\n        $code->writeFile($qrCodeFile);\n\n        $response = new BinaryFileResponse($qrCodeFile);\n\n        return $response;\n    }",
+  "code_after_change": "    public function renew2FaSecretAction(Request $request)\n    {\n        $user = $this->getAdminUser();\n        $proxyUser = $this->getAdminUser(true);\n\n        $twoFactorService = $this->get('scheb_two_factor.security.google_authenticator');\n        $newSecret = $twoFactorService->generateSecret();\n        $user->setTwoFactorAuthentication('enabled', true);\n        $user->setTwoFactorAuthentication('type', 'google');\n        $user->setTwoFactorAuthentication('secret', $newSecret);\n        $user->save();\n\n        Tool\\Session::useSession(function (AttributeBagInterface $adminSession) {\n            Tool\\Session::regenerateId();\n            $adminSession->set('2fa_required', true);\n        });\n\n        $twoFactorService = $this->get('scheb_two_factor.security.google_authenticator');\n        $url = $twoFactorService->getQRContent($proxyUser);\n\n        $code = new \\Endroid\\QrCode\\QrCode;\n        $code->setWriterByName('png');\n        $code->setText($url);\n        $code->setSize(200);\n\n        $qrCodeFile = PIMCORE_PRIVATE_VAR . '/qr-code-' . uniqid() . '.png';\n        $code->writeFile($qrCodeFile);\n\n        $response = new BinaryFileResponse($qrCodeFile);\n\n        return $response;\n    }\n\n    /**",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "        $this->checkCsrfToken($request);"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "Pimcore before 6.2.2 lacks brute force protection for the 2FA token.",
+  "id": 752
+},
+{
+  "cve_id": "CVE-2019-18986",
+  "code_before_change": "    public function lostpasswordAction(Request $request, BruteforceProtectionHandler $bruteforceProtectionHandler)\n    {\n        $view = $this->buildLoginPageViewModel();\n        $view->success = false;\n\n        // TODO is the error on the view used somewhere?\n        if ($request->getMethod() === 'POST' && $username = $request->get('username')) {\n            $user = User::getByName($username);\n\n            if ($user instanceof User) {\n                if (!$user->isActive()) {\n                    $view->error = 'user inactive';\n                }\n\n                if (!$user->getEmail()) {\n                    $view->error = 'user has no email address';\n                }\n\n                if (!$user->getPassword()) {\n                    $view->error = 'user has no password';\n                }\n            } else {\n                $view->error = 'user unknown';\n            }\n\n            if (!$view->error) {\n                $token = Authentication::generateToken($username, $user->getPassword());\n\n                $loginUrl = $this->generateUrl('pimcore_admin_login_check', [\n                    'username' => $username,\n                    'token' => $token,\n                    'reset' => 'true'\n                ], UrlGeneratorInterface::ABSOLUTE_URL);\n\n                try {\n                    $event = new LostPasswordEvent($user, $loginUrl);\n                    $this->get('event_dispatcher')->dispatch(AdminEvents::LOGIN_LOSTPASSWORD, $event);\n\n                    // only send mail if it wasn't prevented in event\n                    if ($event->getSendMail()) {\n                        $mail = Tool::getMail([$user->getEmail()], 'Pimcore lost password service');\n                        $mail->setIgnoreDebugMode(true);\n                        $mail->setBodyText(\"Login to pimcore and change your password using the following link. This temporary login link will expire in 24 hours: \\r\\n\\r\\n\" . $loginUrl);\n                        $mail->send();\n                    }\n\n                    // directly return event response\n                    if ($event->hasResponse()) {\n                        return $event->getResponse();\n                    }\n\n                    $view->success = true;\n                } catch (\\Exception $e) {\n                    $view->error = 'could not send email';\n                }\n            }\n\n            if ($view->error) {\n                $bruteforceProtectionHandler->addEntry($request->get('username'), $request);\n            }\n        }\n\n        return $view;\n    }",
+  "code_after_change": "    public function lostpasswordAction(Request $request, BruteforceProtectionHandler $bruteforceProtectionHandler)\n    {\n        $view = $this->buildLoginPageViewModel();\n        $error = null;\n\n        if ($request->getMethod() === 'POST' && $username = $request->get('username')) {\n            $user = User::getByName($username);\n\n            if ($user instanceof User) {\n                if (!$user->isActive()) {\n                    $error = 'user inactive';\n                }\n\n                if (!$user->getEmail()) {\n                    $error = 'user has no email address';\n                }\n\n                if (!$user->getPassword()) {\n                    $error = 'user has no password';\n                }\n            } else {\n                $error = 'user unknown';\n            }\n\n            if (!$error) {\n                $token = Authentication::generateToken($username, $user->getPassword());\n\n                $loginUrl = $this->generateUrl('pimcore_admin_login_check', [\n                    'username' => $username,\n                    'token' => $token,\n                    'reset' => 'true'\n                ], UrlGeneratorInterface::ABSOLUTE_URL);\n\n                try {\n                    $event = new LostPasswordEvent($user, $loginUrl);\n                    $this->get('event_dispatcher')->dispatch(AdminEvents::LOGIN_LOSTPASSWORD, $event);\n\n                    // only send mail if it wasn't prevented in event\n                    if ($event->getSendMail()) {\n                        $mail = Tool::getMail([$user->getEmail()], 'Pimcore lost password service');\n                        $mail->setIgnoreDebugMode(true);\n                        $mail->setBodyText(\"Login to pimcore and change your password using the following link. This temporary login link will expire in 24 hours: \\r\\n\\r\\n\" . $loginUrl);\n                        $mail->send();\n                    }\n\n                    // directly return event response\n                    if ($event->hasResponse()) {\n                        return $event->getResponse();\n                    }\n                } catch (\\Exception $e) {\n                    $error = 'could not send email';\n                }\n            }\n\n            if ($error) {\n                Logger::error('Lost password service: ' . $error);\n                $bruteforceProtectionHandler->addEntry($request->get('username'), $request);\n            }\n        }\n\n        return $view;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $error = null;",
+      "                    $error = 'user inactive';",
+      "                    $error = 'user has no email address';",
+      "                    $error = 'user has no password';",
+      "                $error = 'user unknown';",
+      "            if (!$error) {",
+      "                    $error = 'could not send email';",
+      "            if ($error) {",
+      "                Logger::error('Lost password service: ' . $error);"
+    ],
+    "deleted": [
+      "        $view->success = false;",
+      "        // TODO is the error on the view used somewhere?",
+      "                    $view->error = 'user inactive';",
+      "                    $view->error = 'user has no email address';",
+      "                    $view->error = 'user has no password';",
+      "                $view->error = 'user unknown';",
+      "            if (!$view->error) {",
+      "                    $view->success = true;",
+      "                    $view->error = 'could not send email';",
+      "            if ($view->error) {"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "Pimcore before 6.2.2 allow attackers to brute-force (guess) valid usernames by using the 'forgot password' functionality as it returns distinct messages for invalid password and non-existing users.",
+  "id": 753
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    public function __construct(public Request $Request, public SessionInterface $Session, public Config $Config, public Logger $Log, public Csrf $Csrf)\n    {\n        $flashBag = $this->Session->getBag('flashes');\n        // add type check because SessionBagInterface doesn't have get(), only FlashBag has it\n        if ($flashBag instanceof FlashBag) {\n            $this->ok = $flashBag->get('ok');\n            $this->ko = $flashBag->get('ko');\n            $this->warning = $flashBag->get('warning');\n        }\n\n        $this->Log->pushHandler(new ErrorLogHandler());\n        $this->Users = new Users();\n        $this->Db = Db::getConnection();\n        // UPDATE SQL SCHEMA if necessary or show error message if version mismatch\n        $Update = new Update($this->Config, new Sql());\n        $Update->checkSchema();\n    }",
+  "code_after_change": "    public function __construct(public Request $Request, public SessionInterface $Session, public Config $Config, public Logger $Log, public Csrf $Csrf)\n    {\n        $flashBag = $this->Session->getBag('flashes');\n        // add type check because SessionBagInterface doesn't have get(), only FlashBag has it\n        if ($flashBag instanceof FlashBag) {\n            $this->ok = $flashBag->get('ok');\n            $this->ko = $flashBag->get('ko');\n            $this->warning = $flashBag->get('warning');\n        }\n\n        $this->Log->pushHandler(new ErrorLogHandler());\n        $this->Users = new Users();\n        $this->Db = Db::getConnection();\n        // UPDATE SQL SCHEMA if necessary or show error message if version mismatch\n        $Update = new Update((int) $this->Config->configArr['schema'], new Sql());\n        $Update->checkSchema();\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $Update = new Update((int) $this->Config->configArr['schema'], new Sql());"
+    ],
+    "deleted": [
+      "        $Update = new Update($this->Config, new Sql());"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 754
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    public function __construct(App $app)\n    {\n        $this->Config = $app->Config;\n        $this->Request = $app->Request;\n        $this->Session = $app->Session;\n    }",
+  "code_after_change": "    public function __construct(private Config $Config, private Request $Request)\n    {\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function __construct(private Config $Config, private Request $Request)"
+    ],
+    "deleted": [
+      "    public function __construct(App $app)",
+      "        $this->Config = $app->Config;",
+      "        $this->Request = $app->Request;",
+      "        $this->Session = $app->Session;"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 755
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    public function __construct(public Config $Config, private Sql $Sql)\n    {\n        $this->Db = Db::getConnection();\n    }",
+  "code_after_change": "    public function __construct(private int $currentSchema, private Sql $Sql)\n    {\n        $this->Db = Db::getConnection();\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function __construct(private int $currentSchema, private Sql $Sql)"
+    ],
+    "deleted": [
+      "    public function __construct(public Config $Config, private Sql $Sql)"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 756
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        /** @psalm-suppress PossiblyNullReference */\n        $command = $this->getApplication()->find('db:check');\n\n        $arguments = array(\n            'command' => 'db:check',\n        );\n\n        $cmdInput = new ArrayInput($arguments);\n        $returnCode = $command->run($cmdInput, $output);\n\n        if ($returnCode === 1) {\n            $output->writeln(array(\n                'Database update starting',\n                '========================',\n            ));\n\n            $Config = Config::getConfig();\n            $Update = new Update($Config, new Sql());\n            $Update->runUpdateScript();\n            $output->writeln('All done.');\n        }\n        return 0;\n    }",
+  "code_after_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        /** @psalm-suppress PossiblyNullReference */\n        $command = $this->getApplication()->find('db:check');\n\n        $arguments = array(\n            'command' => 'db:check',\n        );\n\n        $cmdInput = new ArrayInput($arguments);\n        $returnCode = $command->run($cmdInput, $output);\n\n        if ($returnCode === 1) {\n            $output->writeln(array(\n                'Database update starting',\n                '========================',\n            ));\n\n            $Config = Config::getConfig();\n            $Update = new Update((int) $Config->configArr['schema'], new Sql());\n            $Update->runUpdateScript();\n            $output->writeln('All done.');\n        }\n        return 0;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $Update = new Update((int) $Config->configArr['schema'], new Sql());"
+    ],
+    "deleted": [
+      "            $Update = new Update($Config, new Sql());"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 757
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    public function __construct($message, $code = 0, Exception $previous = null)\n    {\n        parent::__construct($message, $code, $previous);\n    }",
+  "code_after_change": "    public function __construct(?Exception $previous = null)\n    {\n        parent::__construct('An error occured during the execution of the SQL query.', 515, $previous);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function __construct(?Exception $previous = null)",
+      "        parent::__construct('An error occured during the execution of the SQL query.', 515, $previous);"
+    ],
+    "deleted": [
+      "    public function __construct($message, $code = 0, Exception $previous = null)",
+      "        parent::__construct($message, $code, $previous);"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 758
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    public function __construct(?string $message = null)\n    {\n        if ($message === null) {\n            $message = _('Invalid email/password combination.');\n        }\n        parent::__construct($message, 0);\n    }",
+  "code_after_change": "    public function __construct(int $userid)\n    {\n        parent::__construct(_('Invalid email/password combination.'), $userid);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function __construct(int $userid)",
+      "        parent::__construct(_('Invalid email/password combination.'), $userid);"
+    ],
+    "deleted": [
+      "    public function __construct(?string $message = null)",
+      "        if ($message === null) {",
+      "            $message = _('Invalid email/password combination.');",
+      "        }",
+      "        parent::__construct($message, 0);"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 759
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    public function __construct($message = null, $code = 404, Exception $previous = null)\n    {\n        if ($message === null) {\n            $message = _('Nothing to show with this id');\n        }\n        parent::__construct($message, $code, $previous);\n    }",
+  "code_after_change": "    public function __construct(string $message = null, int $code = 404, Exception $previous = null)\n    {\n        if ($message === null) {\n            $message = _('Nothing to show with this id');\n        }\n        parent::__construct($message, $code, $previous);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function __construct(string $message = null, int $code = 404, Exception $previous = null)"
+    ],
+    "deleted": [
+      "    public function __construct($message = null, $code = 404, Exception $previous = null)"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 760
+},
+{
+  "cve_id": "CVE-2021-41171",
+  "code_before_change": "    public function __construct($message = null, $code = 0, Exception $previous = null)\n    {\n        if ($message === null) {\n            $message = _('Authentication required');\n        }\n        parent::__construct($message, $code, $previous);\n    }",
+  "code_after_change": "    public function __construct(string $message = null, int $code = 0, Exception $previous = null)\n    {\n        if ($message === null) {\n            $message = _('Authentication required');\n        }\n        parent::__construct($message, $code, $previous);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function __construct(string $message = null, int $code = 0, Exception $previous = null)"
+    ],
+    "deleted": [
+      "    public function __construct($message = null, $code = 0, Exception $previous = null)"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "eLabFTW is an open source electronic lab notebook manager for research teams. In versions of eLabFTW before 4.1.0, it allows attackers to bypass a brute-force protection mechanism by using many different forged PHPSESSID values in HTTP Cookie header. This issue has been addressed by implementing brute force login protection, as recommended by Owasp with Device Cookies. This mechanism will not impact users and will effectively thwart any brute-force attempts at guessing passwords. The only correct way to address this is to upgrade to version 4.1.0. Adding rate limitation upstream of the eLabFTW service is of course a valid option, with or without upgrading.",
+  "id": 761
+},
+{
+  "cve_id": "CVE-2022-4006",
+  "code_before_change": "            $ipaddress = getenv('REMOTE_ADDR');\n        } else {\n            $ipaddress = 'UNKNOWN';\n        }\n\n        return $ipaddress;\n    }",
+  "code_after_change": "        } elseif (getenv('HTTP_FORWARDED')) {\n            $ipaddress = getenv('HTTP_FORWARDED');\n        } else {\n            $ipaddress = 'UNKNOWN';\n        }\n\n        return $ipaddress;",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "            $ipaddress = getenv('REMOTE_ADDR');"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "A vulnerability, which was classified as problematic, has been found in WBCE CMS. Affected by this issue is the function increase_attempts of the file wbce/framework/class.login.php of the component Header Handler. The manipulation of the argument X-Forwarded-For leads to improper restriction of excessive authentication attempts. The attack may be launched remotely. The name of the patch is d394ba39a7bfeb31eda797b6195fd90ef74b2e75. It is recommended to apply a patch to fix this issue. The identifier of this vulnerability is VDB-213716.",
+  "id": 762
+},
+{
+  "cve_id": "CVE-2023-2531",
+  "code_before_change": "    public function __construct(\n        private readonly EntityManagerInterface $em,\n        private readonly Adapters $adapters\n    ) {\n    }",
+  "code_after_change": "    public function __construct(\n        private readonly EntityManagerInterface $em,\n        private readonly Adapters $adapters,\n        private readonly Entity\\Repository\\SettingsRepository $settingsRepo\n    ) {\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        private readonly Adapters $adapters,",
+      "        private readonly Entity\\Repository\\SettingsRepository $settingsRepo"
+    ],
+    "deleted": [
+      "        private readonly Adapters $adapters"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "Improper Restriction of Excessive Authentication Attempts in GitHub repository azuracast/azuracast prior to 0.18.3.",
+  "id": 763
+},
+{
+  "cve_id": "CVE-2023-2531",
+  "code_before_change": "    public function __construct(\n        private readonly StationRequestRepository $requestRepo\n    ) {\n    }",
+  "code_after_change": "    public function __construct(\n        private readonly StationRequestRepository $requestRepo,\n        private readonly SettingsRepository $settingsRepo\n    ) {\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        private readonly StationRequestRepository $requestRepo,",
+      "        private readonly SettingsRepository $settingsRepo"
+    ],
+    "deleted": [
+      "        private readonly StationRequestRepository $requestRepo"
+    ]
+  },
+  "cwe": [
+    "CWE-307"
+  ],
+  "cve_description": "Improper Restriction of Excessive Authentication Attempts in GitHub repository azuracast/azuracast prior to 0.18.3.",
+  "id": 764
+}
+]

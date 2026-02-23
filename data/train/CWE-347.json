@@ -1,0 +1,92 @@
+[
+{
+  "cve_id": "CVE-2018-5387",
+  "code_before_change": "    protected function signDocument(\\DOMDocument $document, $node)\n    {\n        $this->add509Cert($this->getCertificate()->getPublicKey()->getX509Certificate());\n        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);\n        $this->addReference($document->documentElement, XMLSecurityDSig::SHA1, array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N), array('id_name' => 'ID'));\n\n        $this->sign($this->getCertificate()->getPrivateKey());\n        $this->insertSignature($document->firstChild, $node);\n        $this->canonicalizeSignedInfo();\n    }",
+  "code_after_change": "    protected function signDocument(\\DOMDocument $document, $node)\n    {\n        $this->add509Cert($this->getCertificate()->getPublicKey()->getX509Certificate());\n        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N_COMMENTS);\n        $this->addReference($document->documentElement, XMLSecurityDSig::SHA1, array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N), array('id_name' => 'ID'));\n\n        $this->sign($this->getCertificate()->getPrivateKey());\n        $this->insertSignature($document->firstChild, $node);\n        $this->canonicalizeSignedInfo();\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N_COMMENTS);"
+    ],
+    "deleted": [
+      "        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);"
+    ]
+  },
+  "cwe": [
+    "CWE-347"
+  ],
+  "cve_description": "Wizkunde SAMLBase may incorrectly utilize the results of XML DOM traversal and canonicalization APIs in such a way that an attacker may be able to manipulate the SAML data without invalidating the cryptographic signature, allowing the attack to potentially bypass authentication to SAML service providers.",
+  "id": 863
+},
+{
+  "cve_id": "CVE-2018-5387",
+  "code_before_change": "    public function verifyDOMDocument($document)\n    {\n        $signatureNode = $this->locateSignature($document);\n\n        /**\n         * No signature was added, it should not fail as this is not a requirement on redirect bindings\n         */\n        if (!$signatureNode) {\n            return true;\n        }\n\n        $this->add509Cert($this->getCertificate()->getPublicKey()->getX509Certificate());\n        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);\n        $this->addReference($document->documentElement, XMLSecurityDSig::SHA1, array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N), array('id_name' => 'ID'));\n\n        return $this->verify($this->getCertificate()->getPublicKey());\n    }",
+  "code_after_change": "    public function verifyDOMDocument($document)\n    {\n        $signatureNode = $this->locateSignature($document);\n\n        /**\n         * No signature was added, it should not fail as this is not a requirement on redirect bindings\n         */\n        if (!$signatureNode) {\n            return true;\n        }\n\n        $this->add509Cert($this->getCertificate()->getPublicKey()->getX509Certificate());\n        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N_COMMENTS);\n        $this->addReference($document->documentElement, XMLSecurityDSig::SHA1, array('http://www.w3.org/2000/09/xmldsig#enveloped-signature', XMLSecurityDSig::EXC_C14N), array('id_name' => 'ID'));\n\n        return $this->verify($this->getCertificate()->getPublicKey());\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N_COMMENTS);"
+    ],
+    "deleted": [
+      "        $this->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);"
+    ]
+  },
+  "cwe": [
+    "CWE-347"
+  ],
+  "cve_description": "Wizkunde SAMLBase may incorrectly utilize the results of XML DOM traversal and canonicalization APIs in such a way that an attacker may be able to manipulate the SAML data without invalidating the cryptographic signature, allowing the attack to potentially bypass authentication to SAML service providers.",
+  "id": 864
+},
+{
+  "cve_id": "CVE-2018-7711",
+  "code_before_change": "    public static function validateSignature(array $data, XMLSecurityKey $key)\n    {\n        assert('array_key_exists(\"Query\", $data)');\n        assert('array_key_exists(\"SigAlg\", $data)');\n        assert('array_key_exists(\"Signature\", $data)');\n\n        $query = $data['Query'];\n        $sigAlg = $data['SigAlg'];\n        $signature = $data['Signature'];\n\n        $signature = base64_decode($signature);\n\n        if ($key->type !== XMLSecurityKey::RSA_SHA1) {\n            throw new \\Exception('Invalid key type for validating signature on query string.');\n        }\n        if ($key->type !== $sigAlg) {\n            $key = Utils::castKey($key, $sigAlg);\n        }\n\n        if (!$key->verifySignature($query, $signature)) {\n            throw new \\Exception('Unable to validate signature on query string.');\n        }\n    }",
+  "code_after_change": "    public static function validateSignature(array $data, XMLSecurityKey $key)\n    {\n        assert('array_key_exists(\"Query\", $data)');\n        assert('array_key_exists(\"SigAlg\", $data)');\n        assert('array_key_exists(\"Signature\", $data)');\n\n        $query = $data['Query'];\n        $sigAlg = $data['SigAlg'];\n        $signature = $data['Signature'];\n\n        $signature = base64_decode($signature);\n\n        if ($key->type !== XMLSecurityKey::RSA_SHA1) {\n            throw new \\Exception('Invalid key type for validating signature on query string.');\n        }\n        if ($key->type !== $sigAlg) {\n            $key = Utils::castKey($key, $sigAlg);\n        }\n\n        if ($key->verifySignature($query, $signature) !== 1) {\n            throw new \\Exception('Unable to validate signature on query string.');\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        if ($key->verifySignature($query, $signature) !== 1) {"
+    ],
+    "deleted": [
+      "        if (!$key->verifySignature($query, $signature)) {"
+    ]
+  },
+  "cwe": [
+    "CWE-347"
+  ],
+  "cve_description": "HTTPRedirect.php in the saml2 library in SimpleSAMLphp before 1.15.4 has an incorrect check of return values in the signature validation utilities, allowing an attacker to get invalid signatures accepted as valid by forcing an error during validation. This occurs because of a dependency on PHP functionality that interprets a -1 error code as a true boolean value.",
+  "id": 865
+},
+{
+  "cve_id": "CVE-2019-3465",
+  "code_before_change": "                                    $val = trim($pfx);\n                                    if (! empty($val)) {\n                                        $arpfx[] = $val;\n                                    }\n                                }\n                                if (count($arpfx) > 0) {\n                                    $prefixList = $arpfx;\n                                }\n                            }\n                            break;\n                        }\n                        $node = $node->nextSibling;\n                    }\n            break;\n                case 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315':\n                case 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments':\n                    if (!$includeCommentNodes) {\n                        /* We remove comment nodes by forcing it to use a canonicalization\n                         * without comments.\n                         */\n                        $canonicalMethod = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';\n                    } else {\n                        $canonicalMethod = $algorithm;\n                    }\n\n                    break;\n                case 'http://www.w3.org/TR/1999/REC-xpath-19991116':\n                    $node = $transform->firstChild;\n                    while ($node) {\n                        if ($node->localName == 'XPath') {\n                            $arXPath = array();\n                            $arXPath['query'] = '(.//. | .//@* | .//namespace::*)['.$node->nodeValue.']';\n                            $arXpath['namespaces'] = array();\n                            $nslist = $xpath->query('./namespace::*', $node);\n                            foreach ($nslist AS $nsnode) {\n                                if ($nsnode->localName != \"xml\") {\n                                    $arXPath['namespaces'][$nsnode->localName] = $nsnode->nodeValue;\n                                }\n                            }\n                            break;\n                        }\n                        $node = $node->nextSibling;\n                    }\n                    break;\n            }\n        }\n        if ($data instanceof DOMNode) {\n            $data = $this->canonicalizeData($objData, $canonicalMethod, $arXPath, $prefixList);\n        }\n        return $data;\n    }",
+  "code_after_change": "                                    $val = trim($pfx);\n                                    if (! empty($val)) {\n                                        $arpfx[] = $val;\n                                    }\n                                }\n                                if (count($arpfx) > 0) {\n                                    $prefixList = $arpfx;\n                                }\n                            }\n                            break;\n                        }\n                        $node = $node->nextSibling;\n                    }\n            break;\n                case 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315':\n                case 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments':\n                    if (!$includeCommentNodes) {\n                        /* We remove comment nodes by forcing it to use a canonicalization\n                         * without comments.\n                         */\n                        $canonicalMethod = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';\n                    } else {\n                        $canonicalMethod = $algorithm;\n                    }\n\n                    break;\n                case 'http://www.w3.org/TR/1999/REC-xpath-19991116':\n                    $node = $transform->firstChild;\n                    while ($node) {\n                        if ($node->localName == 'XPath') {\n                            $arXPath = array();\n                            $arXPath['query'] = '(.//. | .//@* | .//namespace::*)['.$node->nodeValue.']';\n                            $arXPath['namespaces'] = array();\n                            $nslist = $xpath->query('./namespace::*', $node);\n                            foreach ($nslist AS $nsnode) {\n                                if ($nsnode->localName != \"xml\") {\n                                    $arXPath['namespaces'][$nsnode->localName] = $nsnode->nodeValue;\n                                }\n                            }\n                            break;\n                        }\n                        $node = $node->nextSibling;\n                    }\n                    break;\n            }\n        }\n        if ($data instanceof DOMNode) {\n            $data = $this->canonicalizeData($objData, $canonicalMethod, $arXPath, $prefixList);\n        }\n        return $data;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                            $arXPath['namespaces'] = array();"
+    ],
+    "deleted": [
+      "                            $arXpath['namespaces'] = array();"
+    ]
+  },
+  "cwe": [
+    "CWE-347"
+  ],
+  "cve_description": "Rob Richards XmlSecLibs, all versions prior to v3.0.3, as used for example by SimpleSAMLphp, performed incorrect validation of cryptographic signatures in XML messages, allowing an authenticated attacker to impersonate others or elevate privileges by creating a crafted XML message.",
+  "id": 866
+},
+{
+  "cve_id": "CVE-2019-3465",
+  "code_before_change": "    public function validateReference()\n    {\n        $docElem = $this->sigNode->ownerDocument->documentElement;\n        if (! $docElem->isSameNode($this->sigNode)) {\n            if ($this->sigNode->parentNode != null) {\n                $this->sigNode->parentNode->removeChild($this->sigNode);\n            }\n        }\n        $xpath = $this->getXPathObj();\n        $query = \"./secdsig:SignedInfo/secdsig:Reference\";\n        $nodeset = $xpath->query($query, $this->sigNode);\n        if ($nodeset->length == 0) {\n            throw new Exception(\"Reference nodes not found\");\n        }\n\n        /* Initialize/reset the list of validated nodes. */\n        $this->validatedNodes = array();\n\n        foreach ($nodeset AS $refNode) {\n            if (! $this->processRefNode($refNode)) {\n                /* Clear the list of validated nodes. */\n                $this->validatedNodes = null;\n                throw new Exception(\"Reference validation failed\");\n            }\n        }\n        return true;\n    }",
+  "code_after_change": "    public function validateReference()\n    {\n        $docElem = $this->sigNode->ownerDocument->documentElement;\n        if (! $docElem->isSameNode($this->sigNode)) {\n            if ($this->sigNode->parentNode != null) {\n                $this->sigNode->parentNode->removeChild($this->sigNode);\n            }\n        }\n        $xpath = $this->getXPathObj();\n        $query = \"./secdsig:SignedInfo[1]/secdsig:Reference\";\n        $nodeset = $xpath->query($query, $this->sigNode);\n        if ($nodeset->length == 0) {\n            throw new Exception(\"Reference nodes not found\");\n        }\n\n        /* Initialize/reset the list of validated nodes. */\n        $this->validatedNodes = array();\n\n        foreach ($nodeset AS $refNode) {\n            if (! $this->processRefNode($refNode)) {\n                /* Clear the list of validated nodes. */\n                $this->validatedNodes = null;\n                throw new Exception(\"Reference validation failed\");\n            }\n        }\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $query = \"./secdsig:SignedInfo[1]/secdsig:Reference\";"
+    ],
+    "deleted": [
+      "        $query = \"./secdsig:SignedInfo/secdsig:Reference\";"
+    ]
+  },
+  "cwe": [
+    "CWE-347"
+  ],
+  "cve_description": "Rob Richards XmlSecLibs, all versions prior to v3.0.3, as used for example by SimpleSAMLphp, performed incorrect validation of cryptographic signatures in XML messages, allowing an authenticated attacker to impersonate others or elevate privileges by creating a crafted XML message.",
+  "id": 867
+}
+]

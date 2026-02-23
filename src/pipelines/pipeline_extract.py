@@ -3,14 +3,15 @@ Knowledge Extraction Pipeline
 RawDiffDTO JSON → LLM 분석 → VulnerabilityKnowledgeDTO JSON
 
 Usage:
-    python src/piplines/pipeline_extract.py \
+    python src/pipelines/pipeline_extract.py \
         --input_file_name CVE-2021-3904.json \
-        --output_file_name CVE-2021-3904_knowledge.json \
-        --model_name gpt-4o-mini \
-        --model_settings "temperature=0.2;max_tokens=4096" \
+        --output_file_name CVE-2021-3904_knowledge.json \       # 기본값 - input file에 +_knowledge.json 붙여서 저장 
+        --model_name gpt-4o-mini \                              # 이미 llm_client에서 정의된 모델이 mini
+        --model_settings "temperature=0.2;max_tokens=4096" \    # 여기도 llm_client에 기본값 존재 
         --thread_pool_size 5 \
         --retry_time 3 \
-        --resume
+        --resume \                                               # 이미 처리된 데이터 건너뛰기 
+        --batch                                                  # 전체 데이터 처리
 """
 import json
 import os
@@ -22,6 +23,7 @@ from pathlib import Path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.utils import llm_client
+from src.dto.vulnerability_knowledge_dto import VulnerabilityKnowledgeDTO, VulnerabilityBehavior
 from tqdm import tqdm
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -57,10 +59,12 @@ def retry_on_failure(max_retries: int = 5, delay: float = 1.0):
 def parse_args():
     """명령줄 인자 파싱"""
     parser = argparse.ArgumentParser(description="Extract vulnerability knowledge using LLM")
-    parser.add_argument("--input_file_name", type=str, required=True, 
+    parser.add_argument("--input_file_name", type=str, required=False, 
                        help="Input JSON file name (in data/train/)")
-    parser.add_argument("--output_file_name", type=str, required=True,
+    parser.add_argument("--output_file_name", type=str, required=False,
                        help="Output JSON file name (in data/knowledge/)")
+    parser.add_argument("--batch", action="store_true",
+                       help="Process all files in data/train/")
     parser.add_argument("--model_name", type=str, required=True,
                        help="LLM model name (e.g., gpt-4o-mini, gpt-4o, gpt-4-turbo)")
     parser.add_argument(
@@ -188,7 +192,7 @@ def parse_vulnerability_knowledge(llm_output: str) -> Dict[str, Any]:
         raise
 
 
-def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, Any]]) -> None:
+def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, Any]], custom_output_file=None) -> None:
     """
     단일 CVE 항목에 대해 지식 추출
     """
@@ -236,39 +240,45 @@ def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, An
         knowledge_extraction_output = generate_with_retry(messages, args.model_settings)
 
         # Parse LLM output
-        output_dict = parse_vulnerability_knowledge(knowledge_extraction_output)
-        
-        # Add metadata
-        output_dict["analysis"] = analysis_output
-        output_dict["purpose"] = llm_client.extract_LLM_response_by_prefix(
-            purpose_output, "Function purpose:"
-        )
-        output_dict["function"] = llm_client.extract_LLM_response_by_prefix(
-            function_output, "The functions of the code snippet are:"
-        )
-        
-        # Add original data
-        output_dict["CVE_id"] = item["cve_id"]
-        output_dict["id"] = item["id"]
-        output_dict["code_before_change"] = item["code_before_change"]
-        output_dict["code_after_change"] = item["code_after_change"]
-        output_dict["modified_lines"] = item["function_modified_lines"]
+        raw_dict = parse_vulnerability_knowledge(knowledge_extraction_output)
 
-        # Extract solution if nested
-        if "solution" in output_dict.get("vulnerability_behavior", {}):
-            output_dict["solution"] = output_dict["vulnerability_behavior"]["solution"]
-        
-        # Flatten vulnerability_behavior fields
-        vb = output_dict.get("vulnerability_behavior", {})
-        output_dict["vulnerability_cause_description"] = vb.get("vulnerability_cause_description", "")
-        output_dict["trigger_condition"] = vb.get("trigger_condition", "")
-        output_dict["specific_code_behavior_causing_vulnerability"] = vb.get("specific_code_behavior_causing_vulnerability", "")
+        # solution 처리: LLM이 vulnerability_behavior 내에 넣은 경우 꺼내기
+        solution = raw_dict.get("solution", "")
+        vb_raw = raw_dict.get("vulnerability_behavior", {})
+        if not solution and "solution" in vb_raw:
+            solution = vb_raw.pop("solution")
+
+        # VulnerabilityBehavior 생성
+        vulnerability_behavior = VulnerabilityBehavior(
+            vulnerability_cause_description=vb_raw.get("vulnerability_cause_description", ""),
+            trigger_condition=vb_raw.get("trigger_condition", ""),
+            specific_code_behavior_causing_vulnerability=vb_raw.get("specific_code_behavior_causing_vulnerability", ""),
+        )
+
+        # VulnerabilityKnowledgeDTO로 유효성 검사 후 직렬화
+        knowledge_dto = VulnerabilityKnowledgeDTO(
+            CVE_id=item["cve_id"],
+            vulnerability_behavior=vulnerability_behavior,
+            solution=solution,
+            purpose=llm_client.extract_LLM_response_by_prefix(purpose_output, "Function purpose:"),
+            function=llm_client.extract_LLM_response_by_prefix(function_output, "The functions of the code snippet are:"),
+            analysis=analysis_output,
+            code_before_change=item["code_before_change"],
+            code_after_change=item["code_after_change"],
+            modified_lines=item["function_modified_lines"],
+            vulnerability_cause_description=vulnerability_behavior.vulnerability_cause_description,
+            trigger_condition=vulnerability_behavior.trigger_condition,
+            specific_code_behavior_causing_vulnerability=vulnerability_behavior.specific_code_behavior_causing_vulnerability,
+        )
+        output_dict = knowledge_dto.model_dump()
 
         # Thread-safe output
         with output_lock:
+            # 배치 모드일 경우 각 파일마다 별도 처리하거나 리스트에 추가
             output_data.append(output_dict)
             with file_lock:
-                output_path = Path("data/knowledge") / args.output_file_name
+                actual_output_name = custom_output_file or args.output_file_name
+                output_path = Path("data/knowledge") / actual_output_name
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(output_path, "w", encoding="utf-8") as f:
                     json.dump(output_data, f, indent=4, ensure_ascii=False)
@@ -280,13 +290,82 @@ def extract_knowledge(args, item: Dict[str, Any], output_data: List[Dict[str, An
         return
 
 
-def process_item(args, item: Dict[str, Any], output_data: List[Dict[str, Any]], resume_set: set):
+def process_item(args, item: Dict[str, Any], output_data: List[Dict[str, Any]], resume_set: set, custom_output_file=None):
     """개별 아이템 처리"""
-    if item["id"] not in resume_set:
-        extract_knowledge(args, item, output_data)
+    if item["cve_id"] not in resume_set:
+        extract_knowledge(args, item, output_data, custom_output_file)
     else:
         print(f"⊙ Skipping {item['cve_id']} (already processed)")
 
+
+def run_batch_pipeline(args):
+    """데이터 디렉토리 전체를 처리하는 배치 파이프라인"""
+    input_dir = Path("data/train")
+    if not input_dir.exists():
+        print(f"Error: Input directory not found: {input_dir}")
+        return
+
+    json_files = list(input_dir.glob("*.json"))
+    print(f"Found {len(json_files)} files in {input_dir}")
+
+    # 모든 아이템을 하나의 리스트로 통합하여 병렬 처리
+    all_items = []
+    file_map = {}  # cve_id -> output_filename
+
+    for f_path in json_files:
+        try:
+            with open(f_path, "r", encoding="utf-8") as f:
+                items = json.load(f)
+                out_name = f_path.name.replace(".json", "_knowledge.json")
+                for item in items:
+                    all_items.append(item)
+                    file_map[item["cve_id"]] = out_name  # cve_id 기준으로 매핑
+        except Exception as e:
+            print(f"Failed to load {f_path}: {e}")
+
+    if not all_items:
+        print("No items to process.")
+        return
+
+    # CWE 파일별 output_data 공유 딕셔너리 (덮어쓰기 방지)
+    unique_out_names = set(file_map.values())
+    output_data_map = {out_name: [] for out_name in unique_out_names}
+    resume_sets = {out_name: set() for out_name in unique_out_names}
+
+    # Resume 처리: 기존 knowledge 파일에서 cve_id 로드
+    if args.resume:
+        for out_name in unique_out_names:
+            output_path = Path("data/knowledge") / out_name
+            if output_path.exists():
+                try:
+                    with open(output_path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                        output_data_map[out_name] = existing
+                        resume_sets[out_name] = set(item["CVE_id"] for item in existing)
+                    print(f"Resuming {out_name}: {len(resume_sets[out_name])} already processed")
+                except Exception as e:
+                    print(f"Failed to load resume data for {out_name}: {e}")
+
+    total_resume = sum(len(s) for s in resume_sets.values())
+    if total_resume:
+        print(f"Resuming: {total_resume} items already processed")
+
+    print(f"Processing {len(all_items)} items across {len(json_files)} files...")
+    with ThreadPoolExecutor(max_workers=args.thread_pool_size) as executor:
+        list(tqdm(
+            executor.map(
+                lambda item: process_item(
+                    args,
+                    item,
+                    output_data_map[file_map[item["cve_id"]]],
+                    resume_sets[file_map[item["cve_id"]]],
+                    custom_output_file=file_map[item["cve_id"]]
+                ),
+                all_items
+            ),
+            total=len(all_items),
+            desc="Batch Knowledge Extraction"
+        ))
 
 def extract_knowledge_pipeline(args):
     """메인 파이프라인"""
@@ -300,6 +379,14 @@ def extract_knowledge_pipeline(args):
         print(f"Failed to initialize LLM client: {e}")
         sys.exit(1)
     
+    if args.batch:
+        run_batch_pipeline(args)
+        return
+
+    if not args.input_file_name or not args.output_file_name:
+        print("Error: --input_file_name and --output_file_name are required unless --batch is used.")
+        sys.exit(1)
+
     # 입력 데이터 로드
     input_path = Path("data/train") / args.input_file_name
     if not input_path.exists():
@@ -320,7 +407,7 @@ def extract_knowledge_pipeline(args):
         if output_path.exists():
             with open(output_path, "r", encoding="utf-8") as f:
                 output_data = json.load(f)
-                resume_set = set([item["id"] for item in output_data])
+                resume_set = set(item["CVE_id"] for item in output_data)
             print(f"Resuming: Found {len(resume_set)} already processed items")
     
     # 병렬 처리

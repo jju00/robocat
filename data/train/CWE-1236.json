@@ -1,0 +1,361 @@
+[
+{
+  "cve_id": "CVE-2019-14749",
+  "code_before_change": "    function dump() {\n\n        if (!$this->output)\n             $this->output = fopen('php://output', 'w');\n\n        // Detect delimeter from the current locale settings. For locales\n        // which use comma (,) as the decimal separator, the semicolon (;)\n        // should be used as the field separator\n        $delimiter = ',';\n        if (class_exists('NumberFormatter')) {\n            $nf = NumberFormatter::create(Internationalization::getCurrentLocale(),\n                NumberFormatter::DECIMAL);\n            $s = $nf->getSymbol(NumberFormatter::DECIMAL_SEPARATOR_SYMBOL);\n            if ($s == ',')\n                $delimiter = ';';\n        }\n\n        // Output a UTF-8 BOM (byte order mark)\n        fputs($this->output, chr(0xEF) . chr(0xBB) . chr(0xBF));\n        fputcsv($this->output, $this->getHeaders(), $delimiter);\n        while ($row=$this->next())\n            fputcsv($this->output, $row, $delimiter);\n\n        fclose($this->output);\n    }",
+  "code_after_change": "    function dump() {\n\n        if (!$this->output)\n             $this->output = fopen('php://output', 'w');\n\n        // Detect delimeter from the current locale settings. For locales\n        // which use comma (,) as the decimal separator, the semicolon (;)\n        // should be used as the field separator\n        $delimiter = ',';\n        if (class_exists('NumberFormatter')) {\n            $nf = NumberFormatter::create(Internationalization::getCurrentLocale(),\n                NumberFormatter::DECIMAL);\n            $s = $nf->getSymbol(NumberFormatter::DECIMAL_SEPARATOR_SYMBOL);\n            if ($s == ',')\n                $delimiter = ';';\n        }\n\n        // Output a UTF-8 BOM (byte order mark)\n        fputs($this->output, chr(0xEF) . chr(0xBB) . chr(0xBF));\n        fputcsv($this->output, $this->getHeaders(), $delimiter);\n        while ($row=$this->next())\n            fputcsv($this->output, array_map(\n                function($v){\n                    if (preg_match('/^[=\\-+@].*/', $v))\n                        return \"'\".$v;\n                    return $v;\n                }, $row),\n            $delimiter);\n\n        fclose($this->output);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            fputcsv($this->output, array_map(",
+      "                function($v){",
+      "                    if (preg_match('/^[=\\-+@].*/', $v))",
+      "                        return \"'\".$v;",
+      "                    return $v;",
+      "                }, $row),",
+      "            $delimiter);"
+    ],
+    "deleted": [
+      "            fputcsv($this->output, $row, $delimiter);"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "An issue was discovered in osTicket before 1.10.7 and 1.12.x before 1.12.1. CSV (aka Formula) injection exists in the export spreadsheets functionality. These spreadsheets are generated dynamically from unvalidated or unfiltered user input in the Name and Internal Notes fields in the Users tab, and the Issue Summary field in the tickets tab. This allows other agents to download data in a .csv file format or .xls file format. This is used as input for spreadsheet applications such as Excel and OpenOffice Calc, resulting in a situation where cells in the spreadsheets can contain input from an untrusted source. As a result, the end user who is accessing the exported spreadsheet can be affected.",
+  "id": 17
+},
+{
+  "cve_id": "CVE-2019-14749",
+  "code_before_change": "            return !isset($thisstaff) || $f->isRequiredForStaff();\n        };\n        if (!$form->isValid($filter))\n            $valid  = false;\n\n        //Make sure the email is not in-use\n        if (($field=$form->getField('email'))\n                && $field->getClean()\n                && User::lookup(array('emails__address'=>$field->getClean()))) {\n            $field->addError(__('Email is assigned to another user'));\n            $valid = false;\n        }\n\n        return $valid ? self::fromVars($form->getClean(), $create) : null;\n    }",
+  "code_after_change": "            return !isset($thisstaff) || $f->isRequiredForStaff() || $f->isVisibleToStaff();\n        };\n        if (!$form->isValid($filter))\n            $valid  = false;\n\n        //Make sure the email is not in-use\n        if (($field=$form->getField('email'))\n                && $field->getClean()\n                && User::lookup(array('emails__address'=>$field->getClean()))) {\n            $field->addError(__('Email is assigned to another user'));\n            $valid = false;\n        }\n\n        return $valid ? self::fromVars($form->getClean(), $create) : null;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            return !isset($thisstaff) || $f->isRequiredForStaff() || $f->isVisibleToStaff();"
+    ],
+    "deleted": [
+      "            return !isset($thisstaff) || $f->isRequiredForStaff();"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "An issue was discovered in osTicket before 1.10.7 and 1.12.x before 1.12.1. CSV (aka Formula) injection exists in the export spreadsheets functionality. These spreadsheets are generated dynamically from unvalidated or unfiltered user input in the Name and Internal Notes fields in the Users tab, and the Issue Summary field in the tickets tab. This allows other agents to download data in a .csv file format or .xls file format. This is used as input for spreadsheet applications such as Excel and OpenOffice Calc, resulting in a situation where cells in the spreadsheets can contain input from an untrusted source. As a result, the end user who is accessing the exported spreadsheet can be affected.",
+  "id": 18
+},
+{
+  "cve_id": "CVE-2021-25960",
+  "code_before_change": "function cleanCSV($string)\n{\n    $check = '/^[=@]/';\n    if (!is_numeric($string)) {\n        $check = '/^[=@+-]/';\n    }\n\n    return preg_replace($check, \"\", $string);\n}",
+  "code_after_change": " * All Rights Reserved.\n * Contributor(s): ______________________________________..\n */\nfunction safe_map($request_var, &$focus, $always_copy = false)\n{\n    safe_map_named($request_var, $focus, $request_var, $always_copy);\n}\n\n/**",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "function cleanCSV($string)",
+      "{",
+      "    $check = '/^[=@]/';",
+      "    if (!is_numeric($string)) {",
+      "        $check = '/^[=@+-]/';",
+      "    }",
+      "    return preg_replace($check, \"\", $string);",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "In “SuiteCRM” application, v7.11.18 through v7.11.19 and v7.10.29 through v7.10.31 are affected by “CSV Injection” vulnerability (Formula Injection). A low privileged attacker can use accounts module to inject payloads in the input fields. When an administrator access accounts module to export the data as a CSV file and opens it, the payload gets executed. This was not fixed properly as part of CVE-2020-15301, allowing the attacker to bypass the security measure.",
+  "id": 19
+},
+{
+  "cve_id": "CVE-2021-25960",
+  "code_before_change": "    private function encloseForCSV($field)\n    {\n        return '\"' .  cleanCSV($field) . '\"';\n    }",
+  "code_after_change": "    private function encloseForCSV($field)\n    {\n        $cleanCSV = new CleanCSV();\n\n        return '\"' . $cleanCSV->escapeField($field) . '\"';\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $cleanCSV = new CleanCSV();",
+      "        return '\"' . $cleanCSV->escapeField($field) . '\"';"
+    ],
+    "deleted": [
+      "        return '\"' .  cleanCSV($field) . '\"';"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "In “SuiteCRM” application, v7.11.18 through v7.11.19 and v7.10.29 through v7.10.31 are affected by “CSV Injection” vulnerability (Formula Injection). A low privileged attacker can use accounts module to inject payloads in the input fields. When an administrator access accounts module to export the data as a CSV file and opens it, the payload gets executed. This was not fixed properly as part of CVE-2020-15301, allowing the attacker to bypass the security measure.",
+  "id": 20
+},
+{
+  "cve_id": "CVE-2021-25960",
+  "code_before_change": "    public function testCreateRelationshipMeta()\n    {\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), null);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts');\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts', true);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(6, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', $this->db, null, array(), 'Contacts');\n        self::assertNotTrue(isset($GLOBALS['log']->calls['fatal']));\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('Nonexists1', $this->db, null, array(), 'Nonexists2');\n        self::assertCount(1, $GLOBALS['log']->calls['debug']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(6, $GLOBALS['log']->calls['fatal']);\n    }",
+  "code_after_change": "    public function testCreateRelationshipMeta()\n    {\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), null);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts');\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta(null, null, null, array(), 'Contacts', true);\n        self::assertCount(1, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(8, $GLOBALS['log']->calls['fatal']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', $this->db, null, array(), 'Contacts');\n        self::assertNotTrue(isset($GLOBALS['log']->calls['fatal']));\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('Nonexists1', $this->db, null, array(), 'Nonexists2');\n        self::assertCount(1, $GLOBALS['log']->calls['debug']);\n\n        // test\n        $GLOBALS['log']->reset();\n        SugarBean::createRelationshipMeta('User', null, null, array(), 'Contacts');\n        self::assertCount(8, $GLOBALS['log']->calls['fatal']);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        self::assertCount(8, $GLOBALS['log']->calls['fatal']);",
+      "        self::assertCount(8, $GLOBALS['log']->calls['fatal']);"
+    ],
+    "deleted": [
+      "        self::assertCount(6, $GLOBALS['log']->calls['fatal']);",
+      "        self::assertCount(6, $GLOBALS['log']->calls['fatal']);"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "In “SuiteCRM” application, v7.11.18 through v7.11.19 and v7.10.29 through v7.10.31 are affected by “CSV Injection” vulnerability (Formula Injection). A low privileged attacker can use accounts module to inject payloads in the input fields. When an administrator access accounts module to export the data as a CSV file and opens it, the payload gets executed. This was not fixed properly as part of CVE-2020-15301, allowing the attacker to bypass the security measure.",
+  "id": 21
+},
+{
+  "cve_id": "CVE-2021-41270",
+  "code_before_change": "    private function flatten(iterable $array, array &$result, string $keySeparator, string $parentKey = '', bool $escapeFormulas = false)\n    {\n        foreach ($array as $key => $value) {\n            if (is_iterable($value)) {\n                $this->flatten($value, $result, $keySeparator, $parentKey.$key.$keySeparator, $escapeFormulas);\n            } else {\n                if ($escapeFormulas && \\in_array(substr((string) $value, 0, 1), $this->formulasStartCharacters, true)) {\n                    $result[$parentKey.$key] = \"\\t\".$value;\n                } else {\n                    // Ensures an actual value is used when dealing with true and false\n                    $result[$parentKey.$key] = false === $value ? 0 : (true === $value ? 1 : $value);\n                }\n            }\n        }\n    }",
+  "code_after_change": "    private function flatten(iterable $array, array &$result, string $keySeparator, string $parentKey = '', bool $escapeFormulas = false)\n    {\n        foreach ($array as $key => $value) {\n            if (is_iterable($value)) {\n                $this->flatten($value, $result, $keySeparator, $parentKey.$key.$keySeparator, $escapeFormulas);\n            } else {\n                if ($escapeFormulas && \\in_array(substr((string) $value, 0, 1), self::FORMULAS_START_CHARACTERS, true)) {\n                    $result[$parentKey.$key] = \"'\".$value;\n                } else {\n                    // Ensures an actual value is used when dealing with true and false\n                    $result[$parentKey.$key] = false === $value ? 0 : (true === $value ? 1 : $value);\n                }\n            }\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                if ($escapeFormulas && \\in_array(substr((string) $value, 0, 1), self::FORMULAS_START_CHARACTERS, true)) {",
+      "                    $result[$parentKey.$key] = \"'\".$value;"
+    ],
+    "deleted": [
+      "                if ($escapeFormulas && \\in_array(substr((string) $value, 0, 1), $this->formulasStartCharacters, true)) {",
+      "                    $result[$parentKey.$key] = \"\\t\".$value;"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "Symfony/Serializer handles serializing and deserializing data structures for Symfony, a PHP framework for web and console applications and a set of reusable PHP components. Symfony versions 4.1.0 before 4.4.35 and versions 5.0.0 before 5.3.12 are vulnerable to CSV injection, also known as formula injection. In Symfony 4.1, maintainers added the opt-in `csv_escape_formulas` option in the `CsvEncoder`, to prefix all cells starting with `=`, `+`, `-` or `@` with a tab `\\t`. Since then, OWASP added 2 chars in that list: Tab (0x09) and Carriage return (0x0D). This makes the previous prefix char (Tab `\\t`) part of the vulnerable characters, and OWASP suggests using the single quote `'` for prefixing the value. Starting with versions 4.4.34 and 5.3.12, Symfony now follows the OWASP recommendations and uses the single quote `'` to prefix formulas and add the prefix to cells starting by `\\t`, `\\r` as well as `=`, `+`, `-` and `@`.",
+  "id": 22
+},
+{
+  "cve_id": "CVE-2021-41270",
+  "code_before_change": "    private function doTestEncodeFormulas(bool $legacy = false)\n    {\n        if ($legacy) {\n            $this->encoder = new CsvEncoder(',', '\"', '\\\\', '.', true);\n        } else {\n            $this->encoder = new CsvEncoder([CsvEncoder::ESCAPE_FORMULAS_KEY => true]);\n        }\n\n        $this->assertSame(<<<'CSV'\n0\n\"\t=2+3\"\n\nCSV\n            , $this->encoder->encode(['=2+3'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n\"\t-2+3\"\n\nCSV\n            , $this->encoder->encode(['-2+3'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n\"\t+2+3\"\n\nCSV\n            , $this->encoder->encode(['+2+3'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n\"\t@MyDataColumn\"\n\nCSV\n            , $this->encoder->encode(['@MyDataColumn'], 'csv'));\n    }",
+  "code_after_change": "    private function doTestEncodeFormulas(bool $legacy = false)\n    {\n        if ($legacy) {\n            $this->encoder = new CsvEncoder(',', '\"', '\\\\', '.', true);\n        } else {\n            $this->encoder = new CsvEncoder([CsvEncoder::ESCAPE_FORMULAS_KEY => true]);\n        }\n\n        $this->assertSame(<<<'CSV'\n0\n'=2+3\n\nCSV\n            , $this->encoder->encode(['=2+3'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n'-2+3\n\nCSV\n            , $this->encoder->encode(['-2+3'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n'+2+3\n\nCSV\n            , $this->encoder->encode(['+2+3'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n'@MyDataColumn\n\nCSV\n            , $this->encoder->encode(['@MyDataColumn'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n\"'\ttab\"\n\nCSV\n            , $this->encoder->encode([\"\\ttab\"], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n\"'=1+2\"\";=1+2\"\n\nCSV\n            , $this->encoder->encode(['=1+2\";=1+2'], 'csv'));\n\n        $this->assertSame(<<<'CSV'\n0\n\"'=1+2'\"\" ;,=1+2\"\n\nCSV\n            , $this->encoder->encode(['=1+2\\'\" ;,=1+2'], 'csv'));\n    }",
+  "function_modified_lines": {
+    "added": [
+      "'=2+3",
+      "'-2+3",
+      "'+2+3",
+      "'@MyDataColumn",
+      "        $this->assertSame(<<<'CSV'",
+      "0",
+      "\"'\ttab\"",
+      "CSV",
+      "            , $this->encoder->encode([\"\\ttab\"], 'csv'));",
+      "        $this->assertSame(<<<'CSV'",
+      "0",
+      "\"'=1+2\"\";=1+2\"",
+      "CSV",
+      "            , $this->encoder->encode(['=1+2\";=1+2'], 'csv'));",
+      "        $this->assertSame(<<<'CSV'",
+      "0",
+      "\"'=1+2'\"\" ;,=1+2\"",
+      "CSV",
+      "            , $this->encoder->encode(['=1+2\\'\" ;,=1+2'], 'csv'));"
+    ],
+    "deleted": [
+      "\"\t=2+3\"",
+      "\"\t-2+3\"",
+      "\"\t+2+3\"",
+      "\"\t@MyDataColumn\""
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "Symfony/Serializer handles serializing and deserializing data structures for Symfony, a PHP framework for web and console applications and a set of reusable PHP components. Symfony versions 4.1.0 before 4.4.35 and versions 5.0.0 before 5.3.12 are vulnerable to CSV injection, also known as formula injection. In Symfony 4.1, maintainers added the opt-in `csv_escape_formulas` option in the `CsvEncoder`, to prefix all cells starting with `=`, `+`, `-` or `@` with a tab `\\t`. Since then, OWASP added 2 chars in that list: Tab (0x09) and Carriage return (0x0D). This makes the previous prefix char (Tab `\\t`) part of the vulnerable characters, and OWASP suggests using the single quote `'` for prefixing the value. Starting with versions 4.4.34 and 5.3.12, Symfony now follows the OWASP recommendations and uses the single quote `'` to prefix formulas and add the prefix to cells starting by `\\t`, `\\r` as well as `=`, `+`, `-` and `@`.",
+  "id": 23
+},
+{
+  "cve_id": "CVE-2021-41270",
+  "code_before_change": "    public function testEncodeFormulasWithSettingsPassedInContext()\n    {\n        $this->assertSame(<<<'CSV'\n0\n\"\t=2+3\"\n\nCSV\n            , $this->encoder->encode(['=2+3'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n\"\t-2+3\"\n\nCSV\n            , $this->encoder->encode(['-2+3'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n\"\t+2+3\"\n\nCSV\n            , $this->encoder->encode(['+2+3'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n\"\t@MyDataColumn\"\n\nCSV\n            , $this->encoder->encode(['@MyDataColumn'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n    }",
+  "code_after_change": "    public function testEncodeFormulasWithSettingsPassedInContext()\n    {\n        $this->assertSame(<<<'CSV'\n0\n'=2+3\n\nCSV\n            , $this->encoder->encode(['=2+3'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n'-2+3\n\nCSV\n            , $this->encoder->encode(['-2+3'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n'+2+3\n\nCSV\n            , $this->encoder->encode(['+2+3'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n'@MyDataColumn\n\nCSV\n            , $this->encoder->encode(['@MyDataColumn'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n\"'\ttab\"\n\nCSV\n            , $this->encoder->encode([\"\\ttab\"], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n\"'=1+2\"\";=1+2\"\n\nCSV\n            , $this->encoder->encode(['=1+2\";=1+2'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n\n        $this->assertSame(<<<'CSV'\n0\n\"'=1+2'\"\" ;,=1+2\"\n\nCSV\n            , $this->encoder->encode(['=1+2\\'\" ;,=1+2'], 'csv', [\n                CsvEncoder::ESCAPE_FORMULAS_KEY => true,\n            ]));\n    }",
+  "function_modified_lines": {
+    "added": [
+      "'=2+3",
+      "'-2+3",
+      "'+2+3",
+      "'@MyDataColumn",
+      "        $this->assertSame(<<<'CSV'",
+      "0",
+      "\"'\ttab\"",
+      "CSV",
+      "            , $this->encoder->encode([\"\\ttab\"], 'csv', [",
+      "                CsvEncoder::ESCAPE_FORMULAS_KEY => true,",
+      "            ]));",
+      "        $this->assertSame(<<<'CSV'",
+      "0",
+      "\"'=1+2\"\";=1+2\"",
+      "CSV",
+      "            , $this->encoder->encode(['=1+2\";=1+2'], 'csv', [",
+      "                CsvEncoder::ESCAPE_FORMULAS_KEY => true,",
+      "            ]));",
+      "        $this->assertSame(<<<'CSV'",
+      "0",
+      "\"'=1+2'\"\" ;,=1+2\"",
+      "CSV",
+      "            , $this->encoder->encode(['=1+2\\'\" ;,=1+2'], 'csv', [",
+      "                CsvEncoder::ESCAPE_FORMULAS_KEY => true,",
+      "            ]));"
+    ],
+    "deleted": [
+      "\"\t=2+3\"",
+      "\"\t-2+3\"",
+      "\"\t+2+3\"",
+      "\"\t@MyDataColumn\""
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "Symfony/Serializer handles serializing and deserializing data structures for Symfony, a PHP framework for web and console applications and a set of reusable PHP components. Symfony versions 4.1.0 before 4.4.35 and versions 5.0.0 before 5.3.12 are vulnerable to CSV injection, also known as formula injection. In Symfony 4.1, maintainers added the opt-in `csv_escape_formulas` option in the `CsvEncoder`, to prefix all cells starting with `=`, `+`, `-` or `@` with a tab `\\t`. Since then, OWASP added 2 chars in that list: Tab (0x09) and Carriage return (0x0D). This makes the previous prefix char (Tab `\\t`) part of the vulnerable characters, and OWASP suggests using the single quote `'` for prefixing the value. Starting with versions 4.4.34 and 5.3.12, Symfony now follows the OWASP recommendations and uses the single quote `'` to prefix formulas and add the prefix to cells starting by `\\t`, `\\r` as well as `=`, `+`, `-` and `@`.",
+  "id": 24
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        $io = new SymfonyStyle($input, $output);\n\n        $io->title('Kimai installation running ...');\n\n        /** @var Application $application */\n        $application = $this->getApplication();\n        /** @var KernelInterface $kernel */\n        $kernel = $application->getKernel();\n        $environment = $kernel->getEnvironment();\n\n        // create the database, in case it is not yet existing\n        try {\n            $this->createDatabase($io, $input, $output);\n        } catch (\\Exception $ex) {\n            $io->error('Failed to create database: ' . $ex->getMessage());\n\n            return self::ERROR_DATABASE;\n        }\n\n        // bootstrap database ONLY via doctrine migrations, so all installation will have the correct and same state\n        try {\n            $this->importMigrations($io, $output);\n        } catch (\\Exception $ex) {\n            $io->error('Failed to set migration status: ' . $ex->getMessage());\n\n            return self::ERROR_MIGRATIONS;\n        }\n\n        if (!$input->getOption('no-cache')) {\n            // flush the cache, just to make sure ... and ignore result\n            $this->rebuildCaches($environment, $io, $input, $output);\n        }\n\n        $io->success(\n            sprintf('Congratulations! Successfully installed %s version %s (%s)', Constants::SOFTWARE, Constants::VERSION, Constants::STATUS)\n        );\n\n        return 0;\n    }",
+  "code_after_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        $io = new SymfonyStyle($input, $output);\n\n        $io->title('Kimai installation running ...');\n\n        /** @var Application $application */\n        $application = $this->getApplication();\n        /** @var KernelInterface $kernel */\n        $kernel = $application->getKernel();\n        $environment = $kernel->getEnvironment();\n\n        // create the database, in case it is not yet existing\n        try {\n            $this->createDatabase($io, $input, $output);\n        } catch (\\Exception $ex) {\n            $io->error('Failed to create database: ' . $ex->getMessage());\n\n            return self::ERROR_DATABASE;\n        }\n\n        // bootstrap database ONLY via doctrine migrations, so all installation will have the correct and same state\n        try {\n            $this->importMigrations($io, $output);\n        } catch (\\Exception $ex) {\n            $io->error('Failed to set migration status: ' . $ex->getMessage());\n\n            return self::ERROR_MIGRATIONS;\n        }\n\n        if (!$input->getOption('no-cache')) {\n            // flush the cache, just to make sure ... and ignore result\n            $this->rebuildCaches($environment, $io, $input, $output);\n        }\n\n        $io->success(\n            sprintf('Congratulations! Successfully installed %s version %s', Constants::SOFTWARE, Constants::VERSION)\n        );\n\n        return 0;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            sprintf('Congratulations! Successfully installed %s version %s', Constants::SOFTWARE, Constants::VERSION)"
+    ],
+    "deleted": [
+      "            sprintf('Congratulations! Successfully installed %s version %s (%s)', Constants::SOFTWARE, Constants::VERSION, Constants::STATUS)"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 25
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        $io = new SymfonyStyle($input, $output);\n\n        $io->title('Kimai updates running ...');\n\n        /** @var Application $application */\n        $application = $this->getApplication();\n        /** @var KernelInterface $kernel */\n        $kernel = $application->getKernel();\n        $environment = $kernel->getEnvironment();\n\n        // make sure database is available, Kimai running and installed\n        try {\n            if (!$this->connection->isConnected() && !$this->connection->connect()) {\n                throw new \\Exception(\n                    sprintf('Database connection could not be established: %s', $this->connection->getDatabase())\n                );\n            }\n\n            if (!$this->connection->getSchemaManager()->tablesExist(['kimai2_users', 'kimai2_timesheet'])) {\n                $io->error('Tables missing. Did you run the installer already?');\n\n                return self::ERROR_DATABASE;\n            }\n\n            if (!$this->connection->getSchemaManager()->tablesExist(['migration_versions'])) {\n                $io->error('Unknown migration status, aborting database update');\n\n                return self::ERROR_DATABASE;\n            }\n        } catch (\\Exception $ex) {\n            $io->error('Failed to validate database: ' . $ex->getMessage());\n\n            return self::ERROR_DATABASE;\n        }\n\n        // execute latest doctrine migrations\n        try {\n            $command = $this->getApplication()->find('doctrine:migrations:migrate');\n            $cmdInput = new ArrayInput(['--allow-no-migration' => true]);\n            $cmdInput->setInteractive(false);\n            if (0 !== $command->run($cmdInput, $output)) {\n                throw new \\RuntimeException('CRITICAL: problem when migrating database');\n            }\n\n            $io->writeln('');\n        } catch (\\Exception $ex) {\n            $io->error($ex->getMessage());\n\n            return self::ERROR_MIGRATIONS;\n        }\n\n        // flush the cache, in case values from the database are cached\n        $cacheResult = $this->rebuildCaches($environment, $io, $input, $output);\n\n        if ($cacheResult !== 0) {\n            $io->warning(\n                [\n                    sprintf('Updated %s to version %s (%s) but the cache could not be rebuilt.', Constants::SOFTWARE, Constants::VERSION, Constants::STATUS),\n                    'Please run the cache commands manually:',\n                    'bin/console cache:clear --env=' . $environment . PHP_EOL .\n                    'bin/console cache:warmup --env=' . $environment\n                ]\n            );\n        } else {\n            $io->success(\n                sprintf('Congratulations! Successfully updated %s to version %s (%s)', Constants::SOFTWARE, Constants::VERSION, Constants::STATUS)\n            );\n        }\n\n        return 0;\n    }",
+  "code_after_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        $io = new SymfonyStyle($input, $output);\n\n        $io->title('Kimai updates running ...');\n\n        /** @var Application $application */\n        $application = $this->getApplication();\n        /** @var KernelInterface $kernel */\n        $kernel = $application->getKernel();\n        $environment = $kernel->getEnvironment();\n\n        // make sure database is available, Kimai running and installed\n        try {\n            if (!$this->connection->isConnected() && !$this->connection->connect()) {\n                throw new \\Exception(\n                    sprintf('Database connection could not be established: %s', $this->connection->getDatabase())\n                );\n            }\n\n            if (!$this->connection->getSchemaManager()->tablesExist(['kimai2_users', 'kimai2_timesheet'])) {\n                $io->error('Tables missing. Did you run the installer already?');\n\n                return self::ERROR_DATABASE;\n            }\n\n            if (!$this->connection->getSchemaManager()->tablesExist(['migration_versions'])) {\n                $io->error('Unknown migration status, aborting database update');\n\n                return self::ERROR_DATABASE;\n            }\n        } catch (\\Exception $ex) {\n            $io->error('Failed to validate database: ' . $ex->getMessage());\n\n            return self::ERROR_DATABASE;\n        }\n\n        // execute latest doctrine migrations\n        try {\n            $command = $this->getApplication()->find('doctrine:migrations:migrate');\n            $cmdInput = new ArrayInput(['--allow-no-migration' => true]);\n            $cmdInput->setInteractive(false);\n            if (0 !== $command->run($cmdInput, $output)) {\n                throw new \\RuntimeException('CRITICAL: problem when migrating database');\n            }\n\n            $io->writeln('');\n        } catch (\\Exception $ex) {\n            $io->error($ex->getMessage());\n\n            return self::ERROR_MIGRATIONS;\n        }\n\n        // flush the cache, in case values from the database are cached\n        $cacheResult = $this->rebuildCaches($environment, $io, $input, $output);\n\n        if ($cacheResult !== 0) {\n            $io->warning(\n                [\n                    sprintf('Updated %s to version %s but the cache could not be rebuilt.', Constants::SOFTWARE, Constants::VERSION),\n                    'Please run the cache commands manually:',\n                    'bin/console cache:clear --env=' . $environment . PHP_EOL .\n                    'bin/console cache:warmup --env=' . $environment\n                ]\n            );\n        } else {\n            $io->success(\n                sprintf('Congratulations! Successfully updated %s to version %s', Constants::SOFTWARE, Constants::VERSION)\n            );\n        }\n\n        return 0;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                    sprintf('Updated %s to version %s but the cache could not be rebuilt.', Constants::SOFTWARE, Constants::VERSION),",
+      "                sprintf('Congratulations! Successfully updated %s to version %s', Constants::SOFTWARE, Constants::VERSION)"
+    ],
+    "deleted": [
+      "                    sprintf('Updated %s to version %s (%s) but the cache could not be rebuilt.', Constants::SOFTWARE, Constants::VERSION, Constants::STATUS),",
+      "                sprintf('Congratulations! Successfully updated %s to version %s (%s)', Constants::SOFTWARE, Constants::VERSION, Constants::STATUS)"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 26
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    protected function configure()\n    {\n        $this\n            ->setName('kimai:version')\n            ->setDescription('Receive version information')\n            ->setHelp('This command allows you to fetch various version information about Kimai.')\n            ->addOption('name', null, InputOption::VALUE_NONE, 'Display the major release name')\n            ->addOption('candidate', null, InputOption::VALUE_NONE, 'Display the current version candidate (e.g. \"stable\" or \"dev\")')\n            ->addOption('short', null, InputOption::VALUE_NONE, 'Display the version only')\n            ->addOption('semver', null, InputOption::VALUE_NONE, 'Semantical versioning (SEMVER) compatible version string')\n        ;\n    }",
+  "code_after_change": "    protected function configure()\n    {\n        $this\n            ->setName('kimai:version')\n            ->setDescription('Receive version information')\n            ->setHelp('This command allows you to fetch various version information about Kimai.')\n            ->addOption('name', null, InputOption::VALUE_NONE, 'Display the major release name')\n            ->addOption('short', null, InputOption::VALUE_NONE, 'Display the version only')\n            // @deprecated since 1.14.1\n            ->addOption('candidate', null, InputOption::VALUE_NONE, 'DEPRECATED: Display the current version candidate (e.g. \"stable\" or \"dev\")')\n            ->addOption('semver', null, InputOption::VALUE_NONE, 'DEPRECATED: Semantical versioning (SEMVER) compatible version string')\n        ;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            // @deprecated since 1.14.1",
+      "            ->addOption('candidate', null, InputOption::VALUE_NONE, 'DEPRECATED: Display the current version candidate (e.g. \"stable\" or \"dev\")')",
+      "            ->addOption('semver', null, InputOption::VALUE_NONE, 'DEPRECATED: Semantical versioning (SEMVER) compatible version string')"
+    ],
+    "deleted": [
+      "            ->addOption('candidate', null, InputOption::VALUE_NONE, 'Display the current version candidate (e.g. \"stable\" or \"dev\")')",
+      "            ->addOption('semver', null, InputOption::VALUE_NONE, 'Semantical versioning (SEMVER) compatible version string')"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 27
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        $io = new SymfonyStyle($input, $output);\n\n        if ($input->getOption('semver')) {\n            $io->writeln(Constants::VERSION . '-' . Constants::STATUS);\n\n            return 0;\n        }\n\n        if ($input->getOption('short')) {\n            $io->writeln(Constants::VERSION);\n\n            return 0;\n        }\n\n        if ($input->getOption('name')) {\n            $io->writeln(Constants::NAME);\n\n            return 0;\n        }\n\n        if ($input->getOption('candidate')) {\n            $io->writeln(Constants::STATUS);\n\n            return 0;\n        }\n\n        $io->writeln(Constants::SOFTWARE . ' - ' . Constants::VERSION . ' ' . Constants::STATUS . ' (' . Constants::NAME . ') by Kevin Papst and contributors.');\n\n        return 0;\n    }",
+  "code_after_change": "    protected function execute(InputInterface $input, OutputInterface $output)\n    {\n        $io = new SymfonyStyle($input, $output);\n\n        if ($input->getOption('semver')) {\n            $io->writeln(Constants::VERSION . '-' . Constants::STATUS);\n\n            return 0;\n        }\n\n        if ($input->getOption('short')) {\n            $io->writeln(Constants::VERSION);\n\n            return 0;\n        }\n\n        if ($input->getOption('name')) {\n            $io->writeln(Constants::NAME);\n\n            return 0;\n        }\n\n        if ($input->getOption('candidate')) {\n            $io->writeln(Constants::STATUS);\n\n            return 0;\n        }\n\n        $io->writeln(Constants::SOFTWARE . ' ' . Constants::VERSION . ' by Kevin Papst and contributors.');\n\n        return 0;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $io->writeln(Constants::SOFTWARE . ' ' . Constants::VERSION . ' by Kevin Papst and contributors.');"
+    ],
+    "deleted": [
+      "        $io->writeln(Constants::SOFTWARE . ' - ' . Constants::VERSION . ' ' . Constants::STATUS . ' (' . Constants::NAME . ') by Kevin Papst and contributors.');"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 28
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    public function testVersion()\n    {\n        $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);\n        $this->assertAccessIsGranted($client, '/api/version');\n        $result = json_decode($client->getResponse()->getContent(), true);\n\n        $this->assertIsArray($result);\n\n        $this->assertArrayHasKey('version', $result);\n        $this->assertArrayHasKey('versionId', $result);\n        $this->assertArrayHasKey('candidate', $result);\n        $this->assertArrayHasKey('semver', $result);\n        $this->assertArrayHasKey('name', $result);\n        $this->assertArrayHasKey('copyright', $result);\n\n        $this->assertSame(Constants::VERSION, $result['version']);\n        $this->assertSame(Constants::VERSION_ID, $result['versionId']);\n        $this->assertEquals(Constants::STATUS, $result['candidate']);\n        $this->assertEquals(Constants::VERSION . '-' . Constants::STATUS, $result['semver']);\n        $this->assertEquals(Constants::NAME, $result['name']);\n        $this->assertEquals(\n            'Kimai - ' . Constants::VERSION . ' ' . Constants::STATUS . ' (' . Constants::NAME . ') by Kevin Papst and contributors.',\n            $result['copyright']\n        );\n    }",
+  "code_after_change": "    public function testVersion()\n    {\n        $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);\n        $this->assertAccessIsGranted($client, '/api/version');\n        $result = json_decode($client->getResponse()->getContent(), true);\n\n        $this->assertIsArray($result);\n\n        $this->assertArrayHasKey('version', $result);\n        $this->assertArrayHasKey('versionId', $result);\n        $this->assertArrayHasKey('candidate', $result);\n        $this->assertArrayHasKey('semver', $result);\n        $this->assertArrayHasKey('name', $result);\n        $this->assertArrayHasKey('copyright', $result);\n\n        $this->assertSame(Constants::VERSION, $result['version']);\n        $this->assertSame(Constants::VERSION_ID, $result['versionId']);\n        $this->assertEquals(Constants::STATUS, $result['candidate']);\n        $this->assertEquals(Constants::VERSION . '-' . Constants::STATUS, $result['semver']);\n        $this->assertEquals(Constants::NAME, $result['name']);\n        $this->assertEquals(\n            'Kimai ' . Constants::VERSION . ' by Kevin Papst and contributors.',\n            $result['copyright']\n        );\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            'Kimai ' . Constants::VERSION . ' by Kevin Papst and contributors.',"
+    ],
+    "deleted": [
+      "            'Kimai - ' . Constants::VERSION . ' ' . Constants::STATUS . ' (' . Constants::NAME . ') by Kevin Papst and contributors.',"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 29
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    public function testFullRun()\n    {\n        $command = $this->getCommand();\n        $commandTester = new CommandTester($command);\n        $commandTester->setInputs(['no']);\n        $commandTester->execute([\n            'command' => $command->getName(),\n        ]);\n\n        $result = $commandTester->getDisplay();\n\n        self::assertStringContainsString('Kimai updates running', $result);\n        // make sure migrations run always\n        self::assertStringContainsString('Application Migrations', $result);\n        self::assertStringContainsString('No migrations to execute.', $result);\n\n        self::assertStringContainsString(\n            sprintf('[OK] Congratulations! Successfully updated Kimai to version %s (%s)', Constants::VERSION, Constants::STATUS),\n            $result\n        );\n\n        self::assertEquals(0, $commandTester->getStatusCode());\n    }",
+  "code_after_change": "    public function testFullRun()\n    {\n        $command = $this->getCommand();\n        $commandTester = new CommandTester($command);\n        $commandTester->setInputs(['no']);\n        $commandTester->execute([\n            'command' => $command->getName(),\n        ]);\n\n        $result = $commandTester->getDisplay();\n\n        self::assertStringContainsString('Kimai updates running', $result);\n        // make sure migrations run always\n        self::assertStringContainsString('Application Migrations', $result);\n        self::assertStringContainsString('No migrations to execute.', $result);\n\n        self::assertStringContainsString(\n            sprintf('[OK] Congratulations! Successfully updated Kimai to version %s', Constants::VERSION),\n            $result\n        );\n\n        self::assertEquals(0, $commandTester->getStatusCode());\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            sprintf('[OK] Congratulations! Successfully updated Kimai to version %s', Constants::VERSION),"
+    ],
+    "deleted": [
+      "            sprintf('[OK] Congratulations! Successfully updated Kimai to version %s (%s)', Constants::VERSION, Constants::STATUS),"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 30
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    public function getTestData()\n    {\n        return [\n            [[], 'Kimai - ' . Constants::VERSION . ' ' . Constants::STATUS . ' (' . Constants::NAME . ') by Kevin Papst and contributors.'],\n            [['--name' => true], Constants::NAME],\n            [['--candidate' => true], Constants::STATUS],\n            [['--short' => true], Constants::VERSION],\n            [['--semver' => true], Constants::VERSION . '-' . Constants::STATUS],\n        ];\n    }",
+  "code_after_change": "    public function getTestData()\n    {\n        return [\n            [[], 'Kimai ' . Constants::VERSION . ' by Kevin Papst and contributors.'],\n            [['--name' => true], Constants::NAME],\n            [['--short' => true], Constants::VERSION],\n            // @deprecated since 1.14.1\n            [['--candidate' => true], Constants::STATUS],\n            [['--semver' => true], Constants::VERSION . '-' . Constants::STATUS],\n        ];\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            [[], 'Kimai ' . Constants::VERSION . ' by Kevin Papst and contributors.'],",
+      "            // @deprecated since 1.14.1",
+      "            [['--candidate' => true], Constants::STATUS],"
+    ],
+    "deleted": [
+      "            [[], 'Kimai - ' . Constants::VERSION . ' ' . Constants::STATUS . ' (' . Constants::NAME . ') by Kevin Papst and contributors.'],",
+      "            [['--candidate' => true], Constants::STATUS],"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 31
+},
+{
+  "cve_id": "CVE-2021-43515",
+  "code_before_change": "    public function testBuild()\n    {\n        $version = Constants::VERSION;\n        $versionParts = explode('.', $version);\n        $major = (int) $versionParts[0];\n        $minor = (int) $versionParts[1];\n        $patch = isset($versionParts[2]) ? (int) $versionParts[2] : 0;\n\n        $expectedId = $major * 10000 + $minor * 100 + $patch;\n\n        self::assertEquals('1.14', Constants::VERSION, 'Invalid release number');\n        self::assertTrue(\\in_array(Constants::STATUS, ['dev', 'stable']), 'Invalid status');\n        self::assertEquals($expectedId, Constants::VERSION_ID, 'Invalid version ID');\n    }",
+  "code_after_change": "    public function testBuild()\n    {\n        $version = Constants::VERSION;\n        $versionParts = explode('.', $version);\n        $major = (int) $versionParts[0];\n        $minor = (int) $versionParts[1];\n        $patch = isset($versionParts[2]) ? (int) $versionParts[2] : 0;\n\n        $expectedId = $major * 10000 + $minor * 100 + $patch;\n\n        self::assertEquals($expectedId, Constants::VERSION_ID, 'Invalid version ID');\n    }\n}",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "        self::assertEquals('1.14', Constants::VERSION, 'Invalid release number');",
+      "        self::assertTrue(\\in_array(Constants::STATUS, ['dev', 'stable']), 'Invalid status');"
+    ]
+  },
+  "cwe": [
+    "CWE-1236"
+  ],
+  "cve_description": "CSV Injection (aka Excel Macro Injection or Formula Injection) exists in creating new timesheet in Kimai. By filling the Description field with malicious payload, it will be mistreated while exporting to a CSV file.",
+  "id": 32
+}
+]

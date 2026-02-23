@@ -1,0 +1,280 @@
+[
+{
+  "cve_id": "CVE-2017-12064",
+  "code_before_change": "function check_file_dir_name($label) {\n  if (empty($label) || preg_match('/[^A-Za-z0-9_.-]/', $label))\n    die(xlt(\"ERROR: The following variable contains invalid characters\").\": \". attr($label));\n}",
+  "code_after_change": "function check_file_dir_name($label) {\n  if (empty($label) || preg_match('/[^A-Za-z0-9_.-]/', $label)) {\n    error_log(\"ERROR: The following variable contains invalid characters:\" . $label);\n    die(xlt(\"ERROR: The following variable contains invalid characters\").\": \". attr($label));\n  }\n}",
+  "function_modified_lines": {
+    "added": [
+      "  if (empty($label) || preg_match('/[^A-Za-z0-9_.-]/', $label)) {",
+      "    error_log(\"ERROR: The following variable contains invalid characters:\" . $label);",
+      "  }"
+    ],
+    "deleted": [
+      "  if (empty($label) || preg_match('/[^A-Za-z0-9_.-]/', $label))"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "The csv_log_html function in library/edihistory/edih_csv_inc.php in OpenEMR 5.0.0 and prior allows attackers to bypass intended access restrictions via a crafted name.",
+  "id": 3
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "   public static function getHost() {\n\n       if (isset($_SERVER['HTTP_HOST'])) {\n           $site_address = (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] ;\n       } else if (class_exists('erLhcoreClassInstance')) {\n           $site_address = 'https://' . erLhcoreClassInstance::$instanceChat->address . '.' . erConfigClassLhConfig::getInstance()->getSetting( 'site', 'seller_domain');\n       } else if (class_exists('erLhcoreClassExtensionLhcphpresque')) {\n           $site_address = erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionLhcphpresque')->settings['site_address'];\n       } else {\n           $site_address = '';\n       }\n\n       return $site_address;\n   }",
+  "code_after_change": "   public static function getHost() {\n        return erLhcoreClassSystem::getHost();\n   }",
+  "function_modified_lines": {
+    "added": [
+      "        return erLhcoreClassSystem::getHost();"
+    ],
+    "deleted": [
+      "       if (isset($_SERVER['HTTP_HOST'])) {",
+      "           $site_address = (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] ;",
+      "       } else if (class_exists('erLhcoreClassInstance')) {",
+      "           $site_address = 'https://' . erLhcoreClassInstance::$instanceChat->address . '.' . erConfigClassLhConfig::getInstance()->getSetting( 'site', 'seller_domain');",
+      "       } else if (class_exists('erLhcoreClassExtensionLhcphpresque')) {",
+      "           $site_address = erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionLhcphpresque')->settings['site_address'];",
+      "       } else {",
+      "           $site_address = '';",
+      "       }",
+      "       return $site_address;"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 4
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "    public static function getHost() {\n\n        if (isset($_SERVER['HTTP_HOST'])) {\n            $site_address = (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] ;\n        } else if (class_exists('erLhcoreClassInstance')) {\n            $site_address = 'https://' . erLhcoreClassInstance::$instanceChat->address . '.' . erConfigClassLhConfig::getInstance()->getSetting( 'site', 'seller_domain');\n        } else if (class_exists('erLhcoreClassExtensionLhcphpresque')) {\n            $site_address = erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionLhcphpresque')->settings['site_address'];\n        } else {\n            $site_address = '';\n        }\n\n        return $site_address;\n    }",
+  "code_after_change": "    public static function getHost() {\n        return erLhcoreClassSystem::getHost();\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        return erLhcoreClassSystem::getHost();"
+    ],
+    "deleted": [
+      "        if (isset($_SERVER['HTTP_HOST'])) {",
+      "            $site_address = (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] ;",
+      "        } else if (class_exists('erLhcoreClassInstance')) {",
+      "            $site_address = 'https://' . erLhcoreClassInstance::$instanceChat->address . '.' . erConfigClassLhConfig::getInstance()->getSetting( 'site', 'seller_domain');",
+      "        } else if (class_exists('erLhcoreClassExtensionLhcphpresque')) {",
+      "            $site_address = erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionLhcphpresque')->settings['site_address'];",
+      "        } else {",
+      "            $site_address = '';",
+      "        }",
+      "        return $site_address;"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 5
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "    public static function showModal($params) {\n\n        if (!isset($params['argument']) || empty($params['argument'])) {\n            return array(\n                'processed' => true,\n                'process_status' => erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chatcommand', 'Please provide modal URL!')\n            );\n        }\n\n        $paramsURL = explode(' ',$params['argument']);\n        $URL = array_shift($paramsURL);\n\n        if (is_numeric($URL)) {\n            $URL =  (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '') . erLhcoreClassDesign::baseurldirect('form/formwidget') . '/' . $URL;\n        }",
+  "code_after_change": "    public static function showModal($params) {\n\n        if (!isset($params['argument']) || empty($params['argument'])) {\n            return array(\n                'processed' => true,\n                'process_status' => erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chatcommand', 'Please provide modal URL!')\n            );\n        }\n\n        $paramsURL = explode(' ',$params['argument']);\n        $URL = array_shift($paramsURL);\n\n        if (is_numeric($URL)) {\n            $URL = erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurldirect('form/formwidget') . '/' . $URL;\n        }\n\n        // Store as message to visitor\n        $msg = new erLhcoreClassModelmsg();\n        $msg->msg = !empty($paramsURL) ? implode(' ',$paramsURL) : erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chatcommand','We will show a form in a moment!');\n        $msg->meta_msg = '{\"content\":{\"execute_js\":{\"text\":\"\",\"ext_execute\":\"modal_ext\",\"ext_args\":\"{\\\"delay\\\":3,\\\"url\\\":\\\"' . $URL .'\\\"}\"}}}';\n        $msg->chat_id = $params['chat']->id;\n        $msg->user_id = $params['user']->id;\n        $msg->time = time();\n        $msg->name_support = $params['user']->name_support;\n        $msg->saveThis();\n\n        // Update last user msg time so auto responder work's correctly\n        $params['chat']->last_op_msg_time = $params['chat']->last_user_msg_time = time();\n        $params['chat']->last_msg_id = $msg->id;\n\n        // All ok, we can make changes\n        $params['chat']->updateThis(array('update' => array('last_msg_id', 'last_op_msg_time', 'status_sub', 'last_user_msg_time')));\n\n        return array(\n            'status' => erLhcoreClassChatEventDispatcher::STOP_WORKFLOW,\n            'processed' => true,\n            'raw_message' => '!modal',\n            'process_status' => erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chatcommand', 'Modal activated!') . ' ' . $URL\n        );\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $URL = erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurldirect('form/formwidget') . '/' . $URL;"
+    ],
+    "deleted": [
+      "            $URL =  (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '') . erLhcoreClassDesign::baseurldirect('form/formwidget') . '/' . $URL;"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 6
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "\t    \t\tself::$collectedInfo[$params['name']] = array('definition' => $params, 'value' => $_FILES[$params['name']]);\n\t    \t}\n\n    \t} else {\n    \t\tif (isset(self::$collectedInfo[$params['name']]['value'])){\n    \t\t\t$valueContent = self::$collectedInfo[$params['name']]['value'];\n    \t\t\t$downloadLink = \"<a href=\\\"http://\".$_SERVER['HTTP_HOST'].erLhcoreClassDesign::baseurl('form/download').'/'.self::$collectedObject->id.'/'.self::$collectedObject->hash.'/'.$params['name'].\"\\\">Download (\".htmlspecialchars($valueContent['name']).\")</a>\";\n    \t\t}\n    \t}\n    \t\n    \treturn \"{$downloadLink}<input type=\\\"file\\\" name=\\\"{$params['name']}\\\" />\";\n    }",
+  "code_after_change": "\t    \t\tself::$collectedInfo[$params['name']] = array('definition' => $params, 'value' => $_FILES[$params['name']]);\n\t    \t}\n\n    \t} else {\n    \t\tif (isset(self::$collectedInfo[$params['name']]['value'])){\n    \t\t\t$valueContent = self::$collectedInfo[$params['name']]['value'];\n    \t\t\t$downloadLink = \"<a href=\\\"\".erLhcoreClassSystem::getHost().erLhcoreClassDesign::baseurl('form/download').'/'.self::$collectedObject->id.'/'.self::$collectedObject->hash.'/'.$params['name'].\"\\\">Download (\".htmlspecialchars($valueContent['name']).\")</a>\";\n    \t\t}\n    \t}\n    \t\n    \treturn \"{$downloadLink}<input type=\\\"file\\\" name=\\\"{$params['name']}\\\" />\";\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    \t\t\t$downloadLink = \"<a href=\\\"\".erLhcoreClassSystem::getHost().erLhcoreClassDesign::baseurl('form/download').'/'.self::$collectedObject->id.'/'.self::$collectedObject->hash.'/'.$params['name'].\"\\\">Download (\".htmlspecialchars($valueContent['name']).\")</a>\";"
+    ],
+    "deleted": [
+      "    \t\t\t$downloadLink = \"<a href=\\\"http://\".$_SERVER['HTTP_HOST'].erLhcoreClassDesign::baseurl('form/download').'/'.self::$collectedObject->id.'/'.self::$collectedObject->hash.'/'.$params['name'].\"\\\">Download (\".htmlspecialchars($valueContent['name']).\")</a>\";"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 7
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "                $chats[$index]->link = erLhcoreClassXMP::getBaseHost() . $_SERVER['HTTP_HOST'] . erLhcoreClassDesign::baseurl('user/login').'/(r)/'.rawurlencode(base64_encode('chat/single/'.$chat->id));\n            }\n        }",
+  "code_after_change": "                $chats[$index]->link = erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurl('user/login').'/(r)/'.rawurlencode(base64_encode('chat/single/'.$chat->id));\n            }\n        }",
+  "function_modified_lines": {
+    "added": [
+      "                $chats[$index]->link = erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurl('user/login').'/(r)/'.rawurlencode(base64_encode('chat/single/'.$chat->id));"
+    ],
+    "deleted": [
+      "                $chats[$index]->link = erLhcoreClassXMP::getBaseHost() . $_SERVER['HTTP_HOST'] . erLhcoreClassDesign::baseurl('user/login').'/(r)/'.rawurlencode(base64_encode('chat/single/'.$chat->id));"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 8
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "\tpublic function __get($var)\n\t{\n\t   switch ($var) {\n\t   \t\n\t   \tcase 'left_menu':\n\t   \t       $this->left_menu = '';\n\t   \t\t   return $this->left_menu;\n\t   \t\tbreak;\n\n           case 'custom_status_css_front':\n               $attr = str_replace('_front', '', $var);\n               $this->$var = false;\n               if ($this->$attr != '') {\n                   $this->$var =  str_replace($this->replace_array['search'], $this->replace_array['replace'], $this->$attr);\n               }\n               return $this->$var;\n               break;\n\n           case 'replace_array':\n\n               $host = '//'.$_SERVER['HTTP_HOST'];\n\n               $this->replace_array = array(\n                   'search' => array(\n                       '{{host}}',\n                       '{{logo_image_url}}',\n                       '{{minimize_image_url}}',\n                       '{{restore_image_url}}',\n                       '{{close_image_url}}',\n                       '{{popup_image_url}}',\n                       '{{operator_image_url}}',\n                       '{{copyright_image_url}}',\n                       '{{need_help_image_url}}',\n                       '{{online_image_url}}',\n                       '{{offline_image_url}}',\n                   ),\n                   'replace' => array(\n                       $host,\n                       $this->logo_image_url,\n                       $this->minimize_image_url,\n                       $this->restore_image_url,\n                       $this->close_image_url,\n                       $this->popup_image_url,\n                       $this->operator_image_url,\n                       $this->copyright_image_url,\n                       $this->need_help_image_url,\n                       $this->online_image_url,\n                       $this->offline_image_url,\n                   ));\n               return $this->replace_array;\n               break;\n\n           case 'operator_image_avatar':\n               return $this->operator_image_url !== false || (isset($this->bot_configuration_array['operator_avatar']) && $this->bot_configuration_array['operator_avatar'] != '');\n\n\t   \tcase 'notification_icon_url':\n\t   \tcase 'logo_image_url':\n\t   \tcase 'minimize_image_url':\n\t   \tcase 'restore_image_url':\n\t   \tcase 'close_image_url':\n\t   \tcase 'popup_image_url':\n\t   \tcase 'operator_image_url':\n\t   \tcase 'copyright_image_url':\n\t   \tcase 'need_help_image_url':\n\t   \tcase 'online_image_url':\n\t   \tcase 'offline_image_url':\n\t   \t       $attr = str_replace('_url', '', $var);\t   \t       \t   \t       \n\t   \t       $this->$var = false;\t   \t        \n\t   \t       if ($this->$attr != ''){\n\t   \t           $this->$var =  ($this->{$attr.'_path'} != '' ? (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) . '/' . $this->{$attr.'_path'} . $this->$attr;\n\t   \t       }\t   \t        \n\t   \t       return $this->$var;\n\t   \t    break;\n\t   \t\t   \t\t\t   \t\t\n\t   \tcase 'need_help_image_url_img':\n\t   \tcase 'online_image_url_img':\n\t   \tcase 'offline_image_url_img':\n\t   \tcase 'logo_image_url_img':\n\t   \tcase 'copyright_image_url_img':\n\t   \tcase 'operator_image_url_img':\n\t   \tcase 'popup_image_url_img':\n\t   \tcase 'close_image_url_img':\n\t   \tcase 'restore_image_url_img':\n\t   \tcase 'minimize_image_url_img':\t   \t\t\t \n\t   \t        $attr = str_replace('_url_img', '', $var);\t   \t    \n\t   \t\t\t$this->$var = false;\t   \t\t\n\t   \t\t\tif($this->$attr != ''){\n\t   \t\t\t\t$this->$var = '<img src=\"'.($this->{$attr.'_path'} != '' ? (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'.$this->{$attr.'_path'} . $this->$attr.'\"/>';\n\t   \t\t\t}\n\t   \t\t\treturn $this->$var;\n\t   \t\tbreak;\n\n       case 'notification_icon':\n       case 'notification_icon_path':\n           $configurationArray = $this->notification_configuration_array;\n           if (isset($configurationArray[$var]) && $configurationArray[$var] != '') {\n               $this->$var = $configurationArray[$var];\n           } else {\n               $this->$var = '';\n           }\n           return $this->$var;\n           break;\n\n       case 'notification_icon_url_img':\n           $attr = str_replace('_url_img', '', $var);\n           $configurationArray = $this->notification_configuration_array;\n           if (isset($configurationArray[$attr]) && $configurationArray[$attr] != '') {\n               $this->$var = '<img src=\"'.($this->{$attr.'_path'} != '' ? erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'.$this->{$attr.'_path'} . $configurationArray[$attr].'\"/>';\n           } else {",
+  "code_after_change": "\tpublic function __get($var)\n\t{\n\t   switch ($var) {\n\t   \t\n\t   \tcase 'left_menu':\n\t   \t       $this->left_menu = '';\n\t   \t\t   return $this->left_menu;\n\t   \t\tbreak;\n\n           case 'custom_status_css_front':\n               $attr = str_replace('_front', '', $var);\n               $this->$var = false;\n               if ($this->$attr != '') {\n                   $this->$var =  str_replace($this->replace_array['search'], $this->replace_array['replace'], $this->$attr);\n               }\n               return $this->$var;\n               break;\n\n           case 'replace_array':\n\n               $host = erLhcoreClassSystem::getHost();\n\n               $this->replace_array = array(\n                   'search' => array(\n                       '{{host}}',\n                       '{{logo_image_url}}',\n                       '{{minimize_image_url}}',\n                       '{{restore_image_url}}',\n                       '{{close_image_url}}',\n                       '{{popup_image_url}}',\n                       '{{operator_image_url}}',\n                       '{{copyright_image_url}}',\n                       '{{need_help_image_url}}',\n                       '{{online_image_url}}',\n                       '{{offline_image_url}}',\n                   ),\n                   'replace' => array(\n                       $host,\n                       $this->logo_image_url,\n                       $this->minimize_image_url,\n                       $this->restore_image_url,\n                       $this->close_image_url,\n                       $this->popup_image_url,\n                       $this->operator_image_url,\n                       $this->copyright_image_url,\n                       $this->need_help_image_url,\n                       $this->online_image_url,\n                       $this->offline_image_url,\n                   ));\n               return $this->replace_array;\n               break;\n\n           case 'operator_image_avatar':\n               return $this->operator_image_url !== false || (isset($this->bot_configuration_array['operator_avatar']) && $this->bot_configuration_array['operator_avatar'] != '');\n\n\t   \tcase 'notification_icon_url':\n\t   \tcase 'logo_image_url':\n\t   \tcase 'minimize_image_url':\n\t   \tcase 'restore_image_url':\n\t   \tcase 'close_image_url':\n\t   \tcase 'popup_image_url':\n\t   \tcase 'operator_image_url':\n\t   \tcase 'copyright_image_url':\n\t   \tcase 'need_help_image_url':\n\t   \tcase 'online_image_url':\n\t   \tcase 'offline_image_url':\n\t   \t       $attr = str_replace('_url', '', $var);\t   \t       \t   \t       \n\t   \t       $this->$var = false;\t   \t        \n\t   \t       if ($this->$attr != ''){\n\t   \t           $this->$var =  ($this->{$attr.'_path'} != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) . '/' . $this->{$attr.'_path'} . $this->$attr;\n\t   \t       }\t   \t        \n\t   \t       return $this->$var;\n\t   \t    break;\n\t   \t\t   \t\t\t   \t\t\n\t   \tcase 'need_help_image_url_img':\n\t   \tcase 'online_image_url_img':\n\t   \tcase 'offline_image_url_img':\n\t   \tcase 'logo_image_url_img':\n\t   \tcase 'copyright_image_url_img':\n\t   \tcase 'operator_image_url_img':\n\t   \tcase 'popup_image_url_img':\n\t   \tcase 'close_image_url_img':\n\t   \tcase 'restore_image_url_img':\n\t   \tcase 'minimize_image_url_img':\t   \t\t\t \n\t   \t        $attr = str_replace('_url_img', '', $var);\t   \t    \n\t   \t\t\t$this->$var = false;\t   \t\t\n\t   \t\t\tif($this->$attr != ''){\n\t   \t\t\t\t$this->$var = '<img src=\"'.($this->{$attr.'_path'} != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'.$this->{$attr.'_path'} . $this->$attr.'\"/>';\n\t   \t\t\t}\n\t   \t\t\treturn $this->$var;\n\t   \t\tbreak;\n\n       case 'notification_icon':\n       case 'notification_icon_path':\n           $configurationArray = $this->notification_configuration_array;\n           if (isset($configurationArray[$var]) && $configurationArray[$var] != '') {\n               $this->$var = $configurationArray[$var];\n           } else {\n               $this->$var = '';\n           }\n           return $this->$var;\n           break;\n\n       case 'notification_icon_url_img':\n           $attr = str_replace('_url_img', '', $var);\n           $configurationArray = $this->notification_configuration_array;\n           if (isset($configurationArray[$attr]) && $configurationArray[$attr] != '') {\n               $this->$var = '<img src=\"'.($this->{$attr.'_path'} != '' ? erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'.$this->{$attr.'_path'} . $configurationArray[$attr].'\"/>';\n           } else {",
+  "function_modified_lines": {
+    "added": [
+      "               $host = erLhcoreClassSystem::getHost();",
+      "\t   \t           $this->$var =  ($this->{$attr.'_path'} != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) . '/' . $this->{$attr.'_path'} . $this->$attr;",
+      "\t   \t\t\t\t$this->$var = '<img src=\"'.($this->{$attr.'_path'} != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'.$this->{$attr.'_path'} . $this->$attr.'\"/>';"
+    ],
+    "deleted": [
+      "               $host = '//'.$_SERVER['HTTP_HOST'];",
+      "\t   \t           $this->$var =  ($this->{$attr.'_path'} != '' ? (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) . '/' . $this->{$attr.'_path'} . $this->$attr;",
+      "\t   \t\t\t\t$this->$var = '<img src=\"'.($this->{$attr.'_path'} != '' ? (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'.$this->{$attr.'_path'} . $this->$attr.'\"/>';"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 9
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "    public function __get($var) {\n\n        switch ($var) {\n\n            case 'configuration_array':\n                $this->configuration_array = array();\n                if ($this->configuration != ''){\n                    $jsonData = json_decode($this->configuration,true);\n                    if ($jsonData !== null) {\n                        $this->configuration_array = $jsonData;\n                    } else {\n                        $this->configuration_array = array();\n                    }\n                }\n                return $this->configuration_array;\n                break;\n\n            case 'name_support':\n                return $this->name_support = $this->nick;\n                break;\n\n            case 'has_photo':\n                return $this->filename != '';\n                break;\n\n            case 'has_photo_avatar':\n                return $this->filename != '' || $this->avatar != '';\n                break;\n\n            case 'photo_path':\n                $this->photo_path = ($this->filepath != '' ? '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;\n                return $this->photo_path;\n                break;\n\n            case 'file_path_server':\n                return $this->filepath . $this->filename;\n                break;\n\n            default:\n                break;\n        }\n    }",
+  "code_after_change": "    public function __get($var) {\n\n        switch ($var) {\n\n            case 'configuration_array':\n                $this->configuration_array = array();\n                if ($this->configuration != ''){\n                    $jsonData = json_decode($this->configuration,true);\n                    if ($jsonData !== null) {\n                        $this->configuration_array = $jsonData;\n                    } else {\n                        $this->configuration_array = array();\n                    }\n                }\n                return $this->configuration_array;\n                break;\n\n            case 'name_support':\n                return $this->name_support = $this->nick;\n                break;\n\n            case 'has_photo':\n                return $this->filename != '';\n                break;\n\n            case 'has_photo_avatar':\n                return $this->filename != '' || $this->avatar != '';\n                break;\n\n            case 'photo_path':\n                $this->photo_path = ($this->filepath != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;\n                return $this->photo_path;\n                break;\n\n            case 'file_path_server':\n                return $this->filepath . $this->filename;\n                break;\n\n            default:\n                break;\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                $this->photo_path = ($this->filepath != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;"
+    ],
+    "deleted": [
+      "                $this->photo_path = ($this->filepath != '' ? '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 10
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "    public function __get($var) {\n\n        switch ($var) {\n            case 'configuration_array':\n                $this->configuration_array = array();\n                if ($this->configuration != ''){\n                    $jsonData = json_decode($this->configuration,true);\n                    if ($jsonData !== null) {\n                        $this->configuration_array = $jsonData;\n                    } else {\n                        $this->configuration_array = array();\n                    }\n                }\n                return $this->configuration_array;\n                break;\n\n            case 'name_support':\n                return $this->name_support = $this->nick;\n                break;\n\n            case 'has_photo':\n                return $this->filename != '';\n                break;\n\n            case 'photo_path':\n                $this->photo_path = ($this->filepath != '' ? '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;\n                return $this->photo_path;\n                break;\n\n            case 'file_path_server':\n                return $this->filepath . $this->filename;\n                break;\n\n            default:\n                break;\n        }\n    }",
+  "code_after_change": "    public function __get($var) {\n\n        switch ($var) {\n            case 'configuration_array':\n                $this->configuration_array = array();\n                if ($this->configuration != ''){\n                    $jsonData = json_decode($this->configuration,true);\n                    if ($jsonData !== null) {\n                        $this->configuration_array = $jsonData;\n                    } else {\n                        $this->configuration_array = array();\n                    }\n                }\n                return $this->configuration_array;\n                break;\n\n            case 'name_support':\n                return $this->name_support = $this->nick;\n                break;\n\n            case 'has_photo':\n                return $this->filename != '';\n                break;\n\n            case 'photo_path':\n                $this->photo_path = ($this->filepath != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;\n                return $this->photo_path;\n                break;\n\n            case 'file_path_server':\n                return $this->filepath . $this->filename;\n                break;\n\n            default:\n                break;\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                $this->photo_path = ($this->filepath != '' ? erLhcoreClassSystem::getHost() . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;"
+    ],
+    "deleted": [
+      "                $this->photo_path = ($this->filepath != '' ? '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassSystem::instance()->wwwDir() : erLhcoreClassSystem::instance()->wwwImagesDir() ) .'/'. $this->filepath . $this->filename;"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 11
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "                foreach ($matches[1] as $index => $body) {\n                    $parts = explode('_', $body);\n                    $fileID = $parts[0];\n                    $hash = $parts[1];\n                    try {\n                        $file = erLhcoreClassModelChatFile::fetch($fileID);\n                        if (is_object($file) && $hash == $file->security_hash) {\n\n                            $url = (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassDesign::baseurldirect('file/downloadfile') . \"/{$file->id}/{$hash}\";\n\n                            $media[] = array(\n                                'id' => $file->id,\n                                'size' => $file->size,\n                                'upload_name' => $file->upload_name,\n                                'type' => $file->type,\n                                'extension' => $file->extension,\n                                'hash' => $hash,\n                                'url' => $url,\n                            );\n\n                            $msg_text_cleaned = str_replace($matches[0][$index],'',$msg_text_cleaned);\n                        }\n\n                    } catch (Exception $e) {\n\n                    }\n                }",
+  "code_after_change": "                foreach ($matches[1] as $index => $body) {\n                    $parts = explode('_', $body);\n                    $fileID = $parts[0];\n                    $hash = $parts[1];\n                    try {\n                        $file = erLhcoreClassModelChatFile::fetch($fileID);\n                        if (is_object($file) && $hash == $file->security_hash) {\n\n                            $url = erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurldirect('file/downloadfile') . \"/{$file->id}/{$hash}\";\n\n                            $media[] = array(\n                                'id' => $file->id,\n                                'size' => $file->size,\n                                'upload_name' => $file->upload_name,\n                                'type' => $file->type,\n                                'extension' => $file->extension,\n                                'hash' => $hash,\n                                'url' => $url,\n                            );\n\n                            $msg_text_cleaned = str_replace($matches[0][$index],'',$msg_text_cleaned);\n                        }\n\n                    } catch (Exception $e) {\n\n                    }\n                }",
+  "function_modified_lines": {
+    "added": [
+      "                            $url = erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurldirect('file/downloadfile') . \"/{$file->id}/{$hash}\";"
+    ],
+    "deleted": [
+      "                            $url = (erLhcoreClassSystem::$httpsMode == true ? 'https:' : 'http:') . '//' . $_SERVER['HTTP_HOST'] . erLhcoreClassDesign::baseurldirect('file/downloadfile') . \"/{$file->id}/{$hash}\";"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 12
+},
+{
+  "cve_id": "CVE-2022-0935",
+  "code_before_change": "    function generateAutoLoginLink($params){\n\n        $dataRequest = array();\n        $dataRequestAppend = array();\n\n        // Destination ID\n        if (isset($params['r'])){\n            $dataRequest['r'] = $params['r'];\n            $dataRequestAppend[] = '/(r)/'.rawurlencode(base64_encode($params['r']));\n        }\n\n        // User ID\n        if (isset($params['u']) && is_numeric($params['u'])){\n            $dataRequest['u'] = $params['u'];\n            $dataRequestAppend[] = '/(u)/'.rawurlencode($params['u']);\n        }\n\n        // Username\n        if (isset($params['l'])){\n            $dataRequest['l'] = $params['l'];\n            $dataRequestAppend[] = '/(l)/'.rawurlencode($params['l']);\n        }\n\n        if (!isset($params['l']) && !isset($params['u'])) {\n            throw new Exception('Username or User ID has to be provided');\n        }\n\n        $ts = time() + $params['t'];\n\n        // Expire time for link\n        if (isset($params['t'])) {\n            $dataRequest['t'] = $ts;\n            $dataRequestAppend[] = '/(t)/'.rawurlencode($ts);\n        }\n\n        $hashValidation = sha1($params['secret_hash'].sha1($params['secret_hash'].implode(',', $dataRequest)));\n\n        return $_SERVER['HTTP_HOST'] . erLhcoreClassDesign::baseurldirect(\"user/autologin\") . \"/{$hashValidation}\".implode('', $dataRequestAppend);\n    }",
+  "code_after_change": "    function generateAutoLoginLink($params){\n\n        $dataRequest = array();\n        $dataRequestAppend = array();\n\n        // Destination ID\n        if (isset($params['r'])){\n            $dataRequest['r'] = $params['r'];\n            $dataRequestAppend[] = '/(r)/'.rawurlencode(base64_encode($params['r']));\n        }\n\n        // User ID\n        if (isset($params['u']) && is_numeric($params['u'])){\n            $dataRequest['u'] = $params['u'];\n            $dataRequestAppend[] = '/(u)/'.rawurlencode($params['u']);\n        }\n\n        // Username\n        if (isset($params['l'])){\n            $dataRequest['l'] = $params['l'];\n            $dataRequestAppend[] = '/(l)/'.rawurlencode($params['l']);\n        }\n\n        if (!isset($params['l']) && !isset($params['u'])) {\n            throw new Exception('Username or User ID has to be provided');\n        }\n\n        $ts = time() + $params['t'];\n\n        // Expire time for link\n        if (isset($params['t'])) {\n            $dataRequest['t'] = $ts;\n            $dataRequestAppend[] = '/(t)/'.rawurlencode($ts);\n        }\n\n        $hashValidation = sha1($params['secret_hash'].sha1($params['secret_hash'].implode(',', $dataRequest)));\n\n        return erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurldirect(\"user/autologin\") . \"/{$hashValidation}\".implode('', $dataRequestAppend);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        return erLhcoreClassSystem::getHost() . erLhcoreClassDesign::baseurldirect(\"user/autologin\") . \"/{$hashValidation}\".implode('', $dataRequestAppend);"
+    ],
+    "deleted": [
+      "        return $_SERVER['HTTP_HOST'] . erLhcoreClassDesign::baseurldirect(\"user/autologin\") . \"/{$hashValidation}\".implode('', $dataRequestAppend);"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "Host Header injection in password Reset in GitHub repository livehelperchat/livehelperchat prior to 3.97.",
+  "id": 13
+},
+{
+  "cve_id": "CVE-2022-28960",
+  "code_before_change": "function precharger_objet($type, $id_objet, $id_rubrique = 0, $lier_trad = 0, $champ_titre = 'titre') {\n\n\t$table = table_objet_sql($type);\n\t$_id_objet = id_table_objet($table);\n\n\t// si l'objet existe deja, on retourne simplement ses valeurs\n\tif (is_numeric($id_objet)) {\n\t\treturn sql_fetsel(\"*\", $table, \"$_id_objet=$id_objet\");\n\t}\n\n\t// ici, on demande une creation.\n\t// on prerempli certains elements : les champs si traduction,\n\t// les id_rubrique et id_secteur si l'objet a ces champs\n\t$desc = lister_tables_objets_sql($table);\n\t# il faudrait calculer $champ_titre ici\n\t$is_rubrique = isset($desc['field']['id_rubrique']);\n\t$is_secteur = isset($desc['field']['id_secteur']);\n\n\t// si demande de traduction\n\t// on recupere les valeurs de la traduction\n\tif ($lier_trad) {\n\t\tif ($select = charger_fonction(\"precharger_traduction_\" . $type, 'inc', true)) {\n\t\t\t$row = $select($id_objet, $id_rubrique, $lier_trad);\n\t\t} else {\n\t\t\t$row = precharger_traduction_objet($type, $id_objet, $id_rubrique, $lier_trad, $champ_titre);\n\t\t}\n\t} else {\n\t\t$row[$champ_titre] = '';\n\t\tif ($is_rubrique) {\n\t\t\t$row['id_rubrique'] = $id_rubrique;\n\t\t}\n\t}\n\n\t// calcul de la rubrique\n\t# note : comment faire pour des traductions sur l'objet rubriques ?\n\tif ($is_rubrique) {\n\t\t// appel du script a la racine, faut choisir \n\t\t// admin restreint ==> sa premiere rubrique\n\t\t// autre ==> la derniere rubrique cree\n\t\tif (!$row['id_rubrique']) {\n\t\t\tif ($GLOBALS['connect_id_rubrique']) {\n\t\t\t\t$row['id_rubrique'] = $id_rubrique = current($GLOBALS['connect_id_rubrique']);\n\t\t\t} else {\n\t\t\t\t$row_rub = sql_fetsel(\"id_rubrique\", \"spip_rubriques\", \"\", \"\", \"id_rubrique DESC\", 1);\n\t\t\t\t$row['id_rubrique'] = $id_rubrique = $row_rub['id_rubrique'];\n\t\t\t}\n\t\t\tif (!autoriser('creerarticledans', 'rubrique', $row['id_rubrique'])) {\n\t\t\t\t// manque de chance, la rubrique n'est pas autorisee, on cherche un des secteurs autorises\n\t\t\t\t$res = sql_select(\"id_rubrique\", \"spip_rubriques\", \"id_parent=0\");\n\t\t\t\twhile (!autoriser('creerarticledans', 'rubrique', $row['id_rubrique']) && $row_rub = sql_fetch($res)) {\n\t\t\t\t\t$row['id_rubrique'] = $row_rub['id_rubrique'];\n\t\t\t\t}\n\t\t\t}",
+  "code_after_change": "function precharger_objet($type, $id_objet, $id_rubrique = 0, $lier_trad = 0, $champ_titre = 'titre') {\n\n\t$table = table_objet_sql($type);\n\t$_id_objet = id_table_objet($table);\n\n\t// si l'objet existe deja, on retourne simplement ses valeurs\n\tif (is_numeric($id_objet)) {\n\t\treturn sql_fetsel(\"*\", $table, \"$_id_objet=\".intval($id_objet));\n\t}\n\n\t// ici, on demande une creation.\n\t// on prerempli certains elements : les champs si traduction,\n\t// les id_rubrique et id_secteur si l'objet a ces champs\n\t$desc = lister_tables_objets_sql($table);\n\t# il faudrait calculer $champ_titre ici\n\t$is_rubrique = isset($desc['field']['id_rubrique']);\n\t$is_secteur = isset($desc['field']['id_secteur']);\n\n\t// si demande de traduction\n\t// on recupere les valeurs de la traduction\n\tif ($lier_trad) {\n\t\tif ($select = charger_fonction(\"precharger_traduction_\" . $type, 'inc', true)) {\n\t\t\t$row = $select($id_objet, $id_rubrique, $lier_trad);\n\t\t} else {\n\t\t\t$row = precharger_traduction_objet($type, $id_objet, $id_rubrique, $lier_trad, $champ_titre);\n\t\t}\n\t} else {\n\t\t$row[$champ_titre] = '';\n\t\tif ($is_rubrique) {\n\t\t\t$row['id_rubrique'] = $id_rubrique;\n\t\t}\n\t}\n\n\t// calcul de la rubrique\n\t# note : comment faire pour des traductions sur l'objet rubriques ?\n\tif ($is_rubrique) {\n\t\t// appel du script a la racine, faut choisir \n\t\t// admin restreint ==> sa premiere rubrique\n\t\t// autre ==> la derniere rubrique cree\n\t\tif (!$row['id_rubrique']) {\n\t\t\tif ($GLOBALS['connect_id_rubrique']) {\n\t\t\t\t$row['id_rubrique'] = $id_rubrique = current($GLOBALS['connect_id_rubrique']);\n\t\t\t} else {\n\t\t\t\t$row_rub = sql_fetsel(\"id_rubrique\", \"spip_rubriques\", \"\", \"\", \"id_rubrique DESC\", 1);\n\t\t\t\t$row['id_rubrique'] = $id_rubrique = $row_rub['id_rubrique'];\n\t\t\t}\n\t\t\tif (!autoriser('creerarticledans', 'rubrique', $row['id_rubrique'])) {\n\t\t\t\t// manque de chance, la rubrique n'est pas autorisee, on cherche un des secteurs autorises\n\t\t\t\t$res = sql_select(\"id_rubrique\", \"spip_rubriques\", \"id_parent=0\");\n\t\t\t\twhile (!autoriser('creerarticledans', 'rubrique', $row['id_rubrique']) && $row_rub = sql_fetch($res)) {\n\t\t\t\t\t$row['id_rubrique'] = $row_rub['id_rubrique'];\n\t\t\t\t}\n\t\t\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\treturn sql_fetsel(\"*\", $table, \"$_id_objet=\".intval($id_objet));"
+    ],
+    "deleted": [
+      "\t\treturn sql_fetsel(\"*\", $table, \"$_id_objet=$id_objet\");"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "A PHP injection vulnerability in Spip before v3.2.8 allows attackers to execute arbitrary PHP code via the _oups parameter at /ecrire.",
+  "id": 14
+},
+{
+  "cve_id": "CVE-2022-28960",
+  "code_before_change": "\t\t\t\t$row_rub = sql_fetsel(\"id_rubrique\", \"spip_rubriques\",\n\t\t\t\t\t\"lang='\" . $GLOBALS['spip_lang'] . \"' AND id_parent=$id_parent\");\n\t\t\t\tif ($row_rub) {\n\t\t\t\t\t$row['id_rubrique'] = $row_rub['id_rubrique'];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\treturn $row;\n}",
+  "code_after_change": "\t\t\t\t$row_rub = sql_fetsel(\"id_rubrique\", \"spip_rubriques\",\n\t\t\t\t\t\"lang='\" . $GLOBALS['spip_lang'] . \"' AND id_parent=\".intval($id_parent));\n\t\t\t\tif ($row_rub) {\n\t\t\t\t\t$row['id_rubrique'] = $row_rub['id_rubrique'];\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t\t\"lang='\" . $GLOBALS['spip_lang'] . \"' AND id_parent=\".intval($id_parent));"
+    ],
+    "deleted": [
+      "\t\t\t\t\t\"lang='\" . $GLOBALS['spip_lang'] . \"' AND id_parent=$id_parent\");"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "A PHP injection vulnerability in Spip before v3.2.8 allows attackers to execute arbitrary PHP code via the _oups parameter at /ecrire.",
+  "id": 15
+},
+{
+  "cve_id": "CVE-2022-28960",
+  "code_before_change": "function critere_where_dist($idb, &$boucles, $crit) {\n\t$boucle = &$boucles[$idb];\n\tif (isset($crit->param[0])) {\n\t\t$_where = calculer_liste($crit->param[0], $idb, $boucles, $boucle->id_parent);\n\t} else {\n\t\t$_where = '@$Pile[0][\"where\"]';\n\t}\n\n\tif ($crit->cond) {\n\t\t$_where = \"(($_where) ? ($_where) : '')\";\n\t}\n\n\tif ($crit->not) {\n\t\t$_where = \"array('NOT',$_where)\";\n\t}\n\n\t$boucle->where[] = $_where;\n}",
+  "code_after_change": "function critere_where_dist($idb, &$boucles, $crit) {\n\t$boucle = &$boucles[$idb];\n\tif (isset($crit->param[0])) {\n\t\t$_where = calculer_liste($crit->param[0], $idb, $boucles, $boucle->id_parent);\n\t} else {\n\t\t$_where = 'spip_sanitize_from_request(@$Pile[0][\"where\"],\"where\",\"vide\")';\n\t}\n\n\tif ($crit->cond) {\n\t\t$_where = \"((\\$zzw = $_where) ? \\$zzw : '')\";\n\t}\n\n\tif ($crit->not) {\n\t\t$_where = \"array('NOT',$_where)\";\n\t}\n\n\t$boucle->where[] = $_where;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t$_where = 'spip_sanitize_from_request(@$Pile[0][\"where\"],\"where\",\"vide\")';",
+      "\t\t$_where = \"((\\$zzw = $_where) ? \\$zzw : '')\";"
+    ],
+    "deleted": [
+      "\t\t$_where = '@$Pile[0][\"where\"]';",
+      "\t\t$_where = \"(($_where) ? ($_where) : '')\";"
+    ]
+  },
+  "cwe": [
+    "CWE-116"
+  ],
+  "cve_description": "A PHP injection vulnerability in Spip before v3.2.8 allows attackers to execute arbitrary PHP code via the _oups parameter at /ecrire.",
+  "id": 16
+}
+]

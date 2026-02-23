@@ -1,0 +1,106 @@
+[
+{
+  "cve_id": "CVE-2023-3303",
+  "code_before_change": "    public function isVisible()\n    {\n        // current photo album must belong to current organization\n        if ($this->getValue('pho_id') > 0 && (int) $this->getValue('pho_org_id') !== $GLOBALS['gCurrentOrgId']) {\n            return false;\n        }\n        // locked photo album could only be viewed by module administrators\n        elseif ((int) $this->getValue('pho_locked') === 1 && !$GLOBALS['gCurrentUser']->editPhotoRight()) {\n            return false;\n        }\n\n        return true;\n    }",
+  "code_after_change": "    public function isVisible()\n    {\n        // current photo album must belong to current organization\n        if ($this->getValue('pho_id') > 0 && (int) $this->getValue('pho_org_id') !== $GLOBALS['gCurrentOrgId']) {\n            return false;\n        }\n        // locked photo album could only be viewed by module administrators\n        elseif ($this->getValue('pho_locked') && !$GLOBALS['gCurrentUser']->editPhotoRight()) {\n            return false;\n        }\n\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        elseif ($this->getValue('pho_locked') && !$GLOBALS['gCurrentUser']->editPhotoRight()) {"
+    ],
+    "deleted": [
+      "        elseif ((int) $this->getValue('pho_locked') === 1 && !$GLOBALS['gCurrentUser']->editPhotoRight()) {"
+    ]
+  },
+  "cwe": [
+    "CWE-284"
+  ],
+  "cve_description": "Improper Access Control in GitHub repository admidio/admidio prior to 4.2.9.",
+  "id": 702
+},
+{
+  "cve_id": "CVE-2023-4650",
+  "code_before_change": "    public function getProfileEditMenu($profile) {\n\n        $menu = [];\n\n        $menu[] = [\n            'title' => LANG_USERS_EDIT_PROFILE_MAIN,\n            'url'   => href_to_profile($profile, ['edit'])\n        ];\n\n        if ($this->cms_template->hasProfileThemesOptions() && $this->options['is_themes_on']) {\n\n            $menu[] = [\n                'title' => LANG_USERS_EDIT_PROFILE_THEME,\n                'url'   => href_to_profile($profile, ['edit', 'theme'])\n            ];\n        }\n\n        if (cmsEventsManager::getEventListeners('user_notify_types')) {\n\n            $menu[] = [\n                'title' => LANG_USERS_EDIT_PROFILE_NOTICES,\n                'url'   => href_to_profile($profile, ['edit', 'notices'])\n            ];\n        }\n\n        if (!empty($this->options['is_friends_on'])) {\n\n            $menu[] = [\n                'title' => LANG_USERS_EDIT_PROFILE_PRIVACY,\n                'url'   => href_to_profile($profile, ['edit', 'privacy'])\n            ];\n        }\n\n        $menu[] = [\n            'title' => LANG_SECURITY,\n            'url'   => href_to_profile($profile, ['edit', 'password'])\n        ];\n\n        $menu[] = [\n            'title' => LANG_USERS_SESSIONS,\n            'url'   => href_to_profile($profile, ['edit', 'sessions'])\n        ];\n\n        list($menu, $profile) = cmsEventsManager::hook('profile_edit_menu', [$menu, $profile]);\n\n        return $menu;\n    }",
+  "code_after_change": "    public function getProfileEditMenu($profile) {\n\n        $menu = [];\n\n        $menu[] = [\n            'title' => LANG_USERS_EDIT_PROFILE_MAIN,\n            'url'   => href_to_profile($profile, ['edit'])\n        ];\n\n        if ($this->cms_template->hasProfileThemesOptions() && $this->options['is_themes_on']) {\n\n            $menu[] = [\n                'title' => LANG_USERS_EDIT_PROFILE_THEME,\n                'url'   => href_to_profile($profile, ['edit', 'theme'])\n            ];\n        }\n\n        if (cmsEventsManager::getEventListeners('user_notify_types')) {\n\n            $menu[] = [\n                'title' => LANG_USERS_EDIT_PROFILE_NOTICES,\n                'url'   => href_to_profile($profile, ['edit', 'notices'])\n            ];\n        }\n\n        if (!empty($this->options['is_friends_on'])) {\n\n            $menu[] = [\n                'title' => LANG_USERS_EDIT_PROFILE_PRIVACY,\n                'url'   => href_to_profile($profile, ['edit', 'privacy'])\n            ];\n        }\n\n        if ($this->is_own_profile || (!$profile['is_admin'] && $this->cms_user->is_admin)) {\n\n            $menu[] = [\n                'title' => LANG_SECURITY,\n                'url'   => href_to_profile($profile, ['edit', 'password'])\n            ];\n\n            $menu[] = [\n                'title' => LANG_USERS_SESSIONS,\n                'url'   => href_to_profile($profile, ['edit', 'sessions'])\n            ];\n        }\n\n        list($menu, $profile) = cmsEventsManager::hook('profile_edit_menu', [$menu, $profile]);\n\n        return $menu;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        if ($this->is_own_profile || (!$profile['is_admin'] && $this->cms_user->is_admin)) {",
+      "            $menu[] = [",
+      "                'title' => LANG_SECURITY,",
+      "                'url'   => href_to_profile($profile, ['edit', 'password'])",
+      "            ];",
+      "            $menu[] = [",
+      "                'title' => LANG_USERS_SESSIONS,",
+      "                'url'   => href_to_profile($profile, ['edit', 'sessions'])",
+      "            ];",
+      "        }"
+    ],
+    "deleted": [
+      "        $menu[] = [",
+      "            'title' => LANG_SECURITY,",
+      "            'url'   => href_to_profile($profile, ['edit', 'password'])",
+      "        ];",
+      "        $menu[] = [",
+      "            'title' => LANG_USERS_SESSIONS,",
+      "            'url'   => href_to_profile($profile, ['edit', 'sessions'])",
+      "        ];"
+    ]
+  },
+  "cwe": [
+    "CWE-284"
+  ],
+  "cve_description": "Improper Access Control in GitHub repository instantsoft/icms2 prior to 2.16.1-git.",
+  "id": 703
+},
+{
+  "cve_id": "CVE-2023-5976",
+  "code_before_change": "    public function scopeActive($query)\n    {\n        return $query->where('is_active', 1)->where('is_deleted', 0);\n    }",
+  "code_after_change": "    public function scopeActive($query)\n    {\n        return $query\n            ->where('is_active', 1)\n            ->where(function($subQuery) {\n                $subQuery\n                    ->whereNull('is_deleted')\n                    ->orWhere('is_deleted', 0);\n            });\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        return $query",
+      "            ->where('is_active', 1)",
+      "            ->where(function($subQuery) {",
+      "                $subQuery",
+      "                    ->whereNull('is_deleted')",
+      "                    ->orWhere('is_deleted', 0);",
+      "            });"
+    ],
+    "deleted": [
+      "        return $query->where('is_active', 1)->where('is_deleted', 0);"
+    ]
+  },
+  "cwe": [
+    "CWE-284"
+  ],
+  "cve_description": "Improper Access Control in GitHub repository microweber/microweber prior to 2.0.",
+  "id": 704
+},
+{
+  "cve_id": "CVE-2023-5976",
+  "code_before_change": "    public function save()\n    {\n        $validate = [\n            'state.comment_body' => 'required|min:3',\n        ];\n        if (!user_id()) {\n            $validate['state.comment_name'] = 'required|min:3';\n            $validate['state.comment_email'] = 'required|email';\n        }\n\n        $this->validate($validate);\n\n        $comment = new \\MicroweberPackages\\Comment\\Models\\Comment();\n\n        if (isset($this->state['rel_id'])) {\n            $comment->rel_id = $this->state['rel_id'];\n            $comment->rel_type = 'content';\n        }\n\n        if (isset($this->state['reply_to_comment_id'])) {\n            $comment->reply_to_comment_id = $this->state['reply_to_comment_id'];\n        }\n\n        $comment->user_ip = user_ip();\n        $comment->session_id = session_id();\n\n        if (user_id()) {\n            $comment->created_by = user_id();\n        } else {\n            $comment->comment_name = $this->state['comment_name'];\n            $comment->comment_email = $this->state['comment_email'];\n        }\n\n        $comment->comment_body = $this->state['comment_body'];\n        $comment->save();\n\n        $this->state['comment_body'] = '';\n        $this->state['comment_name'] = '';\n        $this->state['comment_email'] = '';\n\n        $this->emit('commentAdded', $comment->id);\n\n    }",
+  "code_after_change": "    public function save()\n    {\n        $validate = [\n            'state.rel_id' => 'required|min:1',\n            'state.comment_body' => 'required|min:3',\n        ];\n        if (!user_id()) {\n            $validate['state.comment_name'] = 'required|min:3';\n            $validate['state.comment_email'] = 'required|email';\n        }\n\n        $this->validate($validate);\n\n        $countContent = Content::where('id', $this->state['rel_id'])->whereActive()->count();\n        if ($countContent == 0) {\n            $this->addError('state.rel_id', 'Content not found');\n            return;\n        }\n\n        $comment = new \\MicroweberPackages\\Comment\\Models\\Comment();\n        $comment->rel_id = $this->state['rel_id'];\n        $comment->rel_type = 'content';\n\n        if (isset($this->state['reply_to_comment_id'])) {\n            $comment->reply_to_comment_id = $this->state['reply_to_comment_id'];\n        }\n\n        $comment->user_ip = user_ip();\n        $comment->session_id = session_id();\n\n        if (user_id()) {\n            $comment->created_by = user_id();\n        } else {\n            $comment->comment_name = $this->state['comment_name'];\n            $comment->comment_email = $this->state['comment_email'];\n        }\n\n        $comment->comment_body = $this->state['comment_body'];\n        $comment->save();\n\n        $this->state['comment_body'] = '';\n        $this->state['comment_name'] = '';\n        $this->state['comment_email'] = '';\n\n        $this->emit('commentAdded', $comment->id);\n\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            'state.rel_id' => 'required|min:1',",
+      "        $countContent = Content::where('id', $this->state['rel_id'])->whereActive()->count();",
+      "        if ($countContent == 0) {",
+      "            $this->addError('state.rel_id', 'Content not found');",
+      "            return;",
+      "        $comment = new \\MicroweberPackages\\Comment\\Models\\Comment();",
+      "        $comment->rel_id = $this->state['rel_id'];",
+      "        $comment->rel_type = 'content';"
+    ],
+    "deleted": [
+      "        $comment = new \\MicroweberPackages\\Comment\\Models\\Comment();",
+      "        if (isset($this->state['rel_id'])) {",
+      "            $comment->rel_id = $this->state['rel_id'];",
+      "            $comment->rel_type = 'content';"
+    ]
+  },
+  "cwe": [
+    "CWE-284"
+  ],
+  "cve_description": "Improper Access Control in GitHub repository microweber/microweber prior to 2.0.",
+  "id": 705
+}
+]

@@ -1,0 +1,23 @@
+[
+{
+  "cve_id": "CVE-2022-0666",
+  "code_before_change": "    public function redirect($url)\n    {\n        if (trim($url) == '') {\n            return false;\n        }\n\n        $url = str_ireplace('Location:', '', $url);\n        $url = trim($url);\n\n        $redirectUrl = site_url();\n        $parseUrl = parse_url($url);\n        if (isset($parseUrl['host'])) {\n            if ($parseUrl['host'] == site_hostname()) {\n                $redirectUrl = $url;\n            }\n        }\n\n        if (!filter_var($redirectUrl, FILTER_VALIDATE_URL)) {\n            $redirectUrl = site_url();\n        }\n\n        if (headers_sent()) {\n            echo '<meta http-equiv=\"refresh\" content=\"0;url=' . $redirectUrl . '\">';\n        } else {\n            return \\Redirect::to($redirectUrl);\n        }\n    }",
+  "code_after_change": "    public function redirect($url)\n    {\n        if (trim($url) == '') {\n            return false;\n        }\n\n        $url = str_ireplace('Location:', '', $url);\n        $url = trim($url);\n\n        $redirectUrl = site_url();\n        $parseUrl = parse_url($url);\n        if (isset($parseUrl['host'])) {\n            if ($parseUrl['host'] == site_hostname()) {\n                $redirectUrl = $url;\n            }\n        }\n\n        $redirectUrl = str_replace(\"\\r\", \"\", $redirectUrl);\n        $redirectUrl = str_replace(\"\\n\", \"\", $redirectUrl);\n\n        if (headers_sent()) {\n            echo '<meta http-equiv=\"refresh\" content=\"0;url=' . $redirectUrl . '\">';\n        } else {\n            return \\Redirect::to($redirectUrl);\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $redirectUrl = str_replace(\"\\r\", \"\", $redirectUrl);",
+      "        $redirectUrl = str_replace(\"\\n\", \"\", $redirectUrl);"
+    ],
+    "deleted": [
+      "        if (!filter_var($redirectUrl, FILTER_VALIDATE_URL)) {",
+      "            $redirectUrl = site_url();",
+      "        }"
+    ]
+  },
+  "cwe": [
+    "CWE-93"
+  ],
+  "cve_description": "CRLF Injection leads to Stack Trace Exposure due to lack of filtering at https://demo.microweber.org/ in Packagist microweber/microweber prior to 1.2.11.",
+  "id": 7060
+}
+]
