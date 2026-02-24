@@ -1,0 +1,20 @@
+[
+{
+  "cve_id": "CVE-2021-41170",
+  "code_before_change": "            $bool = self::evaluateTypedCondition($array, $expression);\n\n            if (!$bool) {\n                $hit->parentNode->removeChild($hit);\n            } else {\n                $hit->removeAttribute('n-if');\n            }\n        }\n        return $doc->saveHTML();\n    }\n}",
+  "code_after_change": "            $expression = $hit->getAttribute('n-if');\n            $bool = self::evaluateTypedCondition($array, $expression);\n            if (!$bool) {\n                $hit->parentNode->removeChild($hit);\n            } else {\n                $hit->removeAttribute('n-if');\n            }\n        }\n        return $doc->saveHTML();\n    }\n}",
+  "patch": "@@ -103,7 +103,7 @@ class TemplateFunctions\n         if (!$pure) {\n             $pattern .= preg_quote(self::$registeredDelimiters[0]) . \"\\s*\";\n         }\n-        $pattern .= \"$closureName\\(([a-z0-9,\\.\\s]+)\\)\";\n+        $pattern .= \"$closureName\\(([a-z0-9,\\.\\s_]+)\\)\";\n         if (!$pure) {\n             $pattern .= \"\\s*\" . preg_quote(self::$registeredDelimiters[1]);\n         }\n@@ -201,7 +201,6 @@ class TemplateFunctions\n         foreach ($flatArray as $key => $value) {\n             $pattern = '/' . $key . '([^.]|$)/';\n             if (preg_match($pattern, $expression, $matches)) {\n-\n                 switch (gettype($flatArray[$key])) {\n                     case 'boolean':\n                         $expression = str_replace($key, $flatArray[$key] ? 'true' : 'false', $expression);\n@@ -241,11 +240,12 @@ class TemplateFunctions\n             return $content;\n         }\n \n+        $array = Template::flattenArray($array);\n+        // important: first try closures\n+        $array = array_merge(self::$registeredClosures, $array);\n         foreach ($hits as $hit) {\n             $expression = $hit->getAttribute('n-if');\n-            $array = Template::flattenArray($array);\n             $bool = self::evaluateTypedCondition($array, $expression);\n-\n             if (!$bool) {\n                 $hit->parentNode->removeChild($hit);\n             } else {\n",
+  "function_modified_lines": {
+    "added": [
+      "            $expression = $hit->getAttribute('n-if');"
+    ],
+    "deleted": []
+  },
+  "cwe": [
+    "CWE-74",
+    "CWE-277"
+  ],
+  "cve_description": "neoan3-apps/template is a neoan3 minimal template engine. Versions prior to 1.1.1 have allowed for passing in closures directly into the template engine. As a result values that are callable are executed by the template engine. The issue arises if a value has the same name as a method or function in scope and can therefore be executed either by mistake or maliciously. In theory all users of the package are affected as long as they either deal with direct user input or database values. A multi-step attack on is therefore plausible. Version 1.1.1 has addressed this vulnerability. Unfortunately only working with hardcoded values is safe in prior versions. As this likely defeats the purpose of a template engine, please upgrade.",
+  "id": 1
+}
+]
