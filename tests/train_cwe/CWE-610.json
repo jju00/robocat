@@ -1,0 +1,107 @@
+[
+{
+  "cve_id": "CVE-2020-5296",
+  "code_before_change": "    public function getFilePath($fileName = null)\n    {\n        if ($fileName === null) {\n            $fileName = $this->fileName;\n        }\n\n        return $this->theme->getPath().'/'.$this->dirName.'/'.$fileName;\n    }\n\n    /**\n     * Returns a list of editable asset extensions.\n     * The list can be overridden with the cms.editableAssetTypes configuration option.\n     * @return array\n     */\n    public static function getEditableExtensions()\n    {\n        $defaultTypes =  ['css', 'js', 'less', 'sass', 'scss'];\n\n        $configTypes = Config::get('cms.editableAssetTypes');\n        if (!$configTypes) {\n            return $defaultTypes;\n        }\n\n        return $configTypes;\n    }\n}",
+  "code_after_change": "    public function getFilePath($fileName = null)\n    {\n        if ($fileName === null) {\n            $fileName = $this->fileName;\n        }\n\n        // Limit paths to those under the assets directory\n        $directory = $this->theme->getPath() . '/' . $this->dirName . '/';\n        $path = realpath($directory . $fileName);\n        if (!starts_with($path, $directory)) {\n            return false;\n        }\n\n        return $path;\n    }\n\n    /**\n     * Returns a list of editable asset extensions.\n     * The list can be overridden with the cms.editableAssetTypes configuration option.\n     * @return array\n     */\n    public static function getEditableExtensions()\n    {\n        $defaultTypes =  ['css', 'js', 'less', 'sass', 'scss'];\n\n        $configTypes = Config::get('cms.editableAssetTypes');\n        if (!$configTypes) {\n            return $defaultTypes;\n        }\n\n        return $configTypes;\n    }\n}",
+  "patch": "@@ -285,7 +285,14 @@ class Asset extends Extendable\n             $fileName = $this->fileName;\n         }\n \n-        return $this->theme->getPath().'/'.$this->dirName.'/'.$fileName;\n+        // Limit paths to those under the assets directory\n+        $directory = $this->theme->getPath() . '/' . $this->dirName . '/';\n+        $path = realpath($directory . $fileName);\n+        if (!starts_with($path, $directory)) {\n+            return false;\n+        }\n+\n+        return $path;\n     }\n \n     /**\n",
+  "function_modified_lines": {
+    "added": [
+      "        // Limit paths to those under the assets directory",
+      "        $directory = $this->theme->getPath() . '/' . $this->dirName . '/';",
+      "        $path = realpath($directory . $fileName);",
+      "        if (!starts_with($path, $directory)) {",
+      "            return false;",
+      "        }",
+      "        return $path;"
+    ],
+    "deleted": [
+      "        return $this->theme->getPath().'/'.$this->dirName.'/'.$fileName;"
+    ]
+  },
+  "cwe": [
+    "CWE-610"
+  ],
+  "cve_description": "In OctoberCMS (october/october composer package) versions from 1.0.319 and before 1.0.466, an attacker can exploit this vulnerability to delete arbitrary local files of an October CMS server. The vulnerability is only exploitable by an authenticated backend user with the `cms.manage_assets` permission. Issue has been patched in Build 466 (v1.0.466).",
+  "id": 1
+},
+{
+  "cve_id": "CVE-2021-32783",
+  "code_before_change": "func (dag *DAG) EnsureService(meta types.NamespacedName, port intstr.IntOrString, cache *KubernetesCache) (*Service, error) {\n\tsvc, svcPort, err := cache.LookupService(meta, port)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\n\tif dagSvc := dag.GetService(k8s.NamespacedNameOf(svc), svcPort.Port); dagSvc != nil {\n\t\treturn dagSvc, nil\n\t}\n\n\tdagSvc := &Service{\n\t\tWeighted: WeightedService{\n\t\t\tServiceName:      svc.Name,\n\t\t\tServiceNamespace: svc.Namespace,\n\t\t\tServicePort:      svcPort,\n\t\t\tWeight:           1,\n\t\t},\n\t\tProtocol:           upstreamProtocol(svc, svcPort),\n\t\tMaxConnections:     annotation.MaxConnections(svc),\n\t\tMaxPendingRequests: annotation.MaxPendingRequests(svc),\n\t\tMaxRequests:        annotation.MaxRequests(svc),\n\t\tMaxRetries:         annotation.MaxRetries(svc),\n\t\tExternalName:       externalName(svc),\n\t}\n\treturn dagSvc, nil\n}\n\nfunc upstreamProtocol(svc *v1.Service, port v1.ServicePort) string {\n\tup := annotation.ParseUpstreamProtocols(svc.Annotations)\n\tprotocol := up[port.Name]\n\tif protocol == \"\" {\n\t\tprotocol = up[strconv.Itoa(int(port.Port))]\n\t}\n\treturn protocol\n}\n\nfunc externalName(svc *v1.Service) string {\n\tif svc.Spec.Type != v1.ServiceTypeExternalName {\n\t\treturn \"\"\n\t}\n\treturn svc.Spec.ExternalName\n}\n\n// serviceGetter is a visitor that gets all services\n// in the DAG.\ntype serviceGetter map[RouteServiceName]*Service\n\nfunc (s serviceGetter) visit(vertex Vertex) {\n\tswitch obj := vertex.(type) {\n\tcase *Service:\n\t\ts[RouteServiceName{\n\t\t\tName:      obj.Weighted.ServiceName,\n\t\t\tNamespace: obj.Weighted.ServiceNamespace,\n\t\t\tPort:      obj.Weighted.ServicePort.Port,\n\t\t}] = obj\n\tdefault:\n\t\tvertex.Visit(s.visit)\n\t}\n}\n\n// GetSecureVirtualHosts returns all secure virtual hosts in the DAG.\nfunc (dag *DAG) GetSecureVirtualHosts() map[ListenerName]*SecureVirtualHost {\n\tgetter := svhostGetter(map[ListenerName]*SecureVirtualHost{})\n\tdag.Visit(getter.visit)\n\treturn getter\n}\n\n// GetSecureVirtualHost returns the secure virtual host in the DAG that\n// matches the provided name, or nil if no matching secure virtual host\n// is found.\nfunc (dag *DAG) GetSecureVirtualHost(ln ListenerName) *SecureVirtualHost {\n\treturn dag.GetSecureVirtualHosts()[ln]\n}\n\n// EnsureSecureVirtualHost adds a secure virtual host with the provided\n// name to the DAG if it does not already exist, and returns it.\nfunc (dag *DAG) EnsureSecureVirtualHost(ln ListenerName) *SecureVirtualHost {\n\tif svh := dag.GetSecureVirtualHost(ln); svh != nil {\n\t\treturn svh\n\t}\n\n\tsvh := &SecureVirtualHost{\n\t\tVirtualHost: VirtualHost{\n\t\t\tName:         ln.Name,\n\t\t\tListenerName: ln.ListenerName,\n\t\t},\n\t}\n\tdag.AddRoot(svh)\n\treturn svh\n}\n\n// svhostGetter is a visitor that gets all secure virtual hosts\n// in the DAG.\ntype svhostGetter map[ListenerName]*SecureVirtualHost\n\nfunc (s svhostGetter) visit(vertex Vertex) {\n\tswitch obj := vertex.(type) {\n\tcase *SecureVirtualHost:\n\t\ts[ListenerName{Name: obj.Name, ListenerName: obj.VirtualHost.ListenerName}] = obj\n\tdefault:\n\t\tvertex.Visit(s.visit)\n\t}\n}\n\n// GetVirtualHosts returns all virtual hosts in the DAG.\nfunc (dag *DAG) GetVirtualHosts() map[ListenerName]*VirtualHost {\n\tgetter := vhostGetter(map[ListenerName]*VirtualHost{})\n\tdag.Visit(getter.visit)\n\treturn getter\n}\n\n// GetVirtualHost returns the virtual host in the DAG that matches the\n// provided name, or nil if no matching virtual host is found.\nfunc (dag *DAG) GetVirtualHost(ln ListenerName) *VirtualHost {\n\treturn dag.GetVirtualHosts()[ln]\n}\n\n// EnsureVirtualHost adds a virtual host with the provided name to the\n// DAG if it does not already exist, and returns it.\nfunc (dag *DAG) EnsureVirtualHost(ln ListenerName) *VirtualHost {\n\tif vhost := dag.GetVirtualHost(ln); vhost != nil {\n\t\treturn vhost\n\t}\n\n\tvhost := &VirtualHost{\n\t\tName:         ln.Name,\n\t\tListenerName: ln.ListenerName,\n\t}\n\tdag.AddRoot(vhost)\n\treturn vhost\n}\n\n// vhostGetter is a visitor that gets all virtual hosts\n// in the DAG.\ntype vhostGetter map[ListenerName]*VirtualHost\n\nfunc (v vhostGetter) visit(vertex Vertex) {\n\tswitch obj := vertex.(type) {\n\tcase *VirtualHost:\n\t\tv[ListenerName{Name: obj.Name, ListenerName: obj.ListenerName}] = obj\n\tdefault:\n\t\tvertex.Visit(v.visit)\n\t}\n}\n\n// GetExtensionClusters returns all extension clusters in the DAG.",
+  "code_after_change": "func (dag *DAG) EnsureService(meta types.NamespacedName, port intstr.IntOrString, cache *KubernetesCache, enableExternalNameSvc bool) (*Service, error) {\n\tsvc, svcPort, err := cache.LookupService(meta, port)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\n\terr = validateExternalName(svc, enableExternalNameSvc)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\n\tif dagSvc := dag.GetService(k8s.NamespacedNameOf(svc), svcPort.Port); dagSvc != nil {\n\t\treturn dagSvc, nil\n\t}\n\n\tdagSvc := &Service{\n\t\tWeighted: WeightedService{\n\t\t\tServiceName:      svc.Name,\n\t\t\tServiceNamespace: svc.Namespace,\n\t\t\tServicePort:      svcPort,\n\t\t\tWeight:           1,\n\t\t},\n\t\tProtocol:           upstreamProtocol(svc, svcPort),\n\t\tMaxConnections:     annotation.MaxConnections(svc),\n\t\tMaxPendingRequests: annotation.MaxPendingRequests(svc),\n\t\tMaxRequests:        annotation.MaxRequests(svc),\n\t\tMaxRetries:         annotation.MaxRetries(svc),\n\t\tExternalName:       externalName(svc),\n\t}\n\treturn dagSvc, nil\n}\n\nfunc validateExternalName(svc *v1.Service, enableExternalNameSvc bool) error {\n\n\t// If this isn't an ExternalName Service, we're all good here.\n\ten := externalName(svc)\n\tif en == \"\" {\n\t\treturn nil\n\t}\n\n\t// If ExternalNames are disabled, then we don't want to add this to the DAG.\n\tif !enableExternalNameSvc {\n\t\treturn fmt.Errorf(\"%s/%s is an ExternalName service, these are not currently enabled. See the config.enableExternalNameService config file setting\", svc.Namespace, svc.Name)\n\t}\n\n\t// Check against a list of known localhost names, using a map to approximate a set.\n\t// TODO(youngnick) This is a very porous hack, and we should probably look into doing a DNS\n\t// lookup to check what the externalName resolves to, but I'm worried about the\n\t// performance impact of doing one or more DNS lookups per DAG run, so we're\n\t// going to go with a specific blocklist for now.\n\tlocalhostNames := map[string]struct{}{\n\t\t\"localhost\":               {},\n\t\t\"localhost.localdomain\":   {},\n\t\t\"local.projectcontour.io\": {},\n\t}\n\n\t_, localhost := localhostNames[en]\n\tif localhost {\n\t\treturn fmt.Errorf(\"%s/%s is an ExternalName service that points to localhost, this is not allowed\", svc.Namespace, svc.Name)\n\t}\n\n\treturn nil\n}\n\nfunc upstreamProtocol(svc *v1.Service, port v1.ServicePort) string {\n\tup := annotation.ParseUpstreamProtocols(svc.Annotations)\n\tprotocol := up[port.Name]\n\tif protocol == \"\" {\n\t\tprotocol = up[strconv.Itoa(int(port.Port))]\n\t}\n\treturn protocol\n}\n\nfunc externalName(svc *v1.Service) string {\n\tif svc.Spec.Type != v1.ServiceTypeExternalName {\n\t\treturn \"\"\n\t}\n\treturn svc.Spec.ExternalName\n}\n\n// serviceGetter is a visitor that gets all services\n// in the DAG.\ntype serviceGetter map[RouteServiceName]*Service\n\nfunc (s serviceGetter) visit(vertex Vertex) {\n\tswitch obj := vertex.(type) {\n\tcase *Service:\n\t\ts[RouteServiceName{\n\t\t\tName:      obj.Weighted.ServiceName,\n\t\t\tNamespace: obj.Weighted.ServiceNamespace,\n\t\t\tPort:      obj.Weighted.ServicePort.Port,\n\t\t}] = obj\n\tdefault:\n\t\tvertex.Visit(s.visit)\n\t}\n}\n\n// GetSecureVirtualHosts returns all secure virtual hosts in the DAG.\nfunc (dag *DAG) GetSecureVirtualHosts() map[ListenerName]*SecureVirtualHost {\n\tgetter := svhostGetter(map[ListenerName]*SecureVirtualHost{})\n\tdag.Visit(getter.visit)\n\treturn getter\n}\n\n// GetSecureVirtualHost returns the secure virtual host in the DAG that\n// matches the provided name, or nil if no matching secure virtual host\n// is found.\nfunc (dag *DAG) GetSecureVirtualHost(ln ListenerName) *SecureVirtualHost {\n\treturn dag.GetSecureVirtualHosts()[ln]\n}\n\n// EnsureSecureVirtualHost adds a secure virtual host with the provided\n// name to the DAG if it does not already exist, and returns it.\nfunc (dag *DAG) EnsureSecureVirtualHost(ln ListenerName) *SecureVirtualHost {\n\tif svh := dag.GetSecureVirtualHost(ln); svh != nil {\n\t\treturn svh\n\t}\n\n\tsvh := &SecureVirtualHost{\n\t\tVirtualHost: VirtualHost{\n\t\t\tName:         ln.Name,\n\t\t\tListenerName: ln.ListenerName,\n\t\t},\n\t}\n\tdag.AddRoot(svh)\n\treturn svh\n}\n\n// svhostGetter is a visitor that gets all secure virtual hosts\n// in the DAG.\ntype svhostGetter map[ListenerName]*SecureVirtualHost\n\nfunc (s svhostGetter) visit(vertex Vertex) {\n\tswitch obj := vertex.(type) {\n\tcase *SecureVirtualHost:\n\t\ts[ListenerName{Name: obj.Name, ListenerName: obj.VirtualHost.ListenerName}] = obj\n\tdefault:\n\t\tvertex.Visit(s.visit)\n\t}\n}\n\n// GetVirtualHosts returns all virtual hosts in the DAG.\nfunc (dag *DAG) GetVirtualHosts() map[ListenerName]*VirtualHost {\n\tgetter := vhostGetter(map[ListenerName]*VirtualHost{})\n\tdag.Visit(getter.visit)\n\treturn getter",
+  "patch": "@@ -51,12 +51,17 @@ func (dag *DAG) GetService(meta types.NamespacedName, port int32) *Service {\n // EnsureService looks for a Kubernetes service in the cache matching the provided\n // namespace, name and port, and returns a DAG service for it. If a matching service\n // cannot be found in the cache, an error is returned.\n-func (dag *DAG) EnsureService(meta types.NamespacedName, port intstr.IntOrString, cache *KubernetesCache) (*Service, error) {\n+func (dag *DAG) EnsureService(meta types.NamespacedName, port intstr.IntOrString, cache *KubernetesCache, enableExternalNameSvc bool) (*Service, error) {\n \tsvc, svcPort, err := cache.LookupService(meta, port)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n \n+\terr = validateExternalName(svc, enableExternalNameSvc)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\n \tif dagSvc := dag.GetService(k8s.NamespacedNameOf(svc), svcPort.Port); dagSvc != nil {\n \t\treturn dagSvc, nil\n \t}\n@@ -78,6 +83,38 @@ func (dag *DAG) EnsureService(meta types.NamespacedName, port intstr.IntOrString\n \treturn dagSvc, nil\n }\n \n+func validateExternalName(svc *v1.Service, enableExternalNameSvc bool) error {\n+\n+\t// If this isn't an ExternalName Service, we're all good here.\n+\ten := externalName(svc)\n+\tif en == \"\" {\n+\t\treturn nil\n+\t}\n+\n+\t// If ExternalNames are disabled, then we don't want to add this to the DAG.\n+\tif !enableExternalNameSvc {\n+\t\treturn fmt.Errorf(\"%s/%s is an ExternalName service, these are not currently enabled. See the config.enableExternalNameService config file setting\", svc.Namespace, svc.Name)\n+\t}\n+\n+\t// Check against a list of known localhost names, using a map to approximate a set.\n+\t// TODO(youngnick) This is a very porous hack, and we should probably look into doing a DNS\n+\t// lookup to check what the externalName resolves to, but I'm worried about the\n+\t// performance impact of doing one or more DNS lookups per DAG run, so we're\n+\t// going to go with a specific blocklist for now.\n+\tlocalhostNames := map[string]struct{}{\n+\t\t\"localhost\":               {},\n+\t\t\"localhost.localdomain\":   {},\n+\t\t\"local.projectcontour.io\": {},\n+\t}\n+\n+\t_, localhost := localhostNames[en]\n+\tif localhost {\n+\t\treturn fmt.Errorf(\"%s/%s is an ExternalName service that points to localhost, this is not allowed\", svc.Namespace, svc.Name)\n+\t}\n+\n+\treturn nil\n+}\n+\n func upstreamProtocol(svc *v1.Service, port v1.ServicePort) string {\n \tup := annotation.ParseUpstreamProtocols(svc.Annotations)\n \tprotocol := up[port.Name]\n",
+  "function_modified_lines": {
+    "added": [
+      "func (dag *DAG) EnsureService(meta types.NamespacedName, port intstr.IntOrString, cache *KubernetesCache, enableExternalNameSvc bool) (*Service, error) {",
+      "\tif err != nil {",
+      "\t\treturn nil, err",
+      "\t}",
+      "\terr = validateExternalName(svc, enableExternalNameSvc)",
+      "}",
+      "func validateExternalName(svc *v1.Service, enableExternalNameSvc bool) error {",
+      "\t// If this isn't an ExternalName Service, we're all good here.",
+      "\ten := externalName(svc)",
+      "\tif en == \"\" {",
+      "\t\treturn nil",
+      "\t}",
+      "\t// If ExternalNames are disabled, then we don't want to add this to the DAG.",
+      "\tif !enableExternalNameSvc {",
+      "\t\treturn fmt.Errorf(\"%s/%s is an ExternalName service, these are not currently enabled. See the config.enableExternalNameService config file setting\", svc.Namespace, svc.Name)",
+      "\t}",
+      "\t// Check against a list of known localhost names, using a map to approximate a set.",
+      "\t// TODO(youngnick) This is a very porous hack, and we should probably look into doing a DNS",
+      "\t// lookup to check what the externalName resolves to, but I'm worried about the",
+      "\t// performance impact of doing one or more DNS lookups per DAG run, so we're",
+      "\t// going to go with a specific blocklist for now.",
+      "\tlocalhostNames := map[string]struct{}{",
+      "\t\t\"localhost\":               {},",
+      "\t\t\"localhost.localdomain\":   {},",
+      "\t\t\"local.projectcontour.io\": {},",
+      "\t}",
+      "\t_, localhost := localhostNames[en]",
+      "\tif localhost {",
+      "\t\treturn fmt.Errorf(\"%s/%s is an ExternalName service that points to localhost, this is not allowed\", svc.Namespace, svc.Name)",
+      "\t}",
+      "\treturn nil"
+    ],
+    "deleted": [
+      "func (dag *DAG) EnsureService(meta types.NamespacedName, port intstr.IntOrString, cache *KubernetesCache) (*Service, error) {",
+      "}",
+      "// GetVirtualHost returns the virtual host in the DAG that matches the",
+      "// provided name, or nil if no matching virtual host is found.",
+      "func (dag *DAG) GetVirtualHost(ln ListenerName) *VirtualHost {",
+      "\treturn dag.GetVirtualHosts()[ln]",
+      "}",
+      "// EnsureVirtualHost adds a virtual host with the provided name to the",
+      "// DAG if it does not already exist, and returns it.",
+      "func (dag *DAG) EnsureVirtualHost(ln ListenerName) *VirtualHost {",
+      "\tif vhost := dag.GetVirtualHost(ln); vhost != nil {",
+      "\t\treturn vhost",
+      "\t}",
+      "\tvhost := &VirtualHost{",
+      "\t\tName:         ln.Name,",
+      "\t\tListenerName: ln.ListenerName,",
+      "\t}",
+      "\tdag.AddRoot(vhost)",
+      "\treturn vhost",
+      "}",
+      "// vhostGetter is a visitor that gets all virtual hosts",
+      "// in the DAG.",
+      "type vhostGetter map[ListenerName]*VirtualHost",
+      "func (v vhostGetter) visit(vertex Vertex) {",
+      "\tswitch obj := vertex.(type) {",
+      "\tcase *VirtualHost:",
+      "\t\tv[ListenerName{Name: obj.Name, ListenerName: obj.ListenerName}] = obj",
+      "\tdefault:",
+      "\t\tvertex.Visit(v.visit)",
+      "\t}",
+      "}",
+      "// GetExtensionClusters returns all extension clusters in the DAG."
+    ]
+  },
+  "cwe": [
+    "CWE-610"
+  ],
+  "cve_description": "Contour is a Kubernetes ingress controller using Envoy proxy. In Contour before version 1.17.1 a specially crafted ExternalName type Service may be used to access Envoy's admin interface, which Contour normally prevents from access outside the Envoy container. This can be used to shut down Envoy remotely (a denial of service), or to expose the existence of any Secret that Envoy is using for its configuration, including most notably TLS Keypairs. However, it *cannot* be used to get the *content* of those secrets. Since this attack allows access to the administration interface, a variety of administration options are available, such as shutting down the Envoy or draining traffic. In general, the Envoy admin interface cannot easily be used for making changes to the cluster, in-flight requests, or backend services, but it could be used to shut down or drain Envoy, change traffic routing, or to retrieve secret metadata, as mentioned above. The issue will be addressed in Contour v1.18.0 and a cherry-picked patch release, v1.17.1, has been released to cover users who cannot upgrade at this time. For more details refer to the linked GitHub Security Advisory.",
+  "id": 1
+}
+]

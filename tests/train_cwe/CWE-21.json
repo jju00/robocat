@@ -1,0 +1,47 @@
+[
+{
+  "cve_id": "CVE-2016-1505",
+  "code_before_change": "def sanitize_path(path):\n    \"\"\"Make absolute (with leading slash) to prevent access to other data.\n       Preserves an potential trailing slash.\"\"\"\n    trailing_slash = \"/\" if path.endswith(\"/\") else \"\"\n    path = posixpath.normpath(path)\n    new_path = \"/\"\n    for part in path.split(\"/\"):\n        if not part or part in (\".\", \"..\"):\n            continue\n        new_path = posixpath.join(new_path, part)\n    trailing_slash = \"\" if new_path.endswith(\"/\") else trailing_slash\n    return new_path + trailing_slash",
+  "code_after_change": "from . import log\n\n\ndef sanitize_path(path):\n    \"\"\"Make absolute (with leading slash) to prevent access to other data.\n       Preserves an potential trailing slash.\"\"\"\n    trailing_slash = \"/\" if path.endswith(\"/\") else \"\"\n    path = posixpath.normpath(path)\n    new_path = \"/\"\n    for part in path.split(\"/\"):\n        if not part or part in (\".\", \"..\"):\n            continue\n        new_path = posixpath.join(new_path, part)\n    trailing_slash = \"\" if new_path.endswith(\"/\") else trailing_slash\n    return new_path + trailing_slash\n\n\ndef is_safe_filesystem_path_component(path):\n    \"\"\"Checks if path is a single component of a local filesystem path\n       and is safe to join\"\"\"\n    if not path:\n        return False\n    drive, _ = os.path.splitdrive(path)\n    if drive:\n        return False\n    head, _ = os.path.split(path)\n    if head:\n        return False\n    if path in (os.curdir, os.pardir):\n        return False\n    return True\n\n\ndef path_to_filesystem(path, base_folder):\n    \"\"\"Converts path to a local filesystem path relative to base_folder\n        in a secure manner or raises ValueError.\"\"\"\n    sane_path = sanitize_path(path).strip(\"/\")\n    safe_path = base_folder\n    if not sane_path:\n        return safe_path\n    for part in sane_path.split(\"/\"):\n        if not is_safe_filesystem_path_component(part):\n            log.LOGGER.debug(\"Can't translate path safely to filesystem: %s\",\n                             path)\n            raise ValueError(\"Unsafe path\")\n        safe_path = os.path.join(safe_path, part)\n    return safe_path",
+  "patch": "@@ -20,8 +20,11 @@ Helper functions for working with paths\n \n \"\"\"\n \n+import os\n import posixpath\n \n+from . import log\n+\n \n def sanitize_path(path):\n     \"\"\"Make absolute (with leading slash) to prevent access to other data.\n@@ -34,4 +37,36 @@ def sanitize_path(path):\n             continue\n         new_path = posixpath.join(new_path, part)\n     trailing_slash = \"\" if new_path.endswith(\"/\") else trailing_slash\n-    return new_path + trailing_slash\n\\ No newline at end of file\n+    return new_path + trailing_slash\n+\n+\n+def is_safe_filesystem_path_component(path):\n+    \"\"\"Checks if path is a single component of a local filesystem path\n+       and is safe to join\"\"\"\n+    if not path:\n+        return False\n+    drive, _ = os.path.splitdrive(path)\n+    if drive:\n+        return False\n+    head, _ = os.path.split(path)\n+    if head:\n+        return False\n+    if path in (os.curdir, os.pardir):\n+        return False\n+    return True\n+\n+\n+def path_to_filesystem(path, base_folder):\n+    \"\"\"Converts path to a local filesystem path relative to base_folder\n+        in a secure manner or raises ValueError.\"\"\"\n+    sane_path = sanitize_path(path).strip(\"/\")\n+    safe_path = base_folder\n+    if not sane_path:\n+        return safe_path\n+    for part in sane_path.split(\"/\"):\n+        if not is_safe_filesystem_path_component(part):\n+            log.LOGGER.debug(\"Can't translate path safely to filesystem: %s\",\n+                             path)\n+            raise ValueError(\"Unsafe path\")\n+        safe_path = os.path.join(safe_path, part)\n+    return safe_path\n\\ No newline at end of file\n",
+  "function_modified_lines": {
+    "added": [
+      "from . import log",
+      "def is_safe_filesystem_path_component(path):",
+      "    \"\"\"Checks if path is a single component of a local filesystem path",
+      "       and is safe to join\"\"\"",
+      "    if not path:",
+      "        return False",
+      "    drive, _ = os.path.splitdrive(path)",
+      "    if drive:",
+      "        return False",
+      "    head, _ = os.path.split(path)",
+      "    if head:",
+      "        return False",
+      "    if path in (os.curdir, os.pardir):",
+      "        return False",
+      "    return True",
+      "def path_to_filesystem(path, base_folder):",
+      "    \"\"\"Converts path to a local filesystem path relative to base_folder",
+      "        in a secure manner or raises ValueError.\"\"\"",
+      "    sane_path = sanitize_path(path).strip(\"/\")",
+      "    safe_path = base_folder",
+      "    if not sane_path:",
+      "        return safe_path",
+      "    for part in sane_path.split(\"/\"):",
+      "        if not is_safe_filesystem_path_component(part):",
+      "            log.LOGGER.debug(\"Can't translate path safely to filesystem: %s\",",
+      "                             path)",
+      "            raise ValueError(\"Unsafe path\")",
+      "        safe_path = os.path.join(safe_path, part)",
+      "    return safe_path"
+    ],
+    "deleted": []
+  },
+  "cwe": [
+    "CWE-21"
+  ],
+  "cve_description": "The filesystem storage backend in Radicale before 1.1 on Windows allows remote attackers to read or write to arbitrary files via a crafted path, as demonstrated by /c:/file/ignore.",
+  "id": 1
+}
+]
