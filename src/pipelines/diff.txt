@@ -1,0 +1,3893 @@
+diff --git a/libraries/classes/Advisor.php b/libraries/classes/Advisor.php
+index ea6bd95465..36d5698e48 100644
+--- a/libraries/classes/Advisor.php
++++ b/libraries/classes/Advisor.php
+@@ -396,7 +396,22 @@ private function replaceVariable(array $matches): string
+      */
+     private function evaluateRuleExpression(string $expression)
+     {
+-        return $this->expression->evaluate($expression, array_merge($this->variables, $this->globals));
++        $variables = array_merge($this->variables, $this->globals);
++
++        // Set default values for missing InnoDB variables when InnoDB is disabled
++        if (! isset($variables['innodb_buffer_pool_size'])) {
++            $variables['innodb_buffer_pool_size'] = 0;
++        }
++
++        if (! isset($variables['innodb_log_file_size'])) {
++            $variables['innodb_log_file_size'] = 0;
++        }
++
++        if (! isset($variables['innodb_log_files_in_group'])) {
++            $variables['innodb_log_files_in_group'] = 0;
++        }
++
++        return $this->expression->evaluate($expression, $variables);
+     }
+ 
+     /**
+diff --git a/libraries/classes/Command/TwigLintCommand.php b/libraries/classes/Command/TwigLintCommand.php
+index 876d352376..1bfbba7eab 100644
+--- a/libraries/classes/Command/TwigLintCommand.php
++++ b/libraries/classes/Command/TwigLintCommand.php
+@@ -73,6 +73,7 @@ protected function configure(): void
+             ->addOption('show-deprecations', null, InputOption::VALUE_NONE, 'Show deprecations as errors');
+     }
+ 
++    /** @return string[] */
+     protected function findFiles(string $baseFolder): array
+     {
+         /* Open the handle */
+@@ -141,7 +142,8 @@ static function (int $level, string $message, string $file, int $line) use (&$pr
+         return $this->display($output, $io, $filesInfo);
+     }
+ 
+-    protected function getFilesInfo(string $templatesPath): array
++    /** @return array{template: string, file: string, valid: bool, line?: int, exception?: Error}[] */
++    public function getFilesInfo(string $templatesPath): array
+     {
+         $filesInfo = [];
+         $filesFound = $this->findFiles($templatesPath);
+@@ -160,6 +162,7 @@ protected function getTemplateContents(string $filePath): string
+         return (string) file_get_contents($filePath);
+     }
+ 
++    /** @return array{template: string, file: string, valid: bool, line?: int, exception?: Error} */
+     private function validate(string $template, string $file): array
+     {
+         $twig = Template::getTwigEnvironment(null);
+diff --git a/libraries/classes/Common.php b/libraries/classes/Common.php
+index 4f5a4007bd..948c30ac1d 100644
+--- a/libraries/classes/Common.php
++++ b/libraries/classes/Common.php
+@@ -45,6 +45,8 @@
+ use function urldecode;
+ 
+ use const E_USER_ERROR;
++use const E_USER_WARNING;
++use const PHP_VERSION_ID;
+ 
+ final class Common
+ {
+@@ -497,7 +499,7 @@ public static function checkTokenRequestParam(): void
+                 __(
+                     'Failed to set session cookie. Maybe you are using HTTP instead of HTTPS to access phpMyAdmin.'
+                 ),
+-                E_USER_ERROR
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+             );
+         }
+ 
+diff --git a/libraries/classes/Config.php b/libraries/classes/Config.php
+index 24cd4b7d00..267102e2b6 100644
+--- a/libraries/classes/Config.php
++++ b/libraries/classes/Config.php
+@@ -24,7 +24,7 @@
+ use function fopen;
+ use function fread;
+ use function function_exists;
+-use function gd_info;
++use function get_defined_constants;
+ use function get_object_vars;
+ use function implode;
+ use function ini_get;
+@@ -63,6 +63,7 @@
+ use const ARRAY_FILTER_USE_KEY;
+ use const DIRECTORY_SEPARATOR;
+ use const E_USER_ERROR;
++use const E_USER_WARNING;
+ use const PHP_OS;
+ use const PHP_URL_PATH;
+ use const PHP_URL_SCHEME;
+@@ -246,38 +247,20 @@ public function checkClient(): void
+     }
+ 
+     /**
+-     * Whether GD2 is present
++     * Determines if GD2+ is available
++     *
++     * Respects the config override ('yes' / 'no') if set,
++     * otherwise checks the `GD_MAJOR_VERSION` constant (>= 2).
+      */
+     public function checkGd2(): void
+     {
+         if ($this->get('GD2Available') === 'yes') {
+             $this->set('PMA_IS_GD2', 1);
+-
+-            return;
+-        }
+-
+-        if ($this->get('GD2Available') === 'no') {
+-            $this->set('PMA_IS_GD2', 0);
+-
+-            return;
+-        }
+-
+-        if (! function_exists('imagecreatetruecolor')) {
++        } elseif ($this->get('GD2Available') === 'no') {
+             $this->set('PMA_IS_GD2', 0);
+-
+-            return;
+-        }
+-
+-        if (function_exists('gd_info')) {
+-            $gd_nfo = gd_info();
+-            if (mb_strstr($gd_nfo['GD Version'], '2.')) {
+-                $this->set('PMA_IS_GD2', 1);
+-
+-                return;
+-            }
++        } else {
++            $this->set('PMA_IS_GD2', (get_defined_constants()['GD_MAJOR_VERSION'] ?? 0) >= 2 ? 1 : 0);
+         }
+-
+-        $this->set('PMA_IS_GD2', 0);
+     }
+ 
+     /**
+@@ -707,7 +690,7 @@ public function checkErrors(): void
+             . __('This usually means there is a syntax error in it, please check any errors shown below.')
+             . '[br][br]'
+             . '[conferr]';
+-        trigger_error($error, E_USER_ERROR);
++        trigger_error($error, PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING);
+     }
+ 
+     /**
+@@ -1232,7 +1215,7 @@ public function checkServers(): void
+             if (! is_int($server_index) || $server_index < 1) {
+                 trigger_error(
+                     sprintf(__('Invalid server index: %s'), $server_index),
+-                    E_USER_ERROR
++                    PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+                 );
+             }
+ 
+diff --git a/libraries/classes/Config/Form.php b/libraries/classes/Config/Form.php
+index aa01acb3bb..a186a3df99 100644
+--- a/libraries/classes/Config/Form.php
++++ b/libraries/classes/Config/Form.php
+@@ -24,6 +24,8 @@
+ use function trigger_error;
+ 
+ use const E_USER_ERROR;
++use const E_USER_WARNING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * Base class for forms, loads default configuration options, checks allowed
+@@ -130,13 +132,19 @@ public function getOptionValueList($optionPath)
+     {
+         $value = $this->configFile->getDbEntry($optionPath);
+         if ($value === null) {
+-            trigger_error($optionPath . ' - select options not defined', E_USER_ERROR);
++            trigger_error(
++                $optionPath . ' - select options not defined',
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
++            );
+ 
+             return [];
+         }
+ 
+         if (! is_array($value)) {
+-            trigger_error($optionPath . ' - not a static value list', E_USER_ERROR);
++            trigger_error(
++                $optionPath . ' - not a static value list',
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
++            );
+ 
+             return [];
+         }
+diff --git a/libraries/classes/Controllers/Database/StructureController.php b/libraries/classes/Controllers/Database/StructureController.php
+index 19d9f7d4cb..eb1a0a406f 100644
+--- a/libraries/classes/Controllers/Database/StructureController.php
++++ b/libraries/classes/Controllers/Database/StructureController.php
+@@ -563,7 +563,7 @@ protected function isRowCountApproximated(
+         if (isset($currentTable['TABLE_ROWS']) && ($currentTable['ENGINE'] != null || $tableIsView)) {
+             // InnoDB/TokuDB table: we did not get an accurate row count
+             $approxRows = ! $tableIsView
+-                && in_array($currentTable['ENGINE'], ['InnoDB', 'TokuDB'])
++                && in_array($currentTable['ENGINE'], ['CSV', 'InnoDB', 'TokuDB'])
+                 && ! $currentTable['COUNTED'];
+ 
+             if ($tableIsView && $currentTable['TABLE_ROWS'] >= $GLOBALS['cfg']['MaxExactCountViews']) {
+@@ -605,16 +605,19 @@ protected function getReplicationStatus($replicaInfo, string $table): array
+             $searchDoDBInTruename = array_search($table, $replicaInfo['Do_DB']);
+             $searchDoDBInDB = array_search($this->db, $replicaInfo['Do_DB']);
+ 
+-            $do = (is_string($searchDoDBInTruename) && strlen($searchDoDBInTruename) > 0)
+-                || (is_string($searchDoDBInDB) && strlen($searchDoDBInDB) > 0)
+-                || ($nbServReplicaDoDb == 0 && $nbServReplicaIgnoreDb == 0)
+-                || $this->hasTable($replicaInfo['Wild_Do_Table'], $table);
+-
+             $searchDb = array_search($this->db, $replicaInfo['Ignore_DB']);
+             $searchTable = array_search($table, $replicaInfo['Ignore_Table']);
+             $ignored = (is_string($searchTable) && strlen($searchTable) > 0)
+                 || (is_string($searchDb) && strlen($searchDb) > 0)
+                 || $this->hasTable($replicaInfo['Wild_Ignore_Table'], $table);
++
++            // Only set do = true if table is not ignored
++            if (! $ignored) {
++                $do = (is_string($searchDoDBInTruename) && strlen($searchDoDBInTruename) > 0)
++                    || (is_string($searchDoDBInDB) && strlen($searchDoDBInDB) > 0)
++                    || ($nbServReplicaDoDb == 0 && $nbServReplicaIgnoreDb == 0)
++                    || $this->hasTable($replicaInfo['Wild_Do_Table'], $table);
++            }
+         }
+ 
+         return [
+@@ -726,6 +729,12 @@ protected function getStuffForEngineTypeTable(
+                     $sumSize
+                 );
+                 break;
++            case 'CSV':
++                [$currentTable, $formattedSize, $unit, $sumSize] = $this->getValuesForCsvTable(
++                    $currentTable,
++                    $sumSize
++                );
++                break;
+             // Mysql 5.0.x (and lower) uses MRG_MyISAM
+             // and MySQL 5.1.x (and higher) uses MRG_MYISAM
+             // Both are aliases for MERGE
+@@ -883,6 +892,70 @@ protected function getValuesForInnodbTable(
+         ];
+     }
+ 
++    /**
++     * Get values for CSV table
++     *
++     * https://bugs.mysql.com/bug.php?id=53929
++     *
++     * @param array $currentTable current table
++     * @param int   $sumSize      sum size
++     *
++     * @return array
++     */
++    protected function getValuesForCsvTable(
++        array $currentTable,
++        $sumSize
++    ) {
++        $formattedSize = $unit = '';
++
++        if ($currentTable['ENGINE'] === 'CSV') {
++            $currentTable['COUNTED'] = true;
++            $currentTable['TABLE_ROWS'] = $this->dbi
++                ->getTable($this->db, $currentTable['TABLE_NAME'])
++                ->countRecords(true);
++        } else {
++            $currentTable['COUNTED'] = false;
++        }
++
++        if ($this->isShowStats) {
++            // Only count columns that have double quotes
++            $columnCount = (int) $this->dbi->fetchValue(
++                'SELECT COUNT(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = \''
++                . $this->dbi->escapeString($this->db) . '\' AND TABLE_NAME = \''
++                . $this->dbi->escapeString($currentTable['TABLE_NAME']) . '\' AND NUMERIC_SCALE IS NULL;'
++            );
++
++            // Get column names
++            $columnNames = $this->dbi->fetchValue(
++                'SELECT GROUP_CONCAT(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = \''
++                . $this->dbi->escapeString($this->db) . '\' AND TABLE_NAME = \''
++                . $this->dbi->escapeString($currentTable['TABLE_NAME']) . '\';'
++            );
++
++            // 10Mb buffer for CONCAT_WS
++            // not sure if is needed
++            $this->dbi->query('SET SESSION group_concat_max_len = 10 * 1024 * 1024');
++
++            // Calculate data length
++            $dataLength = (int) $this->dbi->fetchValue('
++                SELECT SUM(CHAR_LENGTH(REPLACE(REPLACE(REPLACE(
++                    CONCAT_WS(\',\', ' . $columnNames . '),
++                    UNHEX(\'0A\'), \'nn\'), UNHEX(\'22\'), \'nn\'), UNHEX(\'5C\'), \'nn\'
++                ))) FROM ' . Util::backquote($this->db) . '.' . Util::backquote($currentTable['TABLE_NAME']));
++
++            // Calculate quotes length
++            $quotesLength = $currentTable['TABLE_ROWS'] * $columnCount * 2;
++
++            /** @var int $tblsize */
++            $tblsize = $dataLength + $quotesLength + $currentTable['TABLE_ROWS'];
++
++            $sumSize += $tblsize;
++            [$formattedSize, $unit] = Util::formatByteDown($tblsize, 3, $tblsize > 0 ? 1 : 0);
++        }
++
++        return [$currentTable, $formattedSize, $unit, $sumSize];
++    }
++
+     /**
+      * Get values for Mroonga table
+      *
+diff --git a/libraries/classes/Controllers/HomeController.php b/libraries/classes/Controllers/HomeController.php
+index c4b929f970..78192f4e46 100644
+--- a/libraries/classes/Controllers/HomeController.php
++++ b/libraries/classes/Controllers/HomeController.php
+@@ -8,6 +8,7 @@
+ use PhpMyAdmin\CheckUserPrivileges;
+ use PhpMyAdmin\Config;
+ use PhpMyAdmin\ConfigStorage\Relation;
++use PhpMyAdmin\Core;
+ use PhpMyAdmin\DatabaseInterface;
+ use PhpMyAdmin\Git;
+ use PhpMyAdmin\Html\Generator;
+@@ -398,6 +399,21 @@ private function checkRequirements(): void
+             ];
+         }
+ 
++        /**
++         * Check for missing HTTP_HOST
++         * This commonly occurs with nginx >= 1.25.0 and HTTP/3 configurations
++         */
++        if (Core::getenv('HTTP_HOST') === '') {
++            $this->errors[] = [
++                'message' => __(
++                    'The [code]HTTP_HOST[/code] variable is missing,'
++                    . ' which might cause phpMyAdmin to not work properly.'
++                    . ' Please refer to [doc@faq1-46]documentation[/doc] for possible issues.'
++                ),
++                'severity' => 'warning',
++            ];
++        }
++
+         $this->checkLanguageStats();
+     }
+ 
+diff --git a/libraries/classes/Controllers/Import/SimulateDmlController.php b/libraries/classes/Controllers/Import/SimulateDmlController.php
+index cf3637c1d6..79aec51ab2 100644
+--- a/libraries/classes/Controllers/Import/SimulateDmlController.php
++++ b/libraries/classes/Controllers/Import/SimulateDmlController.php
+@@ -81,6 +81,12 @@ static function ($token): bool {
+ 
+     private function process(Parser $parser): void
+     {
++        if ($parser->errors !== []) {
++            $this->error = $parser->errors[0]->getMessage();
++
++            return;
++        }
++
+         foreach ($parser->statements as $statement) {
+             if (
+                 ! $statement instanceof UpdateStatement && ! $statement instanceof DeleteStatement
+diff --git a/libraries/classes/Controllers/Table/GisVisualizationController.php b/libraries/classes/Controllers/Table/GisVisualizationController.php
+index 1f3021c952..3faf9f7103 100644
+--- a/libraries/classes/Controllers/Table/GisVisualizationController.php
++++ b/libraries/classes/Controllers/Table/GisVisualizationController.php
+@@ -10,6 +10,9 @@
+ use PhpMyAdmin\Html\Generator;
+ use PhpMyAdmin\Message;
+ use PhpMyAdmin\ResponseRenderer;
++use PhpMyAdmin\SqlParser\Components\Limit;
++use PhpMyAdmin\SqlParser\Parser;
++use PhpMyAdmin\SqlParser\Statements\SelectStatement;
+ use PhpMyAdmin\Template;
+ use PhpMyAdmin\Url;
+ use PhpMyAdmin\Util;
+@@ -73,24 +76,7 @@ public function __invoke(): void
+             return;
+         }
+ 
+-        // Execute the query and return the result
+-        $result = $this->dbi->tryQuery($sqlQuery);
+-        // Get the meta data of results
+-        $meta = [];
+-        if ($result !== false) {
+-            $meta = $this->dbi->getFieldsMeta($result);
+-        }
+-
+-        // Find the candidate fields for label column and spatial column
+-        $labelCandidates = [];
+-        $spatialCandidates = [];
+-        foreach ($meta as $column_meta) {
+-            if ($column_meta->isMappedTypeGeometry) {
+-                $spatialCandidates[] = $column_meta->name;
+-            } else {
+-                $labelCandidates[] = $column_meta->name;
+-            }
+-        }
++        [$labelCandidates, $spatialCandidates] = $this->getCandidateColumns($sqlQuery);
+ 
+         // Get settings if any posted
+         $visualizationSettings = [];
+@@ -200,4 +186,34 @@ private function saveToFile(string $filename, string $format): void
+         $this->response->disable();
+         $this->visualization->toFile($filename, $format);
+     }
++
++    /**
++     * @return array{list<string>,list<string>}
++     */
++    private function getCandidateColumns(string $sqlQuery): array
++    {
++        $parser = new Parser($sqlQuery);
++        /** @var SelectStatement $statement */
++        $statement = $parser->statements[0];
++        $statement->limit = new Limit(0, 0);
++        $limitedSqlQuery = $statement->build();
++
++        $result = $this->dbi->tryQuery($limitedSqlQuery);
++        $meta = [];
++        if ($result !== false) {
++            $meta = $this->dbi->getFieldsMeta($result);
++        }
++
++        $labelCandidates = [];
++        $spatialCandidates = [];
++        foreach ($meta as $column_meta) {
++            if ($column_meta->isMappedTypeGeometry) {
++                $spatialCandidates[] = $column_meta->name;
++            } else {
++                $labelCandidates[] = $column_meta->name;
++            }
++        }
++
++        return [$labelCandidates, $spatialCandidates];
++    }
+ }
+diff --git a/libraries/classes/Controllers/Table/ReplaceController.php b/libraries/classes/Controllers/Table/ReplaceController.php
+index 32a7aa66b4..46366affc2 100644
+--- a/libraries/classes/Controllers/Table/ReplaceController.php
++++ b/libraries/classes/Controllers/Table/ReplaceController.php
+@@ -162,6 +162,7 @@ public function __invoke(): void
+             'VERSION',
+         ];
+         $func_optional_param = [
++            'NOW',
+             'RAND',
+             'UNIX_TIMESTAMP',
+         ];
+diff --git a/libraries/classes/Controllers/Table/Structure/MoveColumnsController.php b/libraries/classes/Controllers/Table/Structure/MoveColumnsController.php
+index 13f9ac39b2..1b4cf2f3b5 100644
+--- a/libraries/classes/Controllers/Table/Structure/MoveColumnsController.php
++++ b/libraries/classes/Controllers/Table/Structure/MoveColumnsController.php
+@@ -94,11 +94,11 @@ private function generateAlterTableSql(string $createTableSql, array $moveColumn
+         $parser = new Parser($createTableSql);
+         /** @var CreateStatement $statement */
+         $statement = $parser->statements[0];
+-        /** @var CreateDefinition[] $fields */
++        /** @var CreateDefinition[] $fields For CREATE TABLE statement the type is CreateDefinition[] */
+         $fields = $statement->fields;
+         $columns = [];
+         foreach ($fields as $field) {
+-            if ($field->name === null) {
++            if ($field->name === null || $field->isConstraint === true || $field->key !== null) {
+                 continue;
+             }
+ 
+diff --git a/libraries/classes/Core.php b/libraries/classes/Core.php
+index 012e30a123..c6a214076b 100644
+--- a/libraries/classes/Core.php
++++ b/libraries/classes/Core.php
+@@ -57,6 +57,7 @@
+ use const E_USER_ERROR;
+ use const E_USER_WARNING;
+ use const FILTER_VALIDATE_IP;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * Core functions used all over the scripts.
+@@ -375,7 +376,10 @@ public static function sendHeaderLocation(string $uri, bool $use_refresh = false
+ 
+         session_write_close();
+         if ($response->headersSent()) {
+-            trigger_error('Core::sendHeaderLocation called when headers are already sent!', E_USER_ERROR);
++            trigger_error(
++                'Core::sendHeaderLocation called when headers are already sent!',
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
++            );
+         }
+ 
+         // bug #1523784: IE6 does not like 'Refresh: 0', it
+@@ -458,46 +462,64 @@ public static function getNoCacheHeaders(): array
+     }
+ 
+     /**
+-     * Sends header indicating file download.
+-     *
+-     * @param string $filename Filename to include in headers if empty,
+-     *                         none Content-Disposition header will be sent.
++     * @param string $filename Filename to include in headers if empty, none Content-Disposition header will be sent.
+      * @param string $mimetype MIME type to include in headers.
+      * @param int    $length   Length of content (optional)
+-     * @param bool   $no_cache Whether to include no-caching headers.
++     * @param bool   $noCache  Whether to include no-caching headers.
++     *
++     * @return array<string, string>
+      */
+-    public static function downloadHeader(
++    public static function getDownloadHeaders(
+         string $filename,
+         string $mimetype,
+         int $length = 0,
+-        bool $no_cache = true
+-    ): void {
++        bool $noCache = true
++    ): array {
+         $headers = [];
+ 
+-        if ($no_cache) {
++        if ($noCache) {
+             $headers = self::getNoCacheHeaders();
+         }
+ 
+         /* Replace all possibly dangerous chars in filename */
+         $filename = Sanitize::sanitizeFilename($filename);
+-        if (! empty($filename)) {
++        if ($filename !== '') {
+             $headers['Content-Description'] = 'File Transfer';
+             $headers['Content-Disposition'] = 'attachment; filename="' . $filename . '"';
+         }
+ 
+         $headers['Content-Type'] = $mimetype;
+ 
+-        // The default output in PMA uses gzip,
+-        // so if we want to output uncompressed file, we should reset the encoding.
+-        // See PHP bug https://github.com/php/php-src/issues/8218
+-        header_remove('Content-Encoding');
+-
+         $headers['Content-Transfer-Encoding'] = 'binary';
+ 
+         if ($length > 0) {
+             $headers['Content-Length'] = (string) $length;
+         }
+ 
++        return $headers;
++    }
++
++    /**
++     * Sends header indicating file download.
++     *
++     * @param string $filename Filename to include in headers if empty, none Content-Disposition header will be sent.
++     * @param string $mimetype MIME type to include in headers.
++     * @param int    $length   Length of content (optional)
++     * @param bool   $noCache  Whether to include no-caching headers.
++     */
++    public static function downloadHeader(
++        string $filename,
++        string $mimetype,
++        int $length = 0,
++        bool $noCache = true
++    ): void {
++        $headers = self::getDownloadHeaders($filename, $mimetype, $length, $noCache);
++
++        // The default output in PMA uses gzip,
++        // so if we want to output uncompressed file, we should reset the encoding.
++        // See PHP bug https://github.com/php/php-src/issues/8218
++        header_remove('Content-Encoding');
++
+         foreach ($headers as $name => $value) {
+             header(sprintf('%s: %s', $name, $value));
+         }
+diff --git a/libraries/classes/DatabaseInterface.php b/libraries/classes/DatabaseInterface.php
+index 99700b078c..08c12c8959 100644
+--- a/libraries/classes/DatabaseInterface.php
++++ b/libraries/classes/DatabaseInterface.php
+@@ -1125,7 +1125,7 @@ public function postConnect(): void
+         /* Locale for messages */
+         $locale = LanguageManager::getInstance()->getCurrentLanguage()->getMySQLLocale();
+         if ($locale) {
+-            $this->query("SET lc_messages = '" . $locale . "';");
++            $this->tryQuery("SET lc_messages = '" . $locale . "';");
+         }
+ 
+         // Set timezone for the session, if required.
+@@ -1794,8 +1794,10 @@ public function isGrantUser(): bool
+             return $hasGrantPrivilege;
+         }
+ 
++        $collation = $this->getServerCollation();
++
+         [$user, $host] = $this->getCurrentUserAndHost();
+-        $query = QueryGenerator::getInformationSchemaDataForGranteeRequest($user, $host);
++        $query = QueryGenerator::getInformationSchemaDataForGranteeRequest($user, $host, $collation);
+         $result = $this->tryQuery($query);
+ 
+         if ($result) {
+@@ -1804,7 +1806,7 @@ public function isGrantUser(): bool
+ 
+         if (! $hasGrantPrivilege) {
+             foreach ($this->getCurrentRolesAndHost() as [$role, $roleHost]) {
+-                $query = QueryGenerator::getInformationSchemaDataForGranteeRequest($role, $roleHost ?? '');
++                $query = QueryGenerator::getInformationSchemaDataForGranteeRequest($role, $roleHost ?? '', $collation);
+                 $result = $this->tryQuery($query);
+ 
+                 if ($result) {
+@@ -1851,8 +1853,10 @@ public function isCreateUser(): bool
+             return $hasCreatePrivilege;
+         }
+ 
++        $collation = $this->getServerCollation();
++
+         [$user, $host] = $this->getCurrentUserAndHost();
+-        $query = QueryGenerator::getInformationSchemaDataForCreateRequest($user, $host);
++        $query = QueryGenerator::getInformationSchemaDataForCreateRequest($user, $host, $collation);
+         $result = $this->tryQuery($query);
+ 
+         if ($result) {
+@@ -1861,7 +1865,7 @@ public function isCreateUser(): bool
+ 
+         if (! $hasCreatePrivilege) {
+             foreach ($this->getCurrentRolesAndHost() as [$role, $roleHost]) {
+-                $query = QueryGenerator::getInformationSchemaDataForCreateRequest($role, $roleHost ?? '');
++                $query = QueryGenerator::getInformationSchemaDataForCreateRequest($role, $roleHost ?? '', $collation);
+                 $result = $this->tryQuery($query);
+ 
+                 if ($result) {
+diff --git a/libraries/classes/Dbal/DbiMysqli.php b/libraries/classes/Dbal/DbiMysqli.php
+index 6247cedf16..7d1deca5db 100644
+--- a/libraries/classes/Dbal/DbiMysqli.php
++++ b/libraries/classes/Dbal/DbiMysqli.php
+@@ -33,6 +33,7 @@
+ use const MYSQLI_REPORT_OFF;
+ use const MYSQLI_STORE_RESULT;
+ use const MYSQLI_USE_RESULT;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * Interface to the MySQL Improved extension (MySQLi)
+@@ -167,7 +168,7 @@ public function connect($user, $password, array $server)
+                         '[code][doc@cfg_Servers_hide_connection_errors]'
+                         . '$cfg[\'Servers\'][$i][\'hide_connection_errors\'][/doc][/code]'
+                     ),
+-                    E_USER_ERROR
++                    PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+                 );
+             }
+ 
+diff --git a/libraries/classes/Display/Results.php b/libraries/classes/Display/Results.php
+index d6a82fc438..a43b91333a 100644
+--- a/libraries/classes/Display/Results.php
++++ b/libraries/classes/Display/Results.php
+@@ -840,12 +840,16 @@ private function getTableNavigation(
+         // Move to the next page or to the last one
+         $moveForwardButtons = '';
+         if (
++            ! (
+             // view with unknown number of rows
+-            ($this->properties['unlim_num_rows'] === -1 || $this->properties['unlim_num_rows'] === false)
+-            || (! $isShowingAll
+-            && intval($_SESSION['tmpval']['pos']) + intval($_SESSION['tmpval']['max_rows'])
+-                < $this->properties['unlim_num_rows']
+-            && $this->properties['num_rows'] >= $_SESSION['tmpval']['max_rows'])
++            $this->properties['unlim_num_rows'] !== -1
++            && $this->properties['unlim_num_rows'] !== false
++            && ($isShowingAll
++                || ( $this->isExactCount()
++                    && (int) $_SESSION['tmpval']['pos'] + (int) $_SESSION['tmpval']['max_rows']
++                    >= $this->properties['unlim_num_rows'])
++                || $this->properties['num_rows'] < $_SESSION['tmpval']['max_rows'])
++            )
+         ) {
+             $moveForwardButtons = $this->getMoveForwardButtonsForTableNavigation(
+                 htmlspecialchars($this->properties['sql_query']),
+@@ -878,6 +882,15 @@ private function getTableNavigation(
+         ];
+     }
+ 
++    private function isExactCount(): bool
++    {
++        // If we have the full page of rows, we don't know
++        // if there are more unless unlimNumRows is smaller than MaxExactCount
++        return $this->properties['unlim_num_rows'] < $GLOBALS['cfg']['MaxExactCount']
++            || $_SESSION['tmpval']['max_rows'] === self::ALL_ROWS
++            || $this->properties['num_rows'] < $_SESSION['tmpval']['max_rows'];
++    }
++
+     /**
+      * Prepare move backward buttons - previous and first
+      *
+@@ -1870,14 +1883,14 @@ private function getSortOrderLink(
+         array $orderUrlParams,
+         array $multiOrderUrlParams
+     ): string {
+-        $urlPath = Url::getFromRoute('/sql', $multiOrderUrlParams, false);
++        $urlPath = Url::getFromRoute('/sql', $multiOrderUrlParams, true);
+         $innerLinkContent = htmlspecialchars($fieldsMeta->name) . $orderImg
+             . '<input type="hidden" value="'
+             . $urlPath
+             . '">';
+ 
+         return Generator::linkOrButton(
+-            Url::getFromRoute('/sql', $orderUrlParams, false),
++            Url::getFromRoute('/sql', $orderUrlParams, true),
+             null,
+             $innerLinkContent,
+             ['class' => 'sortlink']
+@@ -3687,8 +3700,19 @@ public function getTable(
+ 
+             $sqlQueryMessage = Generator::getMessage($message, $this->properties['sql_query'], 'success');
+         } elseif (($printView === null || $printView != '1') && ! $isLimitedDisplay) {
++            $message = Message::success(__('Your SQL query has been executed successfully.'));
++
++            if ($this->properties['querytime'] > 0) {
++                $message->addText('(');
++
++                $messageQueryTime = Message::notice(__('Query took %01.4f seconds.') . ')');
++                $messageQueryTime->addParam($this->properties['querytime']);
++
++                $message->addMessage($messageQueryTime, '');
++            }
++
+             $sqlQueryMessage = Generator::getMessage(
+-                __('Your SQL query has been executed successfully.'),
++                $message,
+                 $this->properties['sql_query'],
+                 'success'
+             );
+@@ -3962,7 +3986,7 @@ private function setMessageInformation(
+             }
+         } elseif (($_SESSION['tmpval']['max_rows'] === self::ALL_ROWS) || ($posNext > $total)) {
+             $firstShownRec = $_SESSION['tmpval']['pos'];
+-            $lastShownRec = $total - 1;
++            $lastShownRec = $firstShownRec + $this->properties['num_rows'] - 1;
+         } else {
+             $firstShownRec = $_SESSION['tmpval']['pos'];
+             $lastShownRec = $posNext - 1;
+diff --git a/libraries/classes/Gis/GisVisualization.php b/libraries/classes/Gis/GisVisualization.php
+index 8bdcae4e2b..92bd7b5fd6 100644
+--- a/libraries/classes/Gis/GisVisualization.php
++++ b/libraries/classes/Gis/GisVisualization.php
+@@ -434,7 +434,13 @@ public function asOl()
+         $output = 'function drawOpenLayers() {'
+             . 'if (typeof ol !== "undefined") {'
+             . 'var olCss = "js/vendor/openlayers/theme/ol.css";'
+-            . '$(\'head\').append(\'<link rel="stylesheet" type="text/css" href=\'+olCss+\'>\');'
++            . 'if (!document.querySelector(\'link[rel="stylesheet"][href="\' + olCss + \'"]\')) {'
++            . 'var link = document.createElement(\'link\');'
++            . 'link.rel = \'stylesheet\';'
++            . 'link.type = \'text/css\';'
++            . 'link.href = olCss;'
++            . 'document.head.appendChild(link);'
++            . '}'
+             . 'var vectorLayer = new ol.source.Vector({});'
+             . 'var map = new ol.Map({'
+             . 'target: \'openlayersmap\','
+diff --git a/libraries/classes/InsertEdit.php b/libraries/classes/InsertEdit.php
+index 22c22171b8..30f1a18665 100644
+--- a/libraries/classes/InsertEdit.php
++++ b/libraries/classes/InsertEdit.php
+@@ -30,6 +30,7 @@
+ use function in_array;
+ use function is_array;
+ use function is_file;
++use function is_numeric;
+ use function is_string;
+ use function max;
+ use function mb_stripos;
+@@ -1630,6 +1631,13 @@ public function getCurrentValueAsAnArrayForMultipleEdit(
+                     . $this->dbi->escapeString($multiEditSalt[$key]) . "')";
+             }
+ 
++            if (
++                $multiEditFuncs[$key] === 'NOW'
++                && (is_numeric($currentValue) && $currentValue >= 0 && $currentValue <= 6)
++            ) {
++                return $multiEditFuncs[$key] . '(' . $this->dbi->escapeString($currentValue) . ')';
++            }
++
+             return $multiEditFuncs[$key] . "('" . $this->dbi->escapeString($currentValue) . "')";
+         }
+ 
+diff --git a/libraries/classes/LanguageManager.php b/libraries/classes/LanguageManager.php
+index c568eb5fb7..b5ee5a9ea5 100644
+--- a/libraries/classes/LanguageManager.php
++++ b/libraries/classes/LanguageManager.php
+@@ -19,6 +19,8 @@
+ use function ucfirst;
+ 
+ use const E_USER_ERROR;
++use const E_USER_WARNING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * Language selection manager
+@@ -67,6 +69,7 @@ class LanguageManager
+             'ar[_-]ly|arabic (libya)|libian arabic',
+             'ar_LY',
+         ],
++        'ast' => ['ast', 'Asturian', 'Asturianu', 'ast|asturian', ''],
+         'az' => [
+             'az',
+             'Azerbaijani',
+@@ -977,7 +980,7 @@ public function showWarnings(): void
+ 
+         trigger_error(
+             __('Ignoring unsupported language code.'),
+-            E_USER_ERROR
++            PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+         );
+     }
+ }
+diff --git a/libraries/classes/Navigation/NodeFactory.php b/libraries/classes/Navigation/NodeFactory.php
+index ae1989528b..5ed2a82588 100644
+--- a/libraries/classes/Navigation/NodeFactory.php
++++ b/libraries/classes/Navigation/NodeFactory.php
+@@ -16,6 +16,8 @@
+ use function trigger_error;
+ 
+ use const E_USER_ERROR;
++use const E_USER_WARNING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * Node factory - instantiates Node objects or objects derived from the Node class
+@@ -43,7 +45,7 @@ private static function sanitizeClass($class)
+                     __('Invalid class name "%1$s", using default of "Node"'),
+                     $class
+                 ),
+-                E_USER_ERROR
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+             );
+         }
+ 
+@@ -73,7 +75,7 @@ private static function checkClass($class)
+                     __('Could not load class "%1$s"'),
+                     $class
+                 ),
+-                E_USER_ERROR
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+             );
+         }
+ 
+diff --git a/libraries/classes/Partitioning/Partition.php b/libraries/classes/Partitioning/Partition.php
+index 21c0bf1c91..4d05bc2c7d 100644
+--- a/libraries/classes/Partitioning/Partition.php
++++ b/libraries/classes/Partitioning/Partition.php
+@@ -156,20 +156,18 @@ public static function getPartitions($db, $table)
+                 $partitionMap = [];
+                 /** @var array $row */
+                 foreach ($result as $row) {
+-                    if (isset($partitionMap[$row['PARTITION_NAME']])) {
+-                        $partition = $partitionMap[$row['PARTITION_NAME']];
+-                    } else {
+-                        $partition = new Partition($row);
+-                        $partitionMap[$row['PARTITION_NAME']] = $partition;
++                    if (empty($row['PARTITION_NAME'])) {
++                        continue;
+                     }
+ 
++                    $partition = $partitionMap[$row['PARTITION_NAME']] ?? new Partition($row);
++                    $partitionMap[$row['PARTITION_NAME']] = $partition;
++
+                     if (empty($row['SUBPARTITION_NAME'])) {
+                         continue;
+                     }
+ 
+-                    $parentPartition = $partition;
+-                    $partition = new SubPartition($row);
+-                    $parentPartition->addSubPartition($partition);
++                    $partition->addSubPartition(new SubPartition($row));
+                 }
+ 
+                 return array_values($partitionMap);
+diff --git a/libraries/classes/Plugins/Export/ExportJson.php b/libraries/classes/Plugins/Export/ExportJson.php
+index 401430939b..3f19e9a2e2 100644
+--- a/libraries/classes/Plugins/Export/ExportJson.php
++++ b/libraries/classes/Plugins/Export/ExportJson.php
+@@ -113,7 +113,7 @@ public function exportHeader(): bool
+         $data = $this->encode([
+             'type' => 'header',
+             'version' => Version::VERSION,
+-            'comment' => 'Export to JSON plugin for PHPMyAdmin',
++            'comment' => 'Export to JSON plugin for phpMyAdmin',
+         ]);
+         if ($data === false) {
+             return false;
+diff --git a/libraries/classes/Plugins/Export/ExportPdf.php b/libraries/classes/Plugins/Export/ExportPdf.php
+index 11a7836391..b401c6c83c 100644
+--- a/libraries/classes/Plugins/Export/ExportPdf.php
++++ b/libraries/classes/Plugins/Export/ExportPdf.php
+@@ -15,6 +15,7 @@
+ 
+ use function __;
+ use function class_exists;
++use function extension_loaded;
+ 
+ /**
+  * Produce a PDF report (export) from a query
+@@ -332,6 +333,6 @@ private function setPdf($pdf): void
+ 
+     public static function isAvailable(): bool
+     {
+-        return class_exists(TCPDF::class);
++        return class_exists(TCPDF::class) && extension_loaded('curl');
+     }
+ }
+diff --git a/libraries/classes/Plugins/Export/ExportPhparray.php b/libraries/classes/Plugins/Export/ExportPhparray.php
+index 7131f1a008..a244cc6b30 100644
+--- a/libraries/classes/Plugins/Export/ExportPhparray.php
++++ b/libraries/classes/Plugins/Export/ExportPhparray.php
+@@ -83,7 +83,7 @@ public function exportHeader(): bool
+         $this->export->outputHandler(
+             '<?php' . $GLOBALS['crlf']
+             . '/**' . $GLOBALS['crlf']
+-            . ' * Export to PHP Array plugin for PHPMyAdmin' . $GLOBALS['crlf']
++            . ' * Export to PHP Array plugin for phpMyAdmin' . $GLOBALS['crlf']
+             . ' * @version ' . Version::VERSION . $GLOBALS['crlf']
+             . ' */' . $GLOBALS['crlf'] . $GLOBALS['crlf']
+         );
+diff --git a/libraries/classes/Plugins/Export/ExportSql.php b/libraries/classes/Plugins/Export/ExportSql.php
+index 6dcdfcdd39..ddee7a8b51 100644
+--- a/libraries/classes/Plugins/Export/ExportSql.php
++++ b/libraries/classes/Plugins/Export/ExportSql.php
+@@ -53,7 +53,9 @@
+ use function trigger_error;
+ 
+ use const E_USER_ERROR;
++use const E_USER_WARNING;
+ use const PHP_VERSION;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * Handles the export for the SQL class
+@@ -1541,7 +1543,7 @@ public function getTableDef(
+             $message = sprintf(__('Error reading structure for table %s:'), $db . '.' . $table);
+             $message .= ' ' . $tmpError;
+             if (! defined('TESTSUITE')) {
+-                trigger_error($message, E_USER_ERROR);
++                trigger_error($message, PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING);
+             }
+ 
+             return $this->exportComment($message);
+@@ -2270,7 +2272,7 @@ public function exportData(
+             $message = sprintf(__('Error reading data for table %s:'), $db . '.' . $table);
+             $message .= ' ' . $tmpError;
+             if (! defined('TESTSUITE')) {
+-                trigger_error($message, E_USER_ERROR);
++                trigger_error($message, PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING);
+             }
+ 
+             return $this->export->outputHandler(
+diff --git a/libraries/classes/Plugins/Export/Helpers/Pdf.php b/libraries/classes/Plugins/Export/Helpers/Pdf.php
+index 1ec18c2365..8bac35c212 100644
+--- a/libraries/classes/Plugins/Export/Helpers/Pdf.php
++++ b/libraries/classes/Plugins/Export/Helpers/Pdf.php
+@@ -641,7 +641,7 @@ public function getTableDef(
+             foreach ($data as $col => $txt) {
+                 $this->page = $currpage;
+                 $this->setXY($l, $h);
+-                if ($this->tablewidths[$col] > 0) {
++                if (isset($this->tablewidths[$col]) && $this->tablewidths[$col] > 0) {
+                     $this->MultiCell(
+                         $this->tablewidths[$col],
+                         // phpcs:ignore Squiz.NamingConventions.ValidVariableName.MemberNotCamelCaps
+diff --git a/libraries/classes/Plugins/Import/ImportCsv.php b/libraries/classes/Plugins/Import/ImportCsv.php
+index 928491cf7d..1e1b168e83 100644
+--- a/libraries/classes/Plugins/Import/ImportCsv.php
++++ b/libraries/classes/Plugins/Import/ImportCsv.php
+@@ -723,18 +723,21 @@ private function getTableNameFromImport(string $databaseName): string
+             }
+ 
+             // check to see if {filename} as table exist
+-            $nameArray = preg_grep('/' . $importFileName . '/isU', $result);
++            $nameArray = preg_grep('/^' . $importFileName . '$/isU', $result);
+             // if no use filename as table name
+             if ($nameArray === false || count($nameArray) === 0) {
+                 return $importFileName;
+             }
+ 
+             // check if {filename}_ as table exist
+-            $nameArray = preg_grep('/' . $importFileName . '_/isU', $result);
++            $nameArray = preg_grep('/^' . $importFileName . '_$/isU', $result);
+             if ($nameArray === false) {
+                 return $importFileName;
+             }
+ 
++            // Filter for table names starting with the {filename}_ prefix
++            $nameArray = preg_grep('/^' . $importFileName . '_/isU', $result);
++
+             return $importFileName . '_' . (count($nameArray) + 1);
+         }
+ 
+diff --git a/libraries/classes/Query/Generator.php b/libraries/classes/Query/Generator.php
+index e0d4a0b542..cdc59f24f7 100644
+--- a/libraries/classes/Query/Generator.php
++++ b/libraries/classes/Query/Generator.php
+@@ -221,21 +221,27 @@ public static function getInformationSchemaTriggersRequest(string $escapedDb, ?s
+         return $query;
+     }
+ 
+-    public static function getInformationSchemaDataForCreateRequest(string $user, string $host): string
+-    {
++    public static function getInformationSchemaDataForCreateRequest(
++        string $user,
++        string $host,
++        string $collation
++    ): string {
+         // second part of query is for MariaDB that not show roles inside INFORMATION_SCHEMA db
+         return 'SELECT 1 FROM `INFORMATION_SCHEMA`.`USER_PRIVILEGES` '
+             . "WHERE `PRIVILEGE_TYPE` = 'CREATE USER' AND "
+             . "'''" . $user . "''@''" . $host . "''' LIKE `GRANTEE`"
+             . ' UNION '
+             . 'SELECT 1 FROM mysql.user '
+-            . "WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_general_ci AND "
++            . "WHERE `create_user_priv` = 'Y' COLLATE " . $collation . ' AND '
+             . "'" . $user . "' LIKE `User` AND '' LIKE `Host`"
+             . ' LIMIT 1';
+     }
+ 
+-    public static function getInformationSchemaDataForGranteeRequest(string $user, string $host): string
+-    {
++    public static function getInformationSchemaDataForGranteeRequest(
++        string $user,
++        string $host,
++        string $collation
++    ): string {
+         // second part of query is for MariaDB that not show roles inside INFORMATION_SCHEMA db
+         return 'SELECT 1 FROM ('
+             . 'SELECT `GRANTEE`, `IS_GRANTABLE` FROM '
+@@ -250,7 +256,7 @@ public static function getInformationSchemaDataForGranteeRequest(string $user, s
+             . "'''" . $user . "''@''" . $host . "''' LIKE `GRANTEE` "
+             . ' UNION '
+             . 'SELECT 1 FROM mysql.user '
+-            . "WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_general_ci AND "
++            . "WHERE `create_user_priv` = 'Y' COLLATE " . $collation . ' AND '
+             . "'" . $user . "' LIKE `User` AND '' LIKE `Host`"
+             . ' LIMIT 1';
+     }
+diff --git a/libraries/classes/Server/Status/Processes.php b/libraries/classes/Server/Status/Processes.php
+index 166ab3563d..ce46308c4d 100644
+--- a/libraries/classes/Server/Status/Processes.php
++++ b/libraries/classes/Server/Status/Processes.php
+@@ -9,9 +9,11 @@
+ use PhpMyAdmin\Util;
+ 
+ use function __;
++use function array_key_exists;
+ use function array_keys;
+ use function count;
+ use function mb_strtolower;
++use function number_format;
+ use function strlen;
+ use function ucfirst;
+ 
+@@ -44,11 +46,9 @@ public function getList(array $params): array
+         $sqlQuery = $showFullSql
+             ? 'SHOW FULL PROCESSLIST'
+             : 'SHOW PROCESSLIST';
+-        if (
+-            (! empty($params['order_by_field'])
+-                && ! empty($params['sort_order']))
+-            || ! empty($params['showExecuting'])
+-        ) {
++        $useIS = ! empty($params['showExecuting']) ||
++            (! empty($params['order_by_field']) && ! empty($params['sort_order']));
++        if ($useIS) {
+             $urlParams['order_by_field'] = $params['order_by_field'];
+             $urlParams['sort_order'] = $params['sort_order'];
+             $urlParams['showExecuting'] = $params['showExecuting'];
+@@ -80,6 +80,15 @@ public function getList(array $params): array
+                 unset($process[$key]);
+             }
+ 
++            $progress = ! empty($process['Progress']) ? $process['Progress'] : '---';
++            if ($useIS && ! empty($process['Progress'])) {
++                $stage = array_key_exists('Stage', $process) ? (int) $process['Stage'] : null;
++                $maxStage = array_key_exists('Max_stage', $process) ? (int) $process['Max_stage'] : null;
++                if ($stage !== null && $maxStage !== null && $maxStage > 1) {
++                    $progress = number_format(($stage - 1) / $maxStage * 100 + ((float) $progress) / $maxStage, 3);
++                }
++            }
++
+             $rows[] = [
+                 'id' => $process['Id'],
+                 'user' => $process['User'],
+@@ -88,7 +97,7 @@ public function getList(array $params): array
+                 'command' => $process['Command'],
+                 'time' => $process['Time'],
+                 'state' => ! empty($process['State']) ? $process['State'] : '---',
+-                'progress' => ! empty($process['Progress']) ? $process['Progress'] : '---',
++                'progress' => $progress,
+                 'info' => ! empty($process['Info']) ? Generator::formatSql($process['Info'], ! $showFullSql) : '---',
+             ];
+         }
+diff --git a/libraries/classes/Sql.php b/libraries/classes/Sql.php
+index c769b9b864..59546e2deb 100644
+--- a/libraries/classes/Sql.php
++++ b/libraries/classes/Sql.php
+@@ -21,9 +21,11 @@
+ use PhpMyAdmin\Utils\ForeignKey;
+ 
+ use function __;
++use function array_find_key;
+ use function array_key_exists;
+ use function array_keys;
+ use function array_map;
++use function assert;
+ use function bin2hex;
+ use function ceil;
+ use function count;
+@@ -34,11 +36,13 @@
+ use function is_array;
+ use function is_bool;
+ use function is_object;
++use function is_string;
+ use function session_start;
+ use function session_write_close;
+ use function sprintf;
+ use function str_contains;
+ use function str_replace;
++use function strtoupper;
+ use function ucwords;
+ 
+ /**
+@@ -745,6 +749,15 @@ private function countQueryResults(
+                 /** @var SelectStatement $statement */
+                 $statement = $analyzedSqlResults['statement'];
+ 
++                assert($statement->options !== null);
++                /** @var int|null $noCacheIndex */
++                $noCacheIndex = array_find_key(
++                    $statement->options->options,
++                    /** @param mixed $value */
++                    static function ($value): bool {
++                        return is_string($value) && strtoupper($value) === 'SQL_NO_CACHE';
++                    }
++                );
+                 $changeOrder = $analyzedSqlResults['order'] !== false;
+                 $changeLimit = $analyzedSqlResults['limit'] !== false;
+                 $changeExpression = $analyzedSqlResults['is_group'] === false
+@@ -752,8 +765,14 @@ private function countQueryResults(
+                     && $analyzedSqlResults['union'] === false
+                     && count($statement->expr) === 1;
+ 
+-                if ($changeOrder || $changeLimit || $changeExpression) {
++                if ($changeOrder || $changeLimit || $changeExpression || $noCacheIndex !== null) {
+                     $statement = clone $statement;
++                    // Remove SQL_NO_CACHE from subquery because it is not valid sql
++                    if ($noCacheIndex !== null) {
++                        assert($statement->options !== null);
++                        $statement->options = clone $statement->options;
++                        unset($statement->options->options[$noCacheIndex]);
++                    }
+                 }
+ 
+                 // Remove ORDER BY to decrease unnecessary sorting time
+@@ -832,8 +851,8 @@ private function executeTheQuery(
+             $GLOBALS['querytime'] = $this->dbi->lastQueryExecutionTime;
+ 
+             if (! defined('TESTSUITE')) {
+-                // reopen session
+-                session_start();
++                // reopen session but prevent PHP from sending the session cookie again
++                session_start(['use_cookies' => false]);
+             }
+ 
+             // Displays an error message if required and stop parsing the script
+diff --git a/libraries/classes/Table.php b/libraries/classes/Table.php
+index e08bdc42eb..426ae59629 100644
+--- a/libraries/classes/Table.php
++++ b/libraries/classes/Table.php
+@@ -1555,8 +1555,8 @@ public function rename($newName, $newDb = null): bool
+ 
+         $this->messages[] = sprintf(
+             __('Table %1$s has been renamed to %2$s.'),
+-            htmlspecialchars($oldName),
+-            htmlspecialchars($newName)
++            $oldName,
++            $newName
+         );
+ 
+         return true;
+@@ -2241,7 +2241,11 @@ public function updateInternalRelations(
+             $masterField = $multiEditColumnsName[$masterFieldMd5];
+             $foreignTable = $destinationTable[$masterFieldMd5];
+             $foreignField = $destinationColumn[$masterFieldMd5];
+-            if (! empty($foreignDb) && ! empty($foreignTable) && ! empty($foreignField)) {
++            if (
++                $foreignDb !== ''
++                && $foreignTable !== '' && $foreignTable !== null
++                && $foreignField !== '' && $foreignField !== null
++            ) {
+                 if (! isset($existrel[$masterField])) {
+                     $updQuery = 'INSERT INTO '
+                         . Util::backquote($relationFeature->database)
+@@ -2345,20 +2349,20 @@ public function updateForeignKeys(
+             $emptyFields = false;
+             foreach ($masterField as $key => $oneField) {
+                 if (
+-                    (! empty($oneField) && empty($foreignField[$key]))
+-                    || (empty($oneField) && ! empty($foreignField[$key]))
++                    ($oneField !== '' && (! isset($foreignField[$key]) || $foreignField[$key] === ''))
++                    || ($oneField === '' && (isset($foreignField[$key]) && $foreignField[$key] !== ''))
+                 ) {
+                     $emptyFields = true;
+                 }
+ 
+-                if (! empty($oneField) || ! empty($foreignField[$key])) {
++                if ($oneField !== '' || (isset($foreignField[$key]) && $foreignField[$key] !== '')) {
+                     continue;
+                 }
+ 
+                 unset($masterField[$key], $foreignField[$key]);
+             }
+ 
+-            if (! empty($foreignDb) && ! empty($foreignTable) && ! $emptyFields) {
++            if ($foreignDb !== '' && $foreignTable !== '' && ! $emptyFields) {
+                 if (isset($existrelForeign[$masterFieldMd5])) {
+                     $constraintName = $existrelForeign[$masterFieldMd5]['constraint'];
+                     $onDelete = ! empty(
+@@ -2466,8 +2470,8 @@ public function updateForeignKeys(
+             $sqlQueryRecreate = '# Restoring the dropped constraint...' . "\n";
+             $sqlQueryRecreate .= $this->getSQLToCreateForeignKey(
+                 $table,
+-                $masterField,
+-                $existrelForeign[$masterFieldMd5]['ref_db_name'],
++                $existrelForeign[$masterFieldMd5]['index_list'],
++                $existrelForeign[$masterFieldMd5]['ref_db_name'] ?? $GLOBALS['db'],
+                 $existrelForeign[$masterFieldMd5]['ref_table_name'],
+                 $existrelForeign[$masterFieldMd5]['ref_index_list'],
+                 $existrelForeign[$masterFieldMd5]['constraint'],
+diff --git a/libraries/classes/Theme.php b/libraries/classes/Theme.php
+index 6dcb7950df..a9c889ee24 100644
+--- a/libraries/classes/Theme.php
++++ b/libraries/classes/Theme.php
+@@ -20,8 +20,9 @@
+ use function version_compare;
+ 
+ use const DIRECTORY_SEPARATOR;
+-
+ use const E_USER_ERROR;
++use const E_USER_WARNING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * handles theme
+@@ -168,7 +169,7 @@ public function checkImgPath(): bool
+                 __('No valid image path for theme %s found!'),
+                 $this->getName()
+             ),
+-            E_USER_ERROR
++            PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+         );
+ 
+         return false;
+diff --git a/libraries/classes/ThemeManager.php b/libraries/classes/ThemeManager.php
+index 9c10859f21..cc820224e3 100644
+--- a/libraries/classes/ThemeManager.php
++++ b/libraries/classes/ThemeManager.php
+@@ -18,6 +18,7 @@
+ use const DIRECTORY_SEPARATOR;
+ use const E_USER_ERROR;
+ use const E_USER_WARNING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * phpMyAdmin theme manager
+@@ -83,7 +84,7 @@ public function __construct()
+                     __('Default theme %s not found!'),
+                     htmlspecialchars($GLOBALS['cfg']['ThemeDefault'])
+                 ),
+-                E_USER_ERROR
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+             );
+             $configThemeExists = false;
+         } else {
+@@ -142,7 +143,7 @@ public function setActiveTheme(?string $theme): bool
+                     __('Theme %s not found!'),
+                     htmlspecialchars((string) $theme)
+                 ),
+-                E_USER_ERROR
++                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING
+             );
+ 
+             return false;
+diff --git a/libraries/classes/Types.php b/libraries/classes/Types.php
+index 300fad0162..18cd000b4e 100644
+--- a/libraries/classes/Types.php
++++ b/libraries/classes/Types.php
+@@ -96,8 +96,8 @@ public function getEnumOperators()
+     public function getTextOperators()
+     {
+         return [
+-            'LIKE %...%',
+             'LIKE',
++            'LIKE %...%',
+             'NOT LIKE',
+             'NOT LIKE %...%',
+             '=',
+@@ -303,9 +303,10 @@ public function getTypeDescription($type)
+ 
+             case 'TIMESTAMP':
+                 return __(
+-                    'A timestamp, range is 1970-01-01 00:00:01 UTC to 2038-01-09 ' .
+-                    '03:14:07 UTC, stored as the number of seconds since the epoch ' .
+-                    '(1970-01-01 00:00:00 UTC)'
++                    'A timestamp, range is 1970-01-01 00:00:01 UTC to 2038-01-19 ' .
++                    '03:14:07 UTC on 32-bit platforms (MariaDB 11.3 and earlier), ' .
++                    'and up to 2106-02-07 06:28:15 UTC on 64-bit platforms (MariaDB 11.5 and later), ' .
++                    'stored as the number of seconds since the epoch (1970-01-01 00:00:00 UTC)'
+                 );
+ 
+             case 'TIME':
+diff --git a/libraries/classes/Utils/HttpRequest.php b/libraries/classes/Utils/HttpRequest.php
+index 6b74670159..4e4f4857f5 100644
+--- a/libraries/classes/Utils/HttpRequest.php
++++ b/libraries/classes/Utils/HttpRequest.php
+@@ -267,6 +267,10 @@ private function fopen(
+             stream_context_create($context)
+         );
+ 
++        if (function_exists('http_get_last_response_headers')) {
++            $http_response_header = http_get_last_response_headers();
++        }
++
+         if (! isset($http_response_header)) {
+             return null;
+         }
+diff --git a/libraries/classes/Version.php b/libraries/classes/Version.php
+index c2f5271c2c..d9d09cce74 100644
+--- a/libraries/classes/Version.php
++++ b/libraries/classes/Version.php
+@@ -14,12 +14,12 @@
+ final class Version
+ {
+     // The VERSION_SUFFIX constant is defined at libraries/constants.php
+-    public const VERSION = '5.2.2' . VERSION_SUFFIX;
++    public const VERSION = '5.2.3' . VERSION_SUFFIX;
+     public const SERIES = '5.2';
+     public const MAJOR = 5;
+     public const MINOR = 2;
+-    public const PATCH = 2;
+-    public const ID = 50202;
++    public const PATCH = 3;
++    public const ID = 50203;
+     public const PRE_RELEASE_NAME = '';
+     public const IS_DEV = false;
+ }
+diff --git a/test/classes/AbstractNetworkTestCase.php b/test/classes/AbstractNetworkTestCase.php
+index c00075fc5b..3e59e80ab6 100644
+--- a/test/classes/AbstractNetworkTestCase.php
++++ b/test/classes/AbstractNetworkTestCase.php
+@@ -20,6 +20,8 @@
+ use function is_array;
+ use function is_int;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * Base class for phpMyAdmin tests
+  */
+@@ -89,7 +91,10 @@ public function mockResponse(...$param): MockObject
+         }
+ 
+         $attrInstance = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $attrInstance->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrInstance->setAccessible(true);
++        }
++
+         $attrInstance->setValue(null, $mockResponse);
+ 
+         return $mockResponse;
+@@ -102,8 +107,15 @@ protected function tearDown(): void
+     {
+         parent::tearDown();
+         $response = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $response->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $response->setAccessible(true);
++        }
++
+         $response->setValue(null, null);
++        if (PHP_VERSION_ID >= 80100) {
++            return;
++        }
++
+         $response->setAccessible(false);
+     }
+ }
+diff --git a/test/classes/AbstractTestCase.php b/test/classes/AbstractTestCase.php
+index 3760e2b11d..83bb6dfbbd 100644
+--- a/test/classes/AbstractTestCase.php
++++ b/test/classes/AbstractTestCase.php
+@@ -24,6 +24,7 @@
+ use function method_exists;
+ 
+ use const DIRECTORY_SEPARATOR;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * Abstract class to hold some usefull methods used in tests
+@@ -302,7 +303,9 @@ protected function callFunction($object, string $className, string $methodName,
+     {
+         $class = new ReflectionClass($className);
+         $method = $class->getMethod($methodName);
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         return $method->invokeArgs($object, $params);
+     }
+@@ -321,7 +324,9 @@ protected function getProperty(object $object, string $className, string $proper
+     {
+         $class = new ReflectionClass($className);
+         $property = $class->getProperty($propertyName);
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
+ 
+         return $property->getValue($object);
+     }
+diff --git a/test/classes/Command/TwigLintCommandTest.php b/test/classes/Command/TwigLintCommandTest.php
+index 2d6e76d16a..c8ec09322d 100644
+--- a/test/classes/Command/TwigLintCommandTest.php
++++ b/test/classes/Command/TwigLintCommandTest.php
+@@ -8,8 +8,8 @@
+ use PhpMyAdmin\Tests\AbstractTestCase;
+ use Symfony\Component\Console\Command\Command;
+ use Twig\Error\SyntaxError;
+-use Twig\Source;
+ 
++use function array_multisort;
+ use function class_exists;
+ use function sort;
+ 
+@@ -98,53 +98,25 @@ public function testGetFilesInfo(): void
+         ], $filesInfos);
+     }
+ 
+-    /**
+-     * @requires PHPUnit < 10
+-     */
+     public function testGetFilesInfoInvalidFile(): void
+     {
+-        $command = $this->getMockBuilder(TwigLintCommand::class)
+-            ->onlyMethods(['getTemplateContents', 'findFiles'])
+-            ->getMock();
+-
+-        $command->expects($this->exactly(1))
+-            ->method('findFiles')
+-            ->willReturn(
+-                [
+-                    'foo.twig',
+-                    'foo-invalid.twig',
+-                ]
+-            );
+-
+-        $command->expects($this->exactly(2))
+-            ->method('getTemplateContents')
+-            ->withConsecutive(
+-                ['foo.twig'],
+-                ['foo-invalid.twig']
+-            )
+-            ->willReturnOnConsecutiveCalls('{{ file }}', '{{ file }');
+-
+-        $filesFound = $this->callFunction($command, TwigLintCommand::class, 'getFilesInfo', [
+-            TEST_PATH . 'test/classes/_data/file_listing',
+-        ]);
+-
+-        self::assertEquals([
+-            [
+-                'template' => '{{ file }}',
+-                'file' => 'foo.twig',
+-                'valid' => true,
+-            ],
+-            [
+-                'template' => '{{ file }',
+-                'file' => 'foo-invalid.twig',
+-                'valid' => false,
+-                'line' => 1,
+-                'exception' => new SyntaxError('Unexpected "}".', 1, new Source(
+-                    '{{ file }',
+-                    'foo-invalid.twig'
+-                )),
+-            ],
+-        ], $filesFound);
++        $twigLintCommand = new TwigLintCommand();
++        $path = __DIR__ . '/../_data/templates/lint_command';
++        $filesFound = $twigLintCommand->getFilesInfo($path);
++
++        self::assertCount(2, $filesFound);
++        array_multisort($filesFound);
++        self::assertSame('{{ file }}' . "\n", $filesFound[0]['template']);
++        self::assertSame($path . DIRECTORY_SEPARATOR . 'foo-valid.twig', $filesFound[0]['file']);
++        self::assertSame('{{ file }' . "\n", $filesFound[1]['template']);
++        self::assertSame($path . DIRECTORY_SEPARATOR . 'foo-invalid.twig', $filesFound[1]['file']);
++        self::assertArrayHasKey('exception', $filesFound[1]);
++        $exception = $filesFound[1]['exception'];
++        self::assertInstanceOf(SyntaxError::class, $exception);
++        self::assertSame(
++            'Unexpected "}" in "' . $path . DIRECTORY_SEPARATOR . 'foo-invalid.twig" at line 1.',
++            $exception->getMessage()
++        );
+     }
+ 
+     public function testGetContext(): void
+diff --git a/test/classes/Config/FormDisplayTest.php b/test/classes/Config/FormDisplayTest.php
+index 7dd7455a37..4e435840da 100644
+--- a/test/classes/Config/FormDisplayTest.php
++++ b/test/classes/Config/FormDisplayTest.php
+@@ -15,6 +15,8 @@
+ use function function_exists;
+ use function gettype;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Config\FormDisplay
+  */
+@@ -55,7 +57,9 @@ public function testRegisterForm(): void
+         $reflection = new ReflectionClass(FormDisplay::class);
+ 
+         $attrForms = $reflection->getProperty('forms');
+-        $attrForms->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrForms->setAccessible(true);
++        }
+ 
+         $array = [
+             'Servers' => [
+@@ -71,7 +75,9 @@ public function testRegisterForm(): void
+         self::assertInstanceOf(Form::class, $_forms['pma_testform']);
+ 
+         $attrSystemPaths = $reflection->getProperty('systemPaths');
+-        $attrSystemPaths->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrSystemPaths->setAccessible(true);
++        }
+ 
+         self::assertSame([
+             'Servers/2/test' => 'Servers/1/test',
+@@ -79,7 +85,9 @@ public function testRegisterForm(): void
+         ], $attrSystemPaths->getValue($this->object));
+ 
+         $attrTranslatedPaths = $reflection->getProperty('translatedPaths');
+-        $attrTranslatedPaths->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrTranslatedPaths->setAccessible(true);
++        }
+ 
+         self::assertSame([
+             'Servers/2/test' => 'Servers-2-test',
+@@ -102,7 +110,10 @@ public function testProcess(): void
+             ->getMock();
+ 
+         $attrForms = new ReflectionProperty(FormDisplay::class, 'forms');
+-        $attrForms->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrForms->setAccessible(true);
++        }
++
+         $attrForms->setValue($this->object, [1, 2, 3]);
+ 
+         $this->object->expects($this->once())
+@@ -125,11 +136,17 @@ public function testDisplayErrors(): void
+         $reflection = new ReflectionClass(FormDisplay::class);
+ 
+         $attrIsValidated = $reflection->getProperty('isValidated');
+-        $attrIsValidated->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrIsValidated->setAccessible(true);
++        }
++
+         $attrIsValidated->setValue($this->object, true);
+ 
+         $attrIsValidated = $reflection->getProperty('errors');
+-        $attrIsValidated->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrIsValidated->setAccessible(true);
++        }
++
+         $attrIsValidated->setValue($this->object, []);
+ 
+         $result = $this->object->displayErrors();
+@@ -147,7 +164,10 @@ public function testDisplayErrors(): void
+         $sysArr = ['Servers/1/test' => 'Servers/1/test2'];
+ 
+         $attrSystemPaths = $reflection->getProperty('systemPaths');
+-        $attrSystemPaths->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrSystemPaths->setAccessible(true);
++        }
++
+         $attrSystemPaths->setValue($this->object, $sysArr);
+ 
+         $attrIsValidated->setValue($this->object, $arr);
+@@ -170,11 +190,17 @@ public function testFixErrors(): void
+         $reflection = new ReflectionClass(FormDisplay::class);
+ 
+         $attrIsValidated = $reflection->getProperty('isValidated');
+-        $attrIsValidated->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrIsValidated->setAccessible(true);
++        }
++
+         $attrIsValidated->setValue($this->object, true);
+ 
+         $attrIsValidated = $reflection->getProperty('errors');
+-        $attrIsValidated->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrIsValidated->setAccessible(true);
++        }
++
+         $attrIsValidated->setValue($this->object, []);
+ 
+         $this->object->fixErrors();
+@@ -191,7 +217,10 @@ public function testFixErrors(): void
+         $sysArr = ['Servers/1/test' => 'Servers/1/host'];
+ 
+         $attrSystemPaths = $reflection->getProperty('systemPaths');
+-        $attrSystemPaths->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrSystemPaths->setAccessible(true);
++        }
++
+         $attrSystemPaths->setValue($this->object, $sysArr);
+ 
+         $attrIsValidated->setValue($this->object, $arr);
+@@ -211,7 +240,9 @@ public function testFixErrors(): void
+     public function testValidateSelect(): void
+     {
+         $attrValidateSelect = new ReflectionMethod(FormDisplay::class, 'validateSelect');
+-        $attrValidateSelect->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrValidateSelect->setAccessible(true);
++        }
+ 
+         $arr = ['foo' => 'var'];
+         $value = 'foo';
+@@ -261,7 +292,9 @@ public function testValidateSelect(): void
+     public function testHasErrors(): void
+     {
+         $attrErrors = new ReflectionProperty(FormDisplay::class, 'errors');
+-        $attrErrors->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrErrors->setAccessible(true);
++        }
+ 
+         self::assertFalse($this->object->hasErrors());
+ 
+@@ -297,7 +330,9 @@ public function testGetDocLink(): void
+     public function testGetOptName(): void
+     {
+         $method = new ReflectionMethod(FormDisplay::class, 'getOptName');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         self::assertSame('Servers_', $method->invoke($this->object, 'Servers/1/'));
+ 
+@@ -310,11 +345,16 @@ public function testGetOptName(): void
+     public function testLoadUserprefsInfo(): void
+     {
+         $method = new ReflectionMethod(FormDisplay::class, 'loadUserprefsInfo');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $attrUserprefs = new ReflectionProperty(FormDisplay::class, 'userprefsDisallow');
+ 
+-        $attrUserprefs->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrUserprefs->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+         self::assertSame([], $attrUserprefs->getValue($this->object));
+     }
+@@ -325,7 +365,9 @@ public function testLoadUserprefsInfo(): void
+     public function testSetComments(): void
+     {
+         $method = new ReflectionMethod(FormDisplay::class, 'setComments');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         // recoding
+         $opts = ['values' => []];
+diff --git a/test/classes/Config/FormTest.php b/test/classes/Config/FormTest.php
+index c6f5400f4b..5394728323 100644
+--- a/test/classes/Config/FormTest.php
++++ b/test/classes/Config/FormTest.php
+@@ -13,6 +13,8 @@
+ use function array_keys;
+ use function preg_match;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Config\Form
+  */
+@@ -68,7 +70,10 @@ public function testContructor(): void
+     public function testGetOptionType(): void
+     {
+         $attrFieldsTypes = new ReflectionProperty(Form::class, 'fieldsTypes');
+-        $attrFieldsTypes->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrFieldsTypes->setAccessible(true);
++        }
++
+         $attrFieldsTypes->setValue(
+             $this->object,
+             ['7' => 'Seven']
+@@ -110,7 +115,9 @@ public function testReadFormPathsCallBack(): void
+     {
+         $reflection = new ReflectionClass(Form::class);
+         $method = $reflection->getMethod('readFormPathsCallback');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $array = [
+             'foo' => [
+@@ -146,7 +153,9 @@ public function testReadFormPaths(): void
+     {
+         $reflection = new ReflectionClass(Form::class);
+         $method = $reflection->getMethod('readFormPaths');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $array = [
+             'foo' => [
+@@ -187,7 +196,9 @@ public function testReadTypes(): void
+     {
+         $reflection = new ReflectionClass(Form::class);
+         $method = $reflection->getMethod('readTypes');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $this->object->fields = [
+             'pma_form1' => 'Servers/1/port',
+@@ -197,7 +208,9 @@ public function testReadTypes(): void
+         ];
+ 
+         $attrFieldsTypes = $reflection->getProperty('fieldsTypes');
+-        $attrFieldsTypes->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrFieldsTypes->setAccessible(true);
++        }
+ 
+         $method->invoke($this->object, null);
+ 
+diff --git a/test/classes/Config/ServerConfigChecksTest.php b/test/classes/Config/ServerConfigChecksTest.php
+index 27909eb55c..3fa7a865d6 100644
+--- a/test/classes/Config/ServerConfigChecksTest.php
++++ b/test/classes/Config/ServerConfigChecksTest.php
+@@ -14,6 +14,7 @@
+ use function mb_strlen;
+ use function str_repeat;
+ 
++use const PHP_VERSION_ID;
+ use const SODIUM_CRYPTO_SECRETBOX_KEYBYTES;
+ 
+ /**
+@@ -39,7 +40,10 @@ protected function setUp(): void
+         $GLOBALS['ConfigFile'] = $cf;
+ 
+         $reflection = new ReflectionProperty(ConfigFile::class, 'id');
+-        $reflection->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $reflection->setAccessible(true);
++        }
++
+         $this->sessionID = $reflection->getValue($cf);
+ 
+         unset($_SESSION['messages']);
+diff --git a/test/classes/ConfigStorage/RelationTest.php b/test/classes/ConfigStorage/RelationTest.php
+index 429a1f74cb..d3e786604a 100644
+--- a/test/classes/ConfigStorage/RelationTest.php
++++ b/test/classes/ConfigStorage/RelationTest.php
+@@ -14,6 +14,8 @@
+ 
+ use function implode;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\ConfigStorage\Relation
+  * @group medium
+@@ -1939,7 +1941,10 @@ public function testInitRelationParamsDisabledTrackingOthersExist(): void
+         $_SESSION['relation'] = [];
+         $_SESSION['tmpval'] = [];
+         $recentFavoriteTableInstances = (new ReflectionClass(RecentFavoriteTable::class))->getProperty('instances');
+-        $recentFavoriteTableInstances->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $recentFavoriteTableInstances->setAccessible(true);
++        }
++
+         $recentFavoriteTableInstances->setValue(null, []);
+ 
+         $relation = new Relation($this->dbi);
+diff --git a/test/classes/ConfigTest.php b/test/classes/ConfigTest.php
+index acfd4ccc0d..ad3eda75f2 100644
+--- a/test/classes/ConfigTest.php
++++ b/test/classes/ConfigTest.php
+@@ -15,23 +15,14 @@
+ use function file_exists;
+ use function file_put_contents;
+ use function fileperms;
+-use function function_exists;
+-use function gd_info;
+-use function mb_strstr;
+-use function ob_end_clean;
+-use function ob_get_contents;
+-use function ob_start;
+-use function phpinfo;
+-use function preg_match;
++use function get_defined_constants;
+ use function realpath;
+-use function strip_tags;
+ use function stristr;
+ use function sys_get_temp_dir;
+ use function tempnam;
+ use function unlink;
+ 
+ use const DIRECTORY_SEPARATOR;
+-use const INFO_MODULES;
+ use const PHP_EOL;
+ use const PHP_OS;
+ use const TEST_PATH;
+@@ -335,41 +326,11 @@ public function testCheckGd2(): void
+         self::assertSame(0, $this->object->get('PMA_IS_GD2'));
+ 
+         $this->object->set('GD2Available', 'auto');
+-
+-        if (! function_exists('imagecreatetruecolor')) {
+-            $this->object->checkGd2();
+-            self::assertSame(
+-                0,
+-                $this->object->get('PMA_IS_GD2'),
+-                'imagecreatetruecolor does not exist, PMA_IS_GD2 should be 0'
+-            );
+-        }
+-
+-        if (function_exists('gd_info')) {
+-            $this->object->checkGd2();
+-            $gd_nfo = gd_info();
+-            if (mb_strstr($gd_nfo['GD Version'], '2.')) {
+-                self::assertSame(1, $this->object->get('PMA_IS_GD2'), 'GD Version >= 2, PMA_IS_GD2 should be 1');
+-            } else {
+-                self::assertSame(0, $this->object->get('PMA_IS_GD2'), 'GD Version < 2, PMA_IS_GD2 should be 0');
+-            }
+-        }
+-
+-        /* Get GD version string from phpinfo output */
+-        ob_start();
+-        phpinfo(INFO_MODULES); /* Only modules */
+-        $a = strip_tags((string) ob_get_contents());
+-        ob_end_clean();
+-
+-        if (! preg_match('@GD Version[[:space:]]*\(.*\)@', $a, $v)) {
+-            return;
+-        }
+-
+-        if (mb_strstr($v, '2.')) {
+-            self::assertSame(1, $this->object->get('PMA_IS_GD2'), 'PMA_IS_GD2 should be 1');
+-        } else {
+-            self::assertSame(0, $this->object->get('PMA_IS_GD2'), 'PMA_IS_GD2 should be 0');
+-        }
++        $this->object->checkGd2();
++        self::assertSame(
++            (get_defined_constants()['GD_MAJOR_VERSION'] ?? 0) >= 2 ? 1 : 0,
++            $this->object->get('PMA_IS_GD2')
++        );
+     }
+ 
+     /**
+diff --git a/test/classes/ConsoleTest.php b/test/classes/ConsoleTest.php
+index cd5967835d..234405e6c4 100644
+--- a/test/classes/ConsoleTest.php
++++ b/test/classes/ConsoleTest.php
+@@ -7,6 +7,8 @@
+ use PhpMyAdmin\Console;
+ use ReflectionProperty;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Console
+  */
+@@ -21,7 +23,10 @@ public function testGetScripts(): void
+     public function testSetAjax(): void
+     {
+         $isAjax = new ReflectionProperty(Console::class, 'isAjax');
+-        $isAjax->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $isAjax->setAccessible(true);
++        }
++
+         $console = new Console();
+ 
+         self::assertFalse($isAjax->getValue($console));
+diff --git a/test/classes/Controllers/Database/PrivilegesControllerTest.php b/test/classes/Controllers/Database/PrivilegesControllerTest.php
+index e7fbb34114..5d56a4ee53 100644
+--- a/test/classes/Controllers/Database/PrivilegesControllerTest.php
++++ b/test/classes/Controllers/Database/PrivilegesControllerTest.php
+@@ -31,13 +31,23 @@ protected function setUp(): void
+ 
+     public function testIndex(): void
+     {
+-        global $dbi, $db, $server, $cfg, $PMA_PHP_SELF;
++        global $db, $server, $cfg, $PMA_PHP_SELF;
+ 
+         $db = 'db';
+         $server = 0;
+         $cfg['Server']['DisableIS'] = false;
+         $PMA_PHP_SELF = 'index.php';
+ 
++        $dbiDummy = $this->createDbiDummy();
++        $dbiDummy->addResult('SELECT @@collation_server', [['utf8mb4_uca1400_ai_ci']]);
++        // phpcs:ignore Generic.Files.LineLength.TooLong
++        $dbiDummy->addResult("SELECT 1 FROM `INFORMATION_SCHEMA`.`USER_PRIVILEGES` WHERE `PRIVILEGE_TYPE` = 'CREATE USER' AND '''pma_test''@''localhost''' LIKE `GRANTEE` UNION SELECT 1 FROM mysql.user WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_uca1400_ai_ci AND 'pma_test' LIKE `User` AND '' LIKE `Host` LIMIT 1", [['1']]);
++        $dbiDummy->addResult('SELECT @@collation_server', [['utf8mb4_uca1400_ai_ci']]);
++        // phpcs:ignore Generic.Files.LineLength.TooLong
++        $dbiDummy->addResult("SELECT 1 FROM (SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`COLUMN_PRIVILEGES` UNION SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`TABLE_PRIVILEGES` UNION SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`SCHEMA_PRIVILEGES` UNION SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`USER_PRIVILEGES`) t WHERE `IS_GRANTABLE` = 'YES' AND '''pma_test''@''localhost''' LIKE `GRANTEE` UNION SELECT 1 FROM mysql.user WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_uca1400_ai_ci AND 'pma_test' LIKE `User` AND '' LIKE `Host` LIMIT 1", [['1']]);
++        $dbi = $this->createDatabaseInterface($dbiDummy);
++        $GLOBALS['dbi'] = $dbi;
++
+         $privileges = [];
+ 
+         $serverPrivileges = $this->createMock(Privileges::class);
+diff --git a/test/classes/Controllers/Database/Structure/FavoriteTableControllerTest.php b/test/classes/Controllers/Database/Structure/FavoriteTableControllerTest.php
+index c3d0277e08..1a60ec8701 100644
+--- a/test/classes/Controllers/Database/Structure/FavoriteTableControllerTest.php
++++ b/test/classes/Controllers/Database/Structure/FavoriteTableControllerTest.php
+@@ -14,6 +14,8 @@
+ 
+ use function json_encode;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Controllers\Database\Structure\FavoriteTableController
+  */
+@@ -34,7 +36,9 @@ public function testSynchronizeFavoriteTables(): void
+ 
+         $class = new ReflectionClass(FavoriteTableController::class);
+         $method = $class->getMethod('synchronizeFavoriteTables');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $controller = new FavoriteTableController(
+             new ResponseStub(),
+diff --git a/test/classes/Controllers/Database/StructureControllerTest.php b/test/classes/Controllers/Database/StructureControllerTest.php
+index ea72bfa1df..b2aa7495bd 100644
+--- a/test/classes/Controllers/Database/StructureControllerTest.php
++++ b/test/classes/Controllers/Database/StructureControllerTest.php
+@@ -19,6 +19,8 @@
+ use ReflectionClass;
+ use ReflectionException;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Controllers\Database\StructureController
+  */
+@@ -92,7 +94,10 @@ public function testGetValuesForInnodbTable(): void
+     {
+         $class = new ReflectionClass(StructureController::class);
+         $method = $class->getMethod('getValuesForInnodbTable');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $controller = new StructureController(
+             $this->response,
+             $this->template,
+@@ -106,7 +111,10 @@ public function testGetValuesForInnodbTable(): void
+         );
+         // Showing statistics
+         $property = $class->getProperty('isShowStats');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue($controller, true);
+ 
+         $GLOBALS['cfg']['MaxExactCount'] = 10;
+@@ -171,7 +179,9 @@ public function testGetValuesForAriaTable(): void
+     {
+         $class = new ReflectionClass(StructureController::class);
+         $method = $class->getMethod('getValuesForAriaTable');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $controller = new StructureController(
+             $this->response,
+@@ -186,10 +196,16 @@ public function testGetValuesForAriaTable(): void
+         );
+         // Showing statistics
+         $property = $class->getProperty('isShowStats');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue($controller, true);
+         $property = $class->getProperty('dbIsSystemSchema');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue($controller, true);
+ 
+         $currentTable = [
+@@ -287,7 +303,9 @@ public function testHasTable(): void
+     {
+         $class = new ReflectionClass(StructureController::class);
+         $method = $class->getMethod('hasTable');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $controller = new StructureController(
+             $this->response,
+@@ -320,7 +338,9 @@ public function testCheckFavoriteTable(): void
+     {
+         $class = new ReflectionClass(StructureController::class);
+         $method = $class->getMethod('checkFavoriteTable');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $GLOBALS['db'] = 'sakila';
+         $GLOBALS['dbi'] = $this->dbi;
+@@ -374,7 +394,9 @@ public function testDisplayTableList(): void
+     {
+         $class = new ReflectionClass(StructureController::class);
+         $method = $class->getMethod('displayTableList');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $controller = new StructureController(
+             $this->response,
+@@ -390,14 +412,22 @@ public function testDisplayTableList(): void
+         // Showing statistics
+         $class = new ReflectionClass(StructureController::class);
+         $showStatsProperty = $class->getProperty('isShowStats');
+-        $showStatsProperty->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $showStatsProperty->setAccessible(true);
++        }
++
+         $showStatsProperty->setValue($controller, true);
+ 
+         $tablesProperty = $class->getProperty('tables');
+-        $tablesProperty->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $tablesProperty->setAccessible(true);
++        }
+ 
+         $numTables = $class->getProperty('numTables');
+-        $numTables->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $numTables->setAccessible(true);
++        }
++
+         $numTables->setValue($controller, 1);
+ 
+         //no tables
+diff --git a/test/classes/Controllers/Import/SimulateDmlControllerTest.php b/test/classes/Controllers/Import/SimulateDmlControllerTest.php
+index cdeba0193c..024504c409 100644
+--- a/test/classes/Controllers/Import/SimulateDmlControllerTest.php
++++ b/test/classes/Controllers/Import/SimulateDmlControllerTest.php
+@@ -280,4 +280,27 @@ public static function providerForTestGetMatchedRows(): array
+             ],
+         ];
+     }
++
++    public function testStatementWithParsingError(): void
++    {
++        $_POST['sql_delimiter'] = ';';
++        $GLOBALS['sql_query'] = 'UPDATE actor SET';
++
++        $responseRenderer = new ResponseRenderer();
++        $controller = new SimulateDmlController(
++            $responseRenderer,
++            new Template(),
++            new SimulateDml($this->createDatabaseInterface())
++        );
++        $controller();
++
++        $expectedMessage = <<<'HTML'
++<div class="alert alert-danger" role="alert">
++  <img src="themes/dot.gif" title="" alt="" class="icon ic_s_error"> Missing assignment in SET operation.
++</div>
++
++HTML;
++
++        self::assertSame(['message' => $expectedMessage, 'sql_data' => false], $responseRenderer->getJSONResult());
++    }
+ }
+diff --git a/test/classes/Controllers/Server/VariablesControllerTest.php b/test/classes/Controllers/Server/VariablesControllerTest.php
+index 565ddd17ee..e38c687a3a 100644
+--- a/test/classes/Controllers/Server/VariablesControllerTest.php
++++ b/test/classes/Controllers/Server/VariablesControllerTest.php
+@@ -21,6 +21,8 @@
+ use function htmlspecialchars;
+ use function str_replace;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Controllers\Server\VariablesController
+  */
+@@ -137,7 +139,10 @@ public function testFormatVariable(): void
+             ->willReturnOnConsecutiveCalls('byte', 'string');
+ 
+         $response = new ReflectionProperty(ServerVariablesProvider::class, 'instance');
+-        $response->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $response->setAccessible(true);
++        }
++
+         $response->setValue(null, $voidProviderMock);
+ 
+         [$formattedValue, $isHtmlFormatted] = $this->callFunction(
+@@ -189,7 +194,10 @@ public function testFormatVariableMariaDbMySqlKbs(): void
+         }
+ 
+         $response = new ReflectionProperty(ServerVariablesProvider::class, 'instance');
+-        $response->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $response->setAccessible(true);
++        }
++
+         $response->setValue(null, null);
+ 
+         $controller = new VariablesController(ResponseRenderer::getInstance(), new Template(), $GLOBALS['dbi']);
+@@ -248,7 +256,10 @@ public function testFormatVariableMariaDbMySqlKbs(): void
+     public function testFormatVariableVoidProvider(): void
+     {
+         $response = new ReflectionProperty(ServerVariablesProvider::class, 'instance');
+-        $response->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $response->setAccessible(true);
++        }
++
+         $response->setValue(null, new ServerVariablesVoidProvider());
+ 
+         $controller = new VariablesController(ResponseRenderer::getInstance(), new Template(), $GLOBALS['dbi']);
+diff --git a/test/classes/Controllers/Table/IndexRenameControllerTest.php b/test/classes/Controllers/Table/IndexRenameControllerTest.php
+index f2ec09a41d..627c7832d4 100644
+--- a/test/classes/Controllers/Table/IndexRenameControllerTest.php
++++ b/test/classes/Controllers/Table/IndexRenameControllerTest.php
+@@ -14,13 +14,18 @@
+ use PhpMyAdmin\Tests\Stubs\ResponseRenderer;
+ use ReflectionProperty;
+ 
++use const PHP_VERSION_ID;
++
+ /** @covers \PhpMyAdmin\Controllers\Table\IndexRenameController */
+ final class IndexRenameControllerTest extends AbstractTestCase
+ {
+     public function testPreviewSqlWithOldStatement(): void
+     {
+         $indexRegistry = new ReflectionProperty(Index::class, 'registry');
+-        $indexRegistry->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $indexRegistry->setAccessible(true);
++        }
++
+         $indexRegistry->setValue(null, []);
+ 
+         $GLOBALS['cfg']['Server'] = $GLOBALS['cfg']['Servers'][1];
+diff --git a/test/classes/Controllers/Table/IndexesControllerTest.php b/test/classes/Controllers/Table/IndexesControllerTest.php
+index 74cac49b7e..ae98773323 100644
+--- a/test/classes/Controllers/Table/IndexesControllerTest.php
++++ b/test/classes/Controllers/Table/IndexesControllerTest.php
+@@ -21,6 +21,8 @@
+ use function __;
+ use function sprintf;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Controllers\Table\IndexesController
+  */
+@@ -102,7 +104,9 @@ public function testDisplayFormAction(): void
+         $template = new Template();
+ 
+         $method = new ReflectionMethod(IndexesController::class, 'displayForm');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $ctrl = new IndexesController(
+             $response,
+diff --git a/test/classes/Controllers/Table/PrivilegesControllerTest.php b/test/classes/Controllers/Table/PrivilegesControllerTest.php
+index 793d59d3bd..6a0a7f3896 100644
+--- a/test/classes/Controllers/Table/PrivilegesControllerTest.php
++++ b/test/classes/Controllers/Table/PrivilegesControllerTest.php
+@@ -31,7 +31,7 @@ protected function setUp(): void
+ 
+     public function testIndex(): void
+     {
+-        global $dbi, $db, $table, $server, $cfg, $PMA_PHP_SELF;
++        global $db, $table, $server, $cfg, $PMA_PHP_SELF;
+ 
+         $db = 'db';
+         $table = 'table';
+@@ -39,6 +39,16 @@ public function testIndex(): void
+         $cfg['Server']['DisableIS'] = false;
+         $PMA_PHP_SELF = 'index.php';
+ 
++        $dbiDummy = $this->createDbiDummy();
++        $dbiDummy->addResult('SELECT @@collation_server', [['utf8mb4_general_ci']]);
++        // phpcs:ignore Generic.Files.LineLength.TooLong
++        $dbiDummy->addResult("SELECT 1 FROM `INFORMATION_SCHEMA`.`USER_PRIVILEGES` WHERE `PRIVILEGE_TYPE` = 'CREATE USER' AND '''pma_test''@''localhost''' LIKE `GRANTEE` UNION SELECT 1 FROM mysql.user WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_general_ci AND 'pma_test' LIKE `User` AND '' LIKE `Host` LIMIT 1", [['1']]);
++        $dbiDummy->addResult('SELECT @@collation_server', [['utf8mb4_general_ci']]);
++        // phpcs:ignore Generic.Files.LineLength.TooLong
++        $dbiDummy->addResult("SELECT 1 FROM (SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`COLUMN_PRIVILEGES` UNION SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`TABLE_PRIVILEGES` UNION SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`SCHEMA_PRIVILEGES` UNION SELECT `GRANTEE`, `IS_GRANTABLE` FROM `INFORMATION_SCHEMA`.`USER_PRIVILEGES`) t WHERE `IS_GRANTABLE` = 'YES' AND '''pma_test''@''localhost''' LIKE `GRANTEE` UNION SELECT 1 FROM mysql.user WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_general_ci AND 'pma_test' LIKE `User` AND '' LIKE `Host` LIMIT 1", [['1']]);
++        $dbi = $this->createDatabaseInterface($dbiDummy);
++        $GLOBALS['dbi'] = $dbi;
++
+         $privileges = [];
+ 
+         $serverPrivileges = $this->createMock(Privileges::class);
+diff --git a/test/classes/Controllers/Table/Structure/ChangeControllerTest.php b/test/classes/Controllers/Table/Structure/ChangeControllerTest.php
+index 4d435a7f3a..bb997e39a5 100644
+--- a/test/classes/Controllers/Table/Structure/ChangeControllerTest.php
++++ b/test/classes/Controllers/Table/Structure/ChangeControllerTest.php
+@@ -12,6 +12,8 @@
+ use PhpMyAdmin\Transformations;
+ use ReflectionClass;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Controllers\Table\Structure\ChangeController
+  */
+@@ -31,7 +33,9 @@ public function testChangeController(): void
+ 
+         $class = new ReflectionClass(ChangeController::class);
+         $method = $class->getMethod('displayHtmlForColumnChange');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $ctrl = new ChangeController(
+             $response,
+diff --git a/test/classes/Controllers/Table/Structure/MoveColumnsControllerTest.php b/test/classes/Controllers/Table/Structure/MoveColumnsControllerTest.php
+index 4cab536d7a..a267ffea76 100644
+--- a/test/classes/Controllers/Table/Structure/MoveColumnsControllerTest.php
++++ b/test/classes/Controllers/Table/Structure/MoveColumnsControllerTest.php
+@@ -12,6 +12,8 @@
+ 
+ use function preg_replace;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Controllers\Table\Structure\MoveColumnsController
+  */
+@@ -27,7 +29,9 @@ public function testGenerateAlterTableSql(string $createStatement, array $column
+     {
+         $class = new ReflectionClass(MoveColumnsController::class);
+         $method = $class->getMethod('generateAlterTableSql');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $controller = new MoveColumnsController(
+             new ResponseStub(),
+@@ -120,6 +124,49 @@ public static function providerForTestGenerateAlterTableSql(): array
+ ALTER TABLE `test`
+   CHANGE `enum` `enum` enum('yes','no') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no' FIRST
+ SQL
++,
++            ],
++            // with foreign key
++            [
++                <<<'SQL'
++CREATE TABLE orders (
++  order_id INT AUTO_INCREMENT PRIMARY KEY,
++  user_id INT NOT NULL,
++  order_date DATE NOT NULL,
++  amount DECIMAL(10, 2) NOT NULL,
++  status VARCHAR(50) DEFAULT 'pending',
++  CONSTRAINT fk_user
++    FOREIGN KEY (user_id)
++    REFERENCES users(user_id)
++    ON DELETE CASCADE
++    ON UPDATE CASCADE
++)
++SQL
++,
++                ['order_id','user_id','order_date','status','amount'],
++                <<<'SQL'
++ALTER TABLE `orders`
++  CHANGE `status` `status` varchar(50) DEFAULT 'pending' AFTER `order_date`
++SQL
++,
++            ],
++            // With non-primary index
++            [
++                <<<'SQL'
++CREATE TABLE `test_table` (
++  `id` int(11) NOT NULL AUTO_INCREMENT,
++  `val` int(11) DEFAULT NULL,
++  `note` varchar(100) DEFAULT NULL,
++  PRIMARY KEY (`id`),
++  KEY `val_index` (`val`)
++) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
++SQL
++,
++                ['id', 'note', 'val'],
++                <<<'SQL'
++ALTER TABLE `test_table`
++  CHANGE `note` `note` varchar(100) DEFAULT NULL AFTER `id`
++SQL
+ ,
+             ],
+         ];
+diff --git a/test/classes/Controllers/Table/Structure/SaveControllerTest.php b/test/classes/Controllers/Table/Structure/SaveControllerTest.php
+index 8d3752feee..1969116fc9 100644
+--- a/test/classes/Controllers/Table/Structure/SaveControllerTest.php
++++ b/test/classes/Controllers/Table/Structure/SaveControllerTest.php
+@@ -13,6 +13,8 @@
+ use PhpMyAdmin\Transformations;
+ use ReflectionClass;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Controllers\Table\Structure\SaveController
+  */
+@@ -28,7 +30,9 @@ public function testSaveController(): void
+ 
+         $class = new ReflectionClass(SaveController::class);
+         $method = $class->getMethod('adjustColumnPrivileges');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $ctrl = new SaveController(
+             new ResponseStub(),
+diff --git a/test/classes/CoreTest.php b/test/classes/CoreTest.php
+index 505f99ae3d..eca109040c 100644
+--- a/test/classes/CoreTest.php
++++ b/test/classes/CoreTest.php
+@@ -14,7 +14,6 @@
+ use function __;
+ use function _pgettext;
+ use function hash;
+-use function header;
+ use function htmlspecialchars;
+ use function mb_strpos;
+ use function ob_end_clean;
+@@ -936,57 +935,30 @@ public static function providerForTestPopulateRequestWithEncryptedQueryParamsWit
+         ];
+     }
+ 
+-    /**
+-     * @runInSeparateProcess
+-     * @preserveGlobalState disabled
+-     * @requires extension xdebug
+-     * @group ext-xdebug
+-     */
+-    public function testDownloadHeader(): void
++    public function testGetDownloadHeaders(): void
+     {
+-        $GLOBALS['config']->set('PMA_USR_BROWSER_AGENT', 'FIREFOX');
+-
+-        header('Cache-Control: private, max-age=10800');
++        $headersList = Core::getDownloadHeaders('test.sql', 'text/x-sql', 100, false);
+ 
+-        Core::downloadHeader('test.sql', 'text/x-sql', 100, false);
+-
+-        // phpcs:disable SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly.ReferenceViaFullyQualifiedName
+-        $headersList = \xdebug_get_headers();
+-        // phpcs:enable
+-
+-        self::assertContains('Cache-Control: private, max-age=10800', $headersList);
+-        self::assertContains('Content-Description: File Transfer', $headersList);
+-        self::assertContains('Content-Disposition: attachment; filename="test.sql"', $headersList);
+-        self::assertContains('Content-type: text/x-sql;charset=UTF-8', $headersList);
+-        self::assertContains('Content-Transfer-Encoding: binary', $headersList);
+-        self::assertContains('Content-Length: 100', $headersList);
+-        self::assertNotContains('Content-Encoding: gzip', $headersList);
++        $expected = [
++            'Content-Description' => 'File Transfer',
++            'Content-Disposition' => 'attachment; filename="test.sql"',
++            'Content-Type' => 'text/x-sql',
++            'Content-Transfer-Encoding' => 'binary',
++            'Content-Length' => '100',
++        ];
++        self::assertSame($expected, $headersList);
+     }
+ 
+-    /**
+-     * @runInSeparateProcess
+-     * @preserveGlobalState disabled
+-     * @requires extension xdebug
+-     * @group ext-xdebug
+-     */
+-    public function testDownloadHeader2(): void
++    public function testGetDownloadHeaders2(): void
+     {
+-        $GLOBALS['config']->set('PMA_USR_BROWSER_AGENT', 'FIREFOX');
+-
+-        header('Cache-Control: private, max-age=10800');
++        $headersList = Core::getDownloadHeaders('test.sql.gz', 'application/x-gzip', 0, false);
+ 
+-        Core::downloadHeader('test.sql.gz', 'application/x-gzip', 0, false);
+-
+-        // phpcs:disable SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly.ReferenceViaFullyQualifiedName
+-        $headersList = \xdebug_get_headers();
+-        // phpcs:enable
+-
+-        self::assertContains('Cache-Control: private, max-age=10800', $headersList);
+-        self::assertContains('Content-Description: File Transfer', $headersList);
+-        self::assertContains('Content-Disposition: attachment; filename="test.sql.gz"', $headersList);
+-        self::assertContains('Content-Type: application/x-gzip', $headersList);
+-        self::assertNotContains('Content-Encoding: gzip', $headersList);
+-        self::assertContains('Content-Transfer-Encoding: binary', $headersList);
+-        self::assertNotContains('Content-Length: 0', $headersList);
++        $expected = [
++            'Content-Description' => 'File Transfer',
++            'Content-Disposition' => 'attachment; filename="test.sql.gz"',
++            'Content-Type' => 'application/x-gzip',
++            'Content-Transfer-Encoding' => 'binary',
++        ];
++        self::assertSame($expected, $headersList);
+     }
+ }
+diff --git a/test/classes/Database/DesignerTest.php b/test/classes/Database/DesignerTest.php
+index 54f2d91662..a44d919f0c 100644
+--- a/test/classes/Database/DesignerTest.php
++++ b/test/classes/Database/DesignerTest.php
+@@ -13,6 +13,8 @@
+ use PhpMyAdmin\Version;
+ use ReflectionMethod;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Database\Designer
+  */
+@@ -105,7 +107,10 @@ public function testGetPageIdsAndNames(): void
+         $this->designer = new Designer($GLOBALS['dbi'], new Relation($GLOBALS['dbi']), new Template());
+ 
+         $method = new ReflectionMethod(Designer::class, 'getPageIdsAndNames');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invokeArgs($this->designer, [$db]);
+ 
+         self::assertSame([
+diff --git a/test/classes/ErrorHandlerTest.php b/test/classes/ErrorHandlerTest.php
+index 3163d05968..3b0697cbb1 100644
+--- a/test/classes/ErrorHandlerTest.php
++++ b/test/classes/ErrorHandlerTest.php
+@@ -25,6 +25,7 @@
+ use const E_USER_NOTICE;
+ use const E_USER_WARNING;
+ use const E_WARNING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * @covers \PhpMyAdmin\ErrorHandler
+@@ -317,7 +318,10 @@ public function testHandleExceptionForDevEnv(): void
+         $GLOBALS['config']->set('environment', 'development');
+         $responseStub = new ResponseRendererStub();
+         $property = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue(null, $responseStub);
+         $responseStub->setHeadersSent(true);
+         $errorHandler = new ErrorHandler();
+@@ -343,7 +347,10 @@ public function testHandleExceptionForProdEnv(): void
+         $GLOBALS['config']->set('environment', 'production');
+         $responseStub = new ResponseRendererStub();
+         $property = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue(null, $responseStub);
+         $responseStub->setHeadersSent(true);
+         $errorHandler = new ErrorHandler();
+@@ -369,7 +376,10 @@ public function testAddErrorWithFatalErrorAndHeadersSent(): void
+         $GLOBALS['config']->set('environment', 'production');
+         $responseStub = new ResponseRendererStub();
+         $property = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue(null, $responseStub);
+         $responseStub->setHeadersSent(true);
+         $errorHandler = new ErrorHandler();
+@@ -395,7 +405,10 @@ public function testAddErrorWithFatalErrorAndHeadersNotSent(): void
+         $GLOBALS['config']->set('environment', 'production');
+         $responseStub = new ResponseRendererStub();
+         $property = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue(null, $responseStub);
+         $responseStub->setHeadersSent(false);
+         $errorHandler = new ErrorHandler();
+diff --git a/test/classes/FooterTest.php b/test/classes/FooterTest.php
+index 594f1dd6b3..34eb4b7f6d 100644
+--- a/test/classes/FooterTest.php
++++ b/test/classes/FooterTest.php
+@@ -11,6 +11,8 @@
+ 
+ use function json_encode;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Footer
+  */
+@@ -154,7 +156,10 @@ public function testMinimal(): void
+     public function testSetAjax(): void
+     {
+         $isAjax = new ReflectionProperty(Footer::class, 'isAjax');
+-        $isAjax->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $isAjax->setAccessible(true);
++        }
++
+         $footer = new Footer();
+ 
+         self::assertFalse($isAjax->getValue($footer));
+diff --git a/test/classes/HeaderTest.php b/test/classes/HeaderTest.php
+index 585dd3fc19..d174a245c0 100644
+--- a/test/classes/HeaderTest.php
++++ b/test/classes/HeaderTest.php
+@@ -12,6 +12,7 @@
+ use function gmdate;
+ 
+ use const DATE_RFC1123;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * @covers \PhpMyAdmin\Header
+@@ -106,7 +107,9 @@ public function testGetMessage(): void
+     public function testDisableWarnings(): void
+     {
+         $reflection = new ReflectionProperty(Header::class, 'warningsEnabled');
+-        $reflection->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $reflection->setAccessible(true);
++        }
+ 
+         $header = new Header();
+         $header->disableWarnings();
+@@ -233,13 +236,21 @@ public function testSetAjax(): void
+     {
+         $header = new Header();
+         $consoleReflection = new ReflectionProperty(Header::class, 'console');
+-        $consoleReflection->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $consoleReflection->setAccessible(true);
++        }
++
+         $console = $consoleReflection->getValue($header);
+         self::assertInstanceOf(Console::class, $console);
+         $isAjax = new ReflectionProperty(Header::class, 'isAjax');
+-        $isAjax->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $isAjax->setAccessible(true);
++        }
++
+         $consoleIsAjax = new ReflectionProperty(Console::class, 'isAjax');
+-        $consoleIsAjax->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $consoleIsAjax->setAccessible(true);
++        }
+ 
+         self::assertFalse($isAjax->getValue($header));
+         self::assertFalse($consoleIsAjax->getValue($console));
+diff --git a/test/classes/InsertEditTest.php b/test/classes/InsertEditTest.php
+index d6e9f64124..c0af09367c 100644
+--- a/test/classes/InsertEditTest.php
++++ b/test/classes/InsertEditTest.php
+@@ -30,6 +30,7 @@
+ use const MYSQLI_TYPE_DECIMAL;
+ use const MYSQLI_TYPE_TIMESTAMP;
+ use const MYSQLI_TYPE_TINY;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * @covers \PhpMyAdmin\InsertEdit
+@@ -94,8 +95,15 @@ protected function tearDown(): void
+     {
+         parent::tearDown();
+         $response = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $response->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $response->setAccessible(true);
++        }
++
+         $response->setValue(null, null);
++        if (PHP_VERSION_ID >= 80100) {
++            return;
++        }
++
+         $response->setAccessible(false);
+     }
+ 
+@@ -312,7 +320,10 @@ public function testShowEmptyResultMessageOrSetUniqueCondition(): void
+ 
+         $restoreInstance = ResponseRenderer::getInstance();
+         $response = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $response->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $response->setAccessible(true);
++        }
++
+         $response->setValue(null, $responseMock);
+ 
+         $result = $this->callFunction(
+@@ -2693,7 +2704,10 @@ public function testDetermineInsertOrEdit(): void
+ 
+         $restoreInstance = ResponseRenderer::getInstance();
+         $response = new ReflectionProperty(ResponseRenderer::class, 'instance');
+-        $response->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $response->setAccessible(true);
++        }
++
+         $response->setValue(null, $responseMock);
+ 
+         $this->insertEdit = new InsertEdit($dbi);
+diff --git a/test/classes/Navigation/Nodes/NodeTest.php b/test/classes/Navigation/Nodes/NodeTest.php
+index 3d99b2f8e6..c8863bea4f 100644
+--- a/test/classes/Navigation/Nodes/NodeTest.php
++++ b/test/classes/Navigation/Nodes/NodeTest.php
+@@ -11,6 +11,8 @@
+ use PhpMyAdmin\Tests\Stubs\DummyResult;
+ use ReflectionMethod;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Navigation\Nodes\Node
+  */
+@@ -221,7 +223,9 @@ public function testHasSiblingsForNodesAtLevelThree(): void
+     public function testGetWhereClause(): void
+     {
+         $method = new ReflectionMethod(Node::class, 'getWhereClause');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         // Vanilla case
+         $node = NodeFactory::getInstance();
+diff --git a/test/classes/Plugins/Auth/AuthenticationCookieTest.php b/test/classes/Plugins/Auth/AuthenticationCookieTest.php
+index 3e8cc56c9e..40e205b9c0 100644
+--- a/test/classes/Plugins/Auth/AuthenticationCookieTest.php
++++ b/test/classes/Plugins/Auth/AuthenticationCookieTest.php
+@@ -26,6 +26,7 @@
+ use function str_shuffle;
+ use function time;
+ 
++use const PHP_VERSION_ID;
+ use const SODIUM_CRYPTO_SECRETBOX_KEYBYTES;
+ 
+ /**
+@@ -878,7 +879,9 @@ public function testAuthFailsErrno(): void
+     public function testGetEncryptionSecretEmpty(): void
+     {
+         $method = new ReflectionMethod(AuthenticationCookie::class, 'getEncryptionSecret');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $GLOBALS['cfg']['blowfish_secret'] = '';
+         $_SESSION['encryption_key'] = '';
+@@ -892,7 +895,9 @@ public function testGetEncryptionSecretEmpty(): void
+     public function testGetEncryptionSecretConfigured(): void
+     {
+         $method = new ReflectionMethod(AuthenticationCookie::class, 'getEncryptionSecret');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $key = str_repeat('a', SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+         $GLOBALS['cfg']['blowfish_secret'] = $key;
+@@ -906,7 +911,9 @@ public function testGetEncryptionSecretConfigured(): void
+     public function testGetSessionEncryptionSecretConfigured(): void
+     {
+         $method = new ReflectionMethod(AuthenticationCookie::class, 'getEncryptionSecret');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $key = str_repeat('a', SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+         $GLOBALS['cfg']['blowfish_secret'] = 'blowfish_secret';
+diff --git a/test/classes/Plugins/Auth/AuthenticationSignonTest.php b/test/classes/Plugins/Auth/AuthenticationSignonTest.php
+index af3f77e58d..dfe9f8faf0 100644
+--- a/test/classes/Plugins/Auth/AuthenticationSignonTest.php
++++ b/test/classes/Plugins/Auth/AuthenticationSignonTest.php
+@@ -17,6 +17,8 @@
+ use function session_name;
+ use function version_compare;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Auth\AuthenticationSignon
+  */
+@@ -324,6 +326,7 @@ public function testSetCookieParamsDefaults(): void
+             'path' => '/',
+             'domain' => '',
+             'secure' => false,
++            'partitioned' => false,
+             'httponly' => false,
+             'samesite' => '',
+         ];
+@@ -332,6 +335,10 @@ public function testSetCookieParamsDefaults(): void
+             unset($defaultOptions['samesite']);
+         }
+ 
++        if (PHP_VERSION_ID < 80500) {
++            unset($defaultOptions['partitioned']);
++        }
++
+         self::assertSame($defaultOptions, session_get_cookie_params());
+     }
+ }
+diff --git a/test/classes/Plugins/Export/ExportCodegenTest.php b/test/classes/Plugins/Export/ExportCodegenTest.php
+index 03da6a2199..6e07bb705e 100644
+--- a/test/classes/Plugins/Export/ExportCodegenTest.php
++++ b/test/classes/Plugins/Export/ExportCodegenTest.php
+@@ -18,6 +18,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportCodegen
+  * @group medium
+@@ -49,11 +51,16 @@ protected function tearDown(): void
+     public function testInitSpecificVariables(): void
+     {
+         $method = new ReflectionMethod(ExportCodegen::class, 'init');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrCgFormats = new ReflectionProperty(ExportCodegen::class, 'cgFormats');
+-        $attrCgFormats->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrCgFormats->setAccessible(true);
++        }
+ 
+         self::assertSame([
+             'NHibernate C# DO',
+@@ -64,11 +71,17 @@ public function testInitSpecificVariables(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportCodegen::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportCodegen::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+@@ -185,7 +198,10 @@ public function testCgMakeIdentifier(): void
+     public function testHandleNHibernateCSBody(): void
+     {
+         $method = new ReflectionMethod(ExportCodegen::class, 'handleNHibernateCSBody');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invoke($this->object, 'test_db', 'test_table', "\n");
+ 
+         self::assertSame('using System;' . "\n" .
+@@ -235,7 +251,10 @@ public function testHandleNHibernateCSBody(): void
+     public function testHandleNHibernateXMLBody(): void
+     {
+         $method = new ReflectionMethod(ExportCodegen::class, 'handleNHibernateXMLBody');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invoke($this->object, 'test_db', 'test_table', "\n");
+ 
+         self::assertSame('<?xml version="1.0" encoding="utf-8" ?>' . "\n" .
+@@ -267,8 +286,10 @@ public function testSetGetCgFormats(): void
+         $getter = $reflection->getMethod('getCgFormats');
+         $setter = $reflection->getMethod('setCgFormats');
+ 
+-        $getter->setAccessible(true);
+-        $setter->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $getter->setAccessible(true);
++            $setter->setAccessible(true);
++        }
+ 
+         $setter->invoke($this->object, [1, 2]);
+ 
+diff --git a/test/classes/Plugins/Export/ExportCsvTest.php b/test/classes/Plugins/Export/ExportCsvTest.php
+index b81a52314c..93506cf01a 100644
+--- a/test/classes/Plugins/Export/ExportCsvTest.php
++++ b/test/classes/Plugins/Export/ExportCsvTest.php
+@@ -19,6 +19,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportCsv
+  * @group medium
+@@ -55,11 +57,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportCsv::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportCsv::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportExcelTest.php b/test/classes/Plugins/Export/ExportExcelTest.php
+index 35781cfb3c..46efacfe34 100644
+--- a/test/classes/Plugins/Export/ExportExcelTest.php
++++ b/test/classes/Plugins/Export/ExportExcelTest.php
+@@ -18,6 +18,8 @@
+ 
+ use function array_shift;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportExcel
+  * @group medium
+@@ -49,11 +51,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportExcel::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportExcel::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportHtmlwordTest.php b/test/classes/Plugins/Export/ExportHtmlwordTest.php
+index 45e7aee363..781e40cdb7 100644
+--- a/test/classes/Plugins/Export/ExportHtmlwordTest.php
++++ b/test/classes/Plugins/Export/ExportHtmlwordTest.php
+@@ -24,6 +24,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportHtmlword
+  * @group medium
+@@ -66,11 +68,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportHtmlword::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportHtmlword::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+@@ -529,7 +537,10 @@ public function testGetTriggers(): void
+         $GLOBALS['dbi'] = $dbi;
+ 
+         $method = new ReflectionMethod(ExportHtmlword::class, 'getTriggers');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invoke($this->object, 'database', 'table');
+ 
+         self::assertStringContainsString('<td class="print">tna&quot;me</td>' .
+@@ -633,7 +644,9 @@ public function testExportStructure(): void
+     public function testFormatOneColumnDefinition(): void
+     {
+         $method = new ReflectionMethod(ExportHtmlword::class, 'formatOneColumnDefinition');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $cols = [
+             'Null' => 'Yes',
+diff --git a/test/classes/Plugins/Export/ExportJsonTest.php b/test/classes/Plugins/Export/ExportJsonTest.php
+index af0fd3ba6a..b4e46d3987 100644
+--- a/test/classes/Plugins/Export/ExportJsonTest.php
++++ b/test/classes/Plugins/Export/ExportJsonTest.php
+@@ -16,6 +16,8 @@
+ 
+ use function array_shift;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportJson
+  * @group medium
+@@ -52,11 +54,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportJson::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportJson::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+@@ -98,7 +106,7 @@ public function testExportHeader(): void
+         $this->expectOutputString(
+             "[\n"
+             . '{"type":"header","version":"' . Version::VERSION
+-            . '","comment":"Export to JSON plugin for PHPMyAdmin"},'
++            . '","comment":"Export to JSON plugin for phpMyAdmin"},'
+             . "\n"
+         );
+ 
+diff --git a/test/classes/Plugins/Export/ExportLatexTest.php b/test/classes/Plugins/Export/ExportLatexTest.php
+index 094fa0b39d..3750e48d46 100644
+--- a/test/classes/Plugins/Export/ExportLatexTest.php
++++ b/test/classes/Plugins/Export/ExportLatexTest.php
+@@ -23,6 +23,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportLatex
+  * @group medium
+@@ -76,7 +78,10 @@ public function testSetProperties(): void
+         $_SESSION = ['relation' => [$GLOBALS['server'] => $relationParameters->toArray()]];
+ 
+         $method = new ReflectionMethod(ExportLatex::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $properties = $method->invoke($this->object, null);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportMediawikiTest.php b/test/classes/Plugins/Export/ExportMediawikiTest.php
+index e26233e0ca..183532759c 100644
+--- a/test/classes/Plugins/Export/ExportMediawikiTest.php
++++ b/test/classes/Plugins/Export/ExportMediawikiTest.php
+@@ -21,6 +21,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportMediawiki
+  * @group medium
+@@ -62,11 +64,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportMediawiki::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportMediawiki::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportOdsTest.php b/test/classes/Plugins/Export/ExportOdsTest.php
+index fef9bf2411..205abcac0e 100644
+--- a/test/classes/Plugins/Export/ExportOdsTest.php
++++ b/test/classes/Plugins/Export/ExportOdsTest.php
+@@ -28,6 +28,7 @@
+ use const MYSQLI_TYPE_STRING;
+ use const MYSQLI_TYPE_TIME;
+ use const MYSQLI_TYPE_TINY_BLOB;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportOds
+@@ -66,11 +67,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportOds::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportOds::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportOdtTest.php b/test/classes/Plugins/Export/ExportOdtTest.php
+index 7bfc47cb91..c39f765c83 100644
+--- a/test/classes/Plugins/Export/ExportOdtTest.php
++++ b/test/classes/Plugins/Export/ExportOdtTest.php
+@@ -28,6 +28,7 @@
+ use const MYSQLI_TYPE_BLOB;
+ use const MYSQLI_TYPE_DECIMAL;
+ use const MYSQLI_TYPE_STRING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportOdt
+@@ -82,7 +83,10 @@ public function testSetProperties(): void
+         $_SESSION = ['relation' => [$GLOBALS['server'] => $relationParameters->toArray()]];
+ 
+         $method = new ReflectionMethod(ExportOdt::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $properties = $method->invoke($this->object, null);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+@@ -647,7 +651,10 @@ public function testGetTriggers(): void
+         $GLOBALS['dbi'] = $dbi;
+ 
+         $method = new ReflectionMethod(ExportOdt::class, 'getTriggers');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invoke($this->object, 'database', 'ta<ble');
+ 
+         self::assertSame($result, $GLOBALS['odt_buffer']);
+@@ -806,7 +813,9 @@ public function testExportStructure(): void
+     public function testFormatOneColumnDefinition(): void
+     {
+         $method = new ReflectionMethod(ExportOdt::class, 'formatOneColumnDefinition');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $cols = [
+             'Null' => 'Yes',
+diff --git a/test/classes/Plugins/Export/ExportPdfTest.php b/test/classes/Plugins/Export/ExportPdfTest.php
+index ff0fd77a40..9f48cc1d40 100644
+--- a/test/classes/Plugins/Export/ExportPdfTest.php
++++ b/test/classes/Plugins/Export/ExportPdfTest.php
+@@ -18,6 +18,8 @@
+ use function __;
+ use function array_shift;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportPdf
+  * @group medium
+@@ -54,11 +56,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportPdf::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportPdf::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+@@ -131,7 +139,10 @@ public function testExportHeader(): void
+             ->method('setTopMargin');
+ 
+         $attrPdf = new ReflectionProperty(ExportPdf::class, 'pdf');
+-        $attrPdf->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrPdf->setAccessible(true);
++        }
++
+         $attrPdf->setValue($this->object, $pdf);
+ 
+         self::assertTrue($this->object->exportHeader());
+@@ -147,7 +158,10 @@ public function testExportFooter(): void
+             ->method('getPDFData');
+ 
+         $attrPdf = new ReflectionProperty(ExportPdf::class, 'pdf');
+-        $attrPdf->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrPdf->setAccessible(true);
++        }
++
+         $attrPdf->setValue($this->object, $pdf);
+ 
+         self::assertTrue($this->object->exportFooter());
+@@ -179,7 +193,10 @@ public function testExportData(): void
+             ->with('SELECT');
+ 
+         $attrPdf = new ReflectionProperty(ExportPdf::class, 'pdf');
+-        $attrPdf->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrPdf->setAccessible(true);
++        }
++
+         $attrPdf->setValue($this->object, $pdf);
+ 
+         self::assertTrue($this->object->exportData(
+@@ -199,11 +216,17 @@ public function testExportData(): void
+     public function testSetGetPdf(): void
+     {
+         $setter = new ReflectionMethod(ExportPdf::class, 'setPdf');
+-        $setter->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $setter->setAccessible(true);
++        }
++
+         $setter->invoke($this->object, new Pdf());
+ 
+         $getter = new ReflectionMethod(ExportPdf::class, 'getPdf');
+-        $getter->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $getter->setAccessible(true);
++        }
++
+         self::assertInstanceOf(Pdf::class, $getter->invoke($this->object));
+     }
+ }
+diff --git a/test/classes/Plugins/Export/ExportPhparrayTest.php b/test/classes/Plugins/Export/ExportPhparrayTest.php
+index e6a7876963..79ff9b1481 100644
+--- a/test/classes/Plugins/Export/ExportPhparrayTest.php
++++ b/test/classes/Plugins/Export/ExportPhparrayTest.php
+@@ -17,6 +17,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportPhparray
+  * @group medium
+@@ -58,11 +60,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportPhparray::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportPhparray::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportSqlTest.php b/test/classes/Plugins/Export/ExportSqlTest.php
+index eee9d1188e..032fb52ffb 100644
+--- a/test/classes/Plugins/Export/ExportSqlTest.php
++++ b/test/classes/Plugins/Export/ExportSqlTest.php
+@@ -36,6 +36,7 @@
+ use const MYSQLI_TYPE_LONG;
+ use const MYSQLI_TYPE_STRING;
+ use const MYSQLI_UNIQUE_KEY_FLAG;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportSql
+@@ -88,7 +89,10 @@ public function testSetPropertiesWithHideSql(): void
+         $GLOBALS['plugin_param']['single_table'] = false;
+ 
+         $method = new ReflectionMethod(ExportSql::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $properties = $method->invoke($this->object, null);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+@@ -127,7 +131,10 @@ public function testSetProperties(): void
+         $_SESSION = ['relation' => [$GLOBALS['server'] => $relationParameters->toArray()]];
+ 
+         $method = new ReflectionMethod(ExportSql::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $properties = $method->invoke($this->object, null);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+@@ -267,7 +274,9 @@ public function testExportRoutines(): void
+     public function testExportComment(): void
+     {
+         $method = new ReflectionMethod(ExportSql::class, 'exportComment');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $GLOBALS['crlf'] = '##';
+         $GLOBALS['sql_include_comments'] = true;
+@@ -288,7 +297,9 @@ public function testExportComment(): void
+     public function testPossibleCRLF(): void
+     {
+         $method = new ReflectionMethod(ExportSql::class, 'possibleCRLF');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $GLOBALS['crlf'] = '##';
+         $GLOBALS['sql_include_comments'] = true;
+@@ -629,7 +640,10 @@ public function testGetTableDefForView(): void
+         $GLOBALS['sql_compatibility'] = 'MSSQL';
+ 
+         $method = new ReflectionMethod(ExportSql::class, 'getTableDefForView');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invoke($this->object, 'db', 'view', "\n");
+ 
+         self::assertSame("CREATE TABLE `view`(\n" .
+@@ -921,7 +935,10 @@ public function testGetTableComments(): void
+         $this->object->relation = new Relation($dbi);
+ 
+         $method = new ReflectionMethod(ExportSql::class, 'getTableComments');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invoke($this->object, 'db', '', true, true);
+ 
+         self::assertStringContainsString("-- MEDIA TYPES FOR TABLE :\n" .
+@@ -1001,7 +1018,10 @@ public function testExportStructure(): void
+         ));
+         $result = ob_get_clean();
+         $sqlViewsProp = new ReflectionProperty(ExportSql::class, 'sqlViews');
+-        $sqlViewsProp->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $sqlViewsProp->setAccessible(true);
++        }
++
+         $sqlViews = $sqlViewsProp->getValue($this->object);
+ 
+         self::assertSame('', $result);
+@@ -1358,7 +1378,10 @@ public function testMakeCreateTableMSSQLCompatible(): void
+             " \" double NOT NULL DEFAULT '213'\n";
+ 
+         $method = new ReflectionMethod(ExportSql::class, 'makeCreateTableMSSQLCompatible');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $result = $method->invoke($this->object, $query);
+ 
+         self::assertSame("CREATE TABLE (\" datetime DEFAULT NULL,\n" .
+diff --git a/test/classes/Plugins/Export/ExportTexytextTest.php b/test/classes/Plugins/Export/ExportTexytextTest.php
+index 8bb5d8d5d6..b90017ccbe 100644
+--- a/test/classes/Plugins/Export/ExportTexytextTest.php
++++ b/test/classes/Plugins/Export/ExportTexytextTest.php
+@@ -22,6 +22,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportTexytext
+  * @group medium
+@@ -66,11 +68,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportTexytext::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportTexytext::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportXmlTest.php b/test/classes/Plugins/Export/ExportXmlTest.php
+index 721c7ef38b..2ffd882532 100644
+--- a/test/classes/Plugins/Export/ExportXmlTest.php
++++ b/test/classes/Plugins/Export/ExportXmlTest.php
+@@ -20,6 +20,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportXml
+  * @group medium
+@@ -63,11 +65,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportXml::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportXml::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/Plugins/Export/ExportYamlTest.php b/test/classes/Plugins/Export/ExportYamlTest.php
+index 0e1538859f..f152fb5431 100644
+--- a/test/classes/Plugins/Export/ExportYamlTest.php
++++ b/test/classes/Plugins/Export/ExportYamlTest.php
+@@ -17,6 +17,8 @@
+ use function ob_get_clean;
+ use function ob_start;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins\Export\ExportYaml
+  * @group medium
+@@ -58,11 +60,17 @@ protected function tearDown(): void
+     public function testSetProperties(): void
+     {
+         $method = new ReflectionMethod(ExportYaml::class, 'setProperties');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $method->invoke($this->object, null);
+ 
+         $attrProperties = new ReflectionProperty(ExportYaml::class, 'properties');
+-        $attrProperties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $attrProperties->setAccessible(true);
++        }
++
+         $properties = $attrProperties->getValue($this->object);
+ 
+         self::assertInstanceOf(ExportPluginProperties::class, $properties);
+diff --git a/test/classes/PluginsTest.php b/test/classes/PluginsTest.php
+index 6d0c2f49ca..0a6e525739 100644
+--- a/test/classes/PluginsTest.php
++++ b/test/classes/PluginsTest.php
+@@ -6,6 +6,8 @@
+ 
+ use PhpMyAdmin\Plugins;
+ 
++use function extension_loaded;
++
+ /**
+  * @covers \PhpMyAdmin\Plugins
+  */
+@@ -17,9 +19,11 @@ public function testGetExport(): void
+ 
+         $GLOBALS['server'] = 1;
+         $plugins = Plugins::getExport('database', false);
++        $isCurl = extension_loaded('curl');
+         self::assertSame(['export_type' => 'database', 'single_table' => false], $plugin_param);
+         self::assertIsArray($plugins);
+-        self::assertCount(14, $plugins);
++        $pluginCount = $isCurl ? 14 : 13;
++        self::assertCount($pluginCount, $plugins);
+         self::assertContainsOnlyInstancesOf(Plugins\ExportPlugin::class, $plugins);
+     }
+ 
+diff --git a/test/classes/Properties/Options/OptionsPropertyGroupTest.php b/test/classes/Properties/Options/OptionsPropertyGroupTest.php
+index 94d7dd5462..cefacb8a7d 100644
+--- a/test/classes/Properties/Options/OptionsPropertyGroupTest.php
++++ b/test/classes/Properties/Options/OptionsPropertyGroupTest.php
+@@ -9,6 +9,8 @@
+ use PHPUnit\Framework\MockObject\MockObject;
+ use ReflectionProperty;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Properties\Options\OptionsPropertyGroup
+  */
+@@ -38,7 +40,9 @@ protected function tearDown(): void
+     public function testAddProperty(): void
+     {
+         $properties = new ReflectionProperty(OptionsPropertyGroup::class, 'properties');
+-        $properties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $properties->setAccessible(true);
++        }
+ 
+         $properties->setValue($this->stub, [1, 2, 3]);
+ 
+@@ -56,7 +60,9 @@ public function testAddProperty(): void
+     public function testRemoveProperty(): void
+     {
+         $properties = new ReflectionProperty(OptionsPropertyGroup::class, 'properties');
+-        $properties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $properties->setAccessible(true);
++        }
+ 
+         $properties->setValue($this->stub, [1, 2, 'test', 3]);
+         $this->stub->removeProperty('test');
+@@ -76,7 +82,10 @@ public function testGetGroup(): void
+     public function testGetProperties(): void
+     {
+         $properties = new ReflectionProperty(OptionsPropertyGroup::class, 'properties');
+-        $properties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $properties->setAccessible(true);
++        }
++
+         $properties->setValue($this->stub, [1, 2, 3]);
+ 
+         self::assertSame([
+@@ -89,7 +98,10 @@ public function testGetProperties(): void
+     public function testGetNrOfProperties(): void
+     {
+         $properties = new ReflectionProperty(OptionsPropertyGroup::class, 'properties');
+-        $properties->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $properties->setAccessible(true);
++        }
++
+         $properties->setValue($this->stub, [1, 2, 3]);
+ 
+         self::assertSame(3, $this->stub->getNrOfProperties());
+diff --git a/test/classes/ResponseRendererTest.php b/test/classes/ResponseRendererTest.php
+index c855a1e383..a019b42808 100644
+--- a/test/classes/ResponseRendererTest.php
++++ b/test/classes/ResponseRendererTest.php
+@@ -9,6 +9,8 @@
+ use PhpMyAdmin\ResponseRenderer;
+ use ReflectionProperty;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\ResponseRenderer
+  */
+@@ -34,13 +36,21 @@ public function testSetAjax(): void
+         $response = ResponseRenderer::getInstance();
+         $header = $response->getHeader();
+         $footerReflection = new ReflectionProperty(ResponseRenderer::class, 'footer');
+-        $footerReflection->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $footerReflection->setAccessible(true);
++        }
++
+         $footer = $footerReflection->getValue($response);
+         self::assertInstanceOf(Footer::class, $footer);
+         $headerIsAjax = new ReflectionProperty(Header::class, 'isAjax');
+-        $headerIsAjax->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $headerIsAjax->setAccessible(true);
++        }
++
+         $footerIsAjax = new ReflectionProperty(Footer::class, 'isAjax');
+-        $footerIsAjax->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $footerIsAjax->setAccessible(true);
++        }
+ 
+         self::assertFalse($response->isAjax());
+         self::assertFalse($headerIsAjax->getValue($header));
+diff --git a/test/classes/ScriptsTest.php b/test/classes/ScriptsTest.php
+index 709d14793c..64efd0064c 100644
+--- a/test/classes/ScriptsTest.php
++++ b/test/classes/ScriptsTest.php
+@@ -10,6 +10,8 @@
+ 
+ use function rawurlencode;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Scripts
+  */
+@@ -91,7 +93,9 @@ public function testGetFiles(): void
+     public function testAddFile(): void
+     {
+         $reflection = new ReflectionProperty(Scripts::class, 'files');
+-        $reflection->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $reflection->setAccessible(true);
++        }
+ 
+         // Assert empty _files property of
+         // Scripts
+@@ -117,7 +121,9 @@ public function testAddFile(): void
+     public function testAddFiles(): void
+     {
+         $reflection = new ReflectionProperty(Scripts::class, 'files');
+-        $reflection->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $reflection->setAccessible(true);
++        }
+ 
+         $filenames = [
+             'common.js',
+diff --git a/test/classes/Server/PrivilegesTest.php b/test/classes/Server/PrivilegesTest.php
+index b506be7a6f..88d1f5e90c 100644
+--- a/test/classes/Server/PrivilegesTest.php
++++ b/test/classes/Server/PrivilegesTest.php
+@@ -30,6 +30,8 @@
+ use function implode;
+ use function preg_quote;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Server\Privileges
+  */
+@@ -1669,7 +1671,9 @@ public function testGetUserPrivileges(): void
+             new Plugins($this->dbi)
+         );
+         $method = new ReflectionMethod(Privileges::class, 'getUserPrivileges');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         /** @var array|null $actual */
+         $actual = $method->invokeArgs($serverPrivileges, ['test.user', 'test.host', true]);
+diff --git a/test/classes/Setup/ConfigGeneratorTest.php b/test/classes/Setup/ConfigGeneratorTest.php
+index 62fa39d018..552273607f 100644
+--- a/test/classes/Setup/ConfigGeneratorTest.php
++++ b/test/classes/Setup/ConfigGeneratorTest.php
+@@ -15,6 +15,7 @@
+ use function mb_strlen;
+ use function str_repeat;
+ 
++use const PHP_VERSION_ID;
+ use const SODIUM_CRYPTO_SECRETBOX_KEYBYTES;
+ 
+ /**
+@@ -74,7 +75,9 @@ public function testGetVarExport(): void
+     {
+         $reflection = new ReflectionClass(ConfigGenerator::class);
+         $method = $reflection->getMethod('getVarExport');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         self::assertSame('$cfg[\'var_name\'] = 1;' . "\n", $method->invoke(null, 'var_name', 1, "\n"));
+ 
+@@ -108,7 +111,9 @@ public function testGetVarExportForBlowfishSecret(): void
+     {
+         $reflection = new ReflectionClass(ConfigGenerator::class);
+         $method = $reflection->getMethod('getVarExport');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         self::assertSame(
+             '$cfg[\'blowfish_secret\'] = \sodium_hex2bin(\''
+@@ -134,7 +139,9 @@ public function testIsZeroBasedArray(): void
+     {
+         $reflection = new ReflectionClass(ConfigGenerator::class);
+         $method = $reflection->getMethod('isZeroBasedArray');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         self::assertFalse($method->invoke(
+             null,
+@@ -175,7 +182,9 @@ public function testExportZeroBasedArray(): void
+     {
+         $reflection = new ReflectionClass(ConfigGenerator::class);
+         $method = $reflection->getMethod('exportZeroBasedArray');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
+ 
+         $arr = [
+             1,
+diff --git a/test/classes/SqlTest.php b/test/classes/SqlTest.php
+index e0ad892385..54bd517385 100644
+--- a/test/classes/SqlTest.php
++++ b/test/classes/SqlTest.php
+@@ -18,6 +18,7 @@
+ use const MYSQLI_TYPE_SHORT;
+ use const MYSQLI_TYPE_TIMESTAMP;
+ use const MYSQLI_TYPE_VAR_STRING;
++use const PHP_VERSION_ID;
+ 
+ /**
+  * @covers \PhpMyAdmin\Sql
+@@ -537,6 +538,14 @@ public static function dataProviderCountQueryResults(): array
+                 false,
+                 'SELECT COUNT(*) FROM (SELECT * FROM t1 UNION SELECT * FROM t2 ) as cnt',
+             ],
++            [
++                'SELECT SQL_NO_CACHE * FROM t1 WHERE id <> 0',
++                ['max_rows' => -1, 'pos' => 0],
++                25,
++                100,
++                false,
++                'SELECT COUNT(*) FROM (SELECT 1 FROM t1 WHERE id <> 0 ) as cnt',
++            ],
+         ];
+     }
+ 
+@@ -760,7 +769,10 @@ public function testExecuteQueryAndSendQueryResponse(): void
+     public function testGetDetailedProfilingStatsWithoutData(): void
+     {
+         $method = new ReflectionMethod($this->sql, 'getDetailedProfilingStats');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         self::assertSame(
+             ['total_time' => 0, 'states' => [], 'chart' => [], 'profile' => []],
+             $method->invoke($this->sql, [])
+@@ -770,7 +782,10 @@ public function testGetDetailedProfilingStatsWithoutData(): void
+     public function testGetDetailedProfilingStatsWithData(): void
+     {
+         $method = new ReflectionMethod($this->sql, 'getDetailedProfilingStats');
+-        $method->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $method->setAccessible(true);
++        }
++
+         $profiling = [
+             ['Status' => 'Starting', 'Duration' => '0.000017'],
+             ['Status' => 'checking permissions', 'Duration' => '0.000003'],
+diff --git a/test/classes/Stubs/DbiDummy.php b/test/classes/Stubs/DbiDummy.php
+index e47b70b04b..b0f2b63456 100644
+--- a/test/classes/Stubs/DbiDummy.php
++++ b/test/classes/Stubs/DbiDummy.php
+@@ -579,14 +579,6 @@ private function init(): void
+                 'query' => 'SELECT 1 FROM mysql.user LIMIT 1',
+                 'result' => [['1']],
+             ],
+-            [
+-                'query' => 'SELECT 1 FROM `INFORMATION_SCHEMA`.`USER_PRIVILEGES`'
+-                    . " WHERE `PRIVILEGE_TYPE` = 'CREATE USER'"
+-                    . " AND '''pma_test''@''localhost''' LIKE `GRANTEE`"
+-                    . " UNION SELECT 1 FROM mysql.user WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_general_ci"
+-                    . " AND 'pma_test' LIKE `User` AND '' LIKE `Host` LIMIT 1",
+-                'result' => [['1']],
+-            ],
+             [
+                 'query' => 'SELECT 1 FROM (SELECT `GRANTEE`, `IS_GRANTABLE`'
+                     . ' FROM `INFORMATION_SCHEMA`.`COLUMN_PRIVILEGES`'
+@@ -598,7 +590,7 @@ private function init(): void
+                     . ' FROM `INFORMATION_SCHEMA`.`USER_PRIVILEGES`) t'
+                     . " WHERE `IS_GRANTABLE` = 'YES'"
+                     . " AND '''pma_test''@''localhost''' LIKE `GRANTEE`"
+-                    . " UNION SELECT 1 FROM mysql.user WHERE `create_user_priv` = 'Y' COLLATE utf8mb4_general_ci"
++                    . " UNION SELECT 1 FROM mysql.user WHERE `create_user_priv` = 'Y' COLLATE utf8_general_ci"
+                     . " AND 'pma_test' LIKE `User` AND '' LIKE `Host` LIMIT 1",
+                 'result' => [['1']],
+             ],
+diff --git a/test/classes/TrackerTest.php b/test/classes/TrackerTest.php
+index 8936fe1535..c510c85f22 100644
+--- a/test/classes/TrackerTest.php
++++ b/test/classes/TrackerTest.php
+@@ -12,6 +12,8 @@
+ use PhpMyAdmin\Util;
+ use ReflectionMethod;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Tracker
+  */
+@@ -331,7 +333,10 @@ public function testChangeTracking(
+ 
+         if ($type === null) {
+             $method = new ReflectionMethod(Tracker::class, 'changeTracking');
+-            $method->setAccessible(true);
++            if (PHP_VERSION_ID < 80100) {
++                $method->setAccessible(true);
++            }
++
+             $method->invoke(null, $dbname, $tablename, $version, $new_state);
+         } elseif ($type === 'activate') {
+             Tracker::activateTracking($dbname, $tablename, $version);
+diff --git a/test/classes/TypesTest.php b/test/classes/TypesTest.php
+index fe88efc17f..bcde2bde42 100644
+--- a/test/classes/TypesTest.php
++++ b/test/classes/TypesTest.php
+@@ -74,8 +74,8 @@ public function testGetEnumOperators(): void
+     public function testgetTextOperators(): void
+     {
+         self::assertSame([
+-            'LIKE %...%',
+             'LIKE',
++            'LIKE %...%',
+             'NOT LIKE',
+             'NOT LIKE %...%',
+             '=',
+@@ -166,8 +166,8 @@ public static function providerForGetTypeOperators(): array
+                 'CHAR',
+                 true,
+                 [
+-                    'LIKE %...%',
+                     'LIKE',
++                    'LIKE %...%',
+                     'NOT LIKE',
+                     'NOT LIKE %...%',
+                     '=',
+diff --git a/test/classes/UrlTest.php b/test/classes/UrlTest.php
+index 4baea9264e..ed7dd6d28a 100644
+--- a/test/classes/UrlTest.php
++++ b/test/classes/UrlTest.php
+@@ -13,6 +13,8 @@
+ use function str_repeat;
+ use function urldecode;
+ 
++use const PHP_VERSION_ID;
++
+ /**
+  * @covers \PhpMyAdmin\Url
+  */
+@@ -246,7 +248,10 @@ public function testQueryEncryption()
+     public function testGetArgSeparator(string $expected, $iniValue, ?string $cacheValue): void
+     {
+         $property = new ReflectionProperty(Url::class, 'inputArgSeparator');
+-        $property->setAccessible(true);
++        if (PHP_VERSION_ID < 80100) {
++            $property->setAccessible(true);
++        }
++
+         $property->setValue(null, $cacheValue);
+ 
+         self::$inputArgSeparator = $iniValue;
