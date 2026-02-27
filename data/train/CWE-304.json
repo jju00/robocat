@@ -1,0 +1,20 @@
+[
+{
+  "cve_id": "CVE-2022-2821",
+  "code_before_change": "        foreach ($this->_to_convert as $error) {\n\n            $message = $this->getMessage($error['field'], $error['rule'], $error['fallback']);\n\n            // If there is no generic `message()` set or the translated message is not equal to generic message\n            // we can continue without worrying about duplications\n            if ($this->_message === null || ($message != $this->_message && !in_array($message, $this->_errors))) {\n                $this->_errors[] = $message;\n                continue;\n            }\n\n            // If this new error is the generic message AND it has not already been added, add it\n            if ($message == $this->_message && !in_array($this->_message, $this->_errors)) {\n                $this->_errors[] = $this->_message;\n            }\n        }",
+  "code_after_change": "        foreach ($this->_to_convert as $error) {\n\n            $message = $this->getMessage($error['field'], $error['rule'], $error['fallback'], $error['meta']);\n\n            // If there is no generic `message()` set or the translated message is not equal to generic message\n            // we can continue without worrying about duplications\n            if ($this->_message === null || ($message != $this->_message && !in_array($message, $this->_errors))) {\n                $this->_errors[] = $message;\n                continue;\n            }\n\n            // If this new error is the generic message AND it has not already been added, add it\n            if ($message == $this->_message && !in_array($this->_message, $this->_errors)) {\n                $this->_errors[] = $this->_message;\n            }\n        }",
+  "function_modified_lines": {
+    "added": [
+      "            $message = $this->getMessage($error['field'], $error['rule'], $error['fallback'], $error['meta']);"
+    ],
+    "deleted": [
+      "            $message = $this->getMessage($error['field'], $error['rule'], $error['fallback']);"
+    ]
+  },
+  "cwe": [
+    "CWE-304"
+  ],
+  "cve_description": "Missing Critical Step in Authentication in GitHub repository namelessmc/nameless prior to v2.0.2.",
+  "id": 750
+}
+]

@@ -1,0 +1,19 @@
+[
+{
+  "cve_id": "CVE-2021-45931",
+  "code_before_change": "hb_map_clear (hb_map_t *map)\n{\n  if (unlikely (hb_object_is_immutable (map)))\n    return;\n\n  return map->clear ();\n}",
+  "code_after_change": "hb_map_clear (hb_map_t *map)\n{\n  return map->clear ();\n}\n\n/**\n * hb_map_is_empty:",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "  if (unlikely (hb_object_is_immutable (map)))",
+      "    return;"
+    ]
+  },
+  "cwe": [
+    "CWE-787"
+  ],
+  "cve_description": "HarfBuzz 2.9.0 has an out-of-bounds write in hb_bit_set_invertible_t::set (called from hb_sparseset_t<hb_bit_set_invertible_t>::set and hb_set_copy).",
+  "id": 2717
+}
+]

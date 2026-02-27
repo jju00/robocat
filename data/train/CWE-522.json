@@ -1,0 +1,27 @@
+[
+{
+  "cve_id": "CVE-2019-1010308",
+  "code_before_change": "    static function authenticate() {\n        if (isset($_REQUEST['backend_login'])) {\n            $user = DB_DataObject::factory('users');\n            $user->active = true;\n            $user->name = $_REQUEST['username'];\n            $user->find(true);\n\n            // Don't look whether that user exists, so we give less timing information\n            // Instead, rely only on having a matching password\n            $proffered_password = $_REQUEST['password'];\n            if (in_array(\n                $user->password,\n                self::password_hashes($proffered_password, $user->password_salt)\n            )) {\n                // Regenerate the session ID, unless it's an IE we're talking to which would use the old session ID to load the frame contents\n                // Remove this guard once we no longer use frames\n                if(!preg_match('/(?i)msie /', $_SERVER['HTTP_USER_AGENT'])) {\n                    session_regenerate_id();\n                }\n                $user->login();\n                \n                return $user;\n            } else {\n                Log::warn(\"Failed login for user name '\".$_REQUEST['username'].\"' from \" . $_SERVER['REMOTE_ADDR'].' user-agent '.$_SERVER['HTTP_USER_AGENT']);\n                return -1;\n            }\n        }\n        return false;\n    }",
+  "code_after_change": "    static function authenticate($allpass=false) {\n        if (isset($_REQUEST['backend_login'])) {\n            $user = DB_DataObject::factory('users');\n            $user->active = true;\n            $user->name = $_REQUEST['username'];\n            $found = $user->find(true);\n\n            if ($found && $allpass) {\n                Log::debug(\"Logging in user '$user->name' without checking password\");\n                $user->login();\n                return true;\n            }\n\n            // Don't look whether that user exists, so we give less timing information\n            // Instead, rely only on having a matching password\n            $proffered_password = $_REQUEST['password'];\n            if (in_array(\n                $user->password,\n                self::password_hashes($proffered_password, $user->password_salt)\n            )) {\n                // Regenerate the session ID, unless it's an IE we're talking to which would use the old session ID to load the frame contents\n                // Remove this guard once we no longer use frames\n                if(!preg_match('/(?i)msie /', $_SERVER['HTTP_USER_AGENT'])) {\n                    session_regenerate_id();\n                }\n                $user->login();\n                \n                return $user;\n            } else {\n                Log::warn(\"Failed login for user name '\".$_REQUEST['username'].\"' from \" . $_SERVER['REMOTE_ADDR'].' user-agent '.$_SERVER['HTTP_USER_AGENT']);\n                return -1;\n            }\n        }\n        return false;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    static function authenticate($allpass=false) {",
+      "            $found = $user->find(true);",
+      "            if ($found && $allpass) {",
+      "                Log::debug(\"Logging in user '$user->name' without checking password\");",
+      "                $user->login();",
+      "                return true;",
+      "            }"
+    ],
+    "deleted": [
+      "    static function authenticate() {",
+      "            $user->find(true);"
+    ]
+  },
+  "cwe": [
+    "CWE-522"
+  ],
+  "cve_description": "Aquaverde GmbH Aquarius CMS prior to version 4.1.1 is affected by: Incorrect Access Control. The impact is: The access to the log file is not restricted. It contains sensitive information like passwords etc. The component is: log file. The attack vector is: open the file.",
+  "id": 1504
+}
+]

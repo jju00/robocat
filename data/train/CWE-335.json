@@ -1,0 +1,54 @@
+[
+{
+  "cve_id": "CVE-2016-3735",
+  "code_before_change": "function generate_key($size)\n{\n  if (\n    is_callable('openssl_random_pseudo_bytes')\n    and !(version_compare(PHP_VERSION, '5.3.4') < 0 and defined('PHP_WINDOWS_VERSION_MAJOR'))\n    )\n  {\n    return substr(\n      str_replace(\n        array('+', '/'),\n        '',\n        base64_encode(openssl_random_pseudo_bytes($size+10))\n        ),\n      0,\n      $size\n      );\n  }\n  else\n  {\n    $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';\n    $l = strlen($alphabet)-1;\n    $key = '';\n    for ($i=0; $i<$size; $i++)\n    {\n      $key.= $alphabet[mt_rand(0, $l)];\n    }\n    return $key;\n  }\n}",
+  "code_after_change": "function generate_key($size)\n{\n  include_once(PHPWG_ROOT_PATH.'include/random_compat/random.php');\n\n  return substr(\n    str_replace(\n      array('+', '/'),\n      '',\n      base64_encode(random_bytes($size+10))\n      ),\n    0,\n    $size\n    );\n}",
+  "function_modified_lines": {
+    "added": [
+      "  include_once(PHPWG_ROOT_PATH.'include/random_compat/random.php');",
+      "  return substr(",
+      "    str_replace(",
+      "      array('+', '/'),",
+      "      '',",
+      "      base64_encode(random_bytes($size+10))",
+      "      ),",
+      "    0,",
+      "    $size",
+      "    );"
+    ],
+    "deleted": [
+      "  if (",
+      "    is_callable('openssl_random_pseudo_bytes')",
+      "    and !(version_compare(PHP_VERSION, '5.3.4') < 0 and defined('PHP_WINDOWS_VERSION_MAJOR'))",
+      "    )",
+      "  {",
+      "    return substr(",
+      "      str_replace(",
+      "        array('+', '/'),",
+      "        '',",
+      "        base64_encode(openssl_random_pseudo_bytes($size+10))",
+      "        ),",
+      "      0,",
+      "      $size",
+      "      );",
+      "  }",
+      "  else",
+      "  {",
+      "    $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';",
+      "    $l = strlen($alphabet)-1;",
+      "    $key = '';",
+      "    for ($i=0; $i<$size; $i++)",
+      "    {",
+      "      $key.= $alphabet[mt_rand(0, $l)];",
+      "    }",
+      "    return $key;",
+      "  }"
+    ]
+  },
+  "cwe": [
+    "CWE-335"
+  ],
+  "cve_description": "Piwigo is image gallery software written in PHP. When a criteria is not met on a host, piwigo defaults to usingmt_rand in order to generate password reset tokens. mt_rand output can be predicted after recovering the seed used to generate it. This low an unauthenticated attacker to take over an account providing they know an administrators email address in order to be able to request password reset.",
+  "id": 848
+}
+]

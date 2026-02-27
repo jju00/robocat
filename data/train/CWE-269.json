@@ -1,0 +1,378 @@
+[
+{
+  "cve_id": "CVE-2015-8032",
+  "code_before_change": "function article_save()\n{\n    global $txp_user, $vars, $prefs;\n\n    extract($prefs);\n\n    $incoming = array_map('assert_string', psa($vars));\n\n    $oldArticle = safe_row('Status, url_title, Title, '.\n        'unix_timestamp(LastMod) as sLastMod, LastModID, '.\n        'unix_timestamp(Posted) as sPosted, '.\n        'unix_timestamp(Expires) as sExpires',\n        'textpattern', 'ID = '.(int) $incoming['ID']);",
+  "code_after_change": "function article_save()\n{\n    global $txp_user, $vars, $prefs;\n\n    extract($prefs);\n\n    $incoming = array_map('assert_string', psa($vars));\n\n    $oldArticle = safe_row('Status, url_title, Title, textile_body, textile_excerpt, '.\n        'unix_timestamp(LastMod) as sLastMod, LastModID, '.\n        'unix_timestamp(Posted) as sPosted, '.\n        'unix_timestamp(Expires) as sExpires',\n        'textpattern', 'ID = '.(int) $incoming['ID']);",
+  "function_modified_lines": {
+    "added": [
+      "    $oldArticle = safe_row('Status, url_title, Title, textile_body, textile_excerpt, '."
+    ],
+    "deleted": [
+      "    $oldArticle = safe_row('Status, url_title, Title, '."
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "In Textpattern 4.5.7, an unprivileged author can change an article's markup setting.",
+  "id": 674
+},
+{
+  "cve_id": "CVE-2017-15053",
+  "code_before_change": "        foreach ($elem[2] as $field) {\n            echo '\n                    <tr class=\"tr_cf tr_fields hidden\" id=\"cf_tr_'.$field[0].'\">\n                        <td valign=\"top\" class=\"td_title\">&nbsp;&nbsp;<i class=\"fa fa-caret-right\"></i>&nbsp;<i>'.$field[1].'</i> :</td>\n                        <td>';\n            if ($field[3] === \"masked\") {\n                echo '\n                            <div id=\"id_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" style=\"float:left; cursor:pointer; width:300px;\" class=\"fields_div unhide_masked_data pointer\"></div><input type=\"hidden\" id=\"hid_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" class=\"fields\" />';\n            } else {\n                echo '\n                            <div id=\"id_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" style=\"display:inline;\" class=\"fields_div\"></div><input type=\"hidden\" id=\"hid_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" class=\"fields\" />';\n            }\n            echo '\n                        </td>\n                    </tr>';\n        }",
+  "code_after_change": "        foreach ($elem[2] as $field) {\n            echo '\n                    <tr class=\"tr_cf tr_fields hidden\" id=\"cf_tr_'.$field[0].'\">\n                        <td valign=\"top\" class=\"td_title\">&nbsp;&nbsp;<i class=\"fa fa-caret-right\"></i>&nbsp;<i>'.$field[1].'</i> :</td>\n                        <td colspan=\"2\">';\n            if ($field[3] === \"masked\") {\n                echo '\n                            <div id=\"id_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" style=\"float:left; cursor:pointer; width:300px;\" class=\"fields_div unhide_masked_data pointer\"></div><input type=\"hidden\" id=\"hid_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" class=\"fields\" />';\n            } else {\n                echo '\n                            <div id=\"id_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" style=\"display:inline;\" class=\"fields_div\"></div><input type=\"hidden\" id=\"hid_field_'.htmlspecialchars($field[0]).'_'.$elem[0].'\" class=\"fields\" />';\n            }\n            echo '\n                        </td>\n                    </tr>';\n        }",
+  "function_modified_lines": {
+    "added": [
+      "                        <td colspan=\"2\">';"
+    ],
+    "deleted": [
+      "                        <td>';"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "TeamPass before 2.1.27.9 does not properly enforce manager access control when requesting roles.queries.php. It is then possible for a manager user to modify any arbitrary roles within the application, or delete any arbitrary role. To exploit the vulnerability, an authenticated attacker must have the manager rights on the application, then tamper with the requests sent directly, for example by changing the \"id\" parameter when invoking \"delete_role\" on roles.queries.php.",
+  "id": 675
+},
+{
+  "cve_id": "CVE-2019-16202",
+  "code_before_change": "    public function admin_delete($id = null)\n    {\n        if (!$this->request->is('post') && !$this->request->is('delete')) {\n            throw new MethodNotAllowedException(__('Action not allowed, post or delete request expected.'));\n        }\n        if (!$this->_isAdmin()) {\n            throw new Exception('Administrators only.');\n        }\n        $this->User->id = $id;\n        $conditions = array('User.id' => $id);\n        if (!$this->_isSiteAdmin()) {\n            $conditions['org_id'] = $this->Auth->user('org_id');\n        }\n        $user = $this->User->find('first', array(\n                'conditions' => $conditions,\n                'recursive' => -1\n        ));\n        if (empty($user)) {\n            throw new NotFoundException(__('Invalid user'));\n        }\n        $fieldsDescrStr = 'User (' . $id . '): ' . $user['User']['email'];\n        if ($this->User->delete($id)) {\n            $this->__extralog(\"delete\", $fieldsDescrStr, '');\n            if ($this->_isRest()) {\n                return $this->RestResponse->saveSuccessResponse('User', 'admin_delete', $id, $this->response->type(), 'User deleted.');\n            } else {\n                $this->Flash->success(__('User deleted'));\n                $this->redirect(array('action' => 'index'));\n            }\n        }\n        $this->Flash->error(__('User was not deleted'));\n        $this->redirect(array('action' => 'index'));\n    }",
+  "code_after_change": "    public function admin_delete($id = null)\n    {\n        if (!$this->request->is('post') && !$this->request->is('delete')) {\n            throw new MethodNotAllowedException(__('Action not allowed, post or delete request expected.'));\n        }\n        if (!$this->_isAdmin()) {\n            throw new Exception('Administrators only.');\n        }\n        $this->User->id = $id;\n        $conditions = array('User.id' => $id);\n        if (!$this->_isSiteAdmin()) {\n            $conditions['org_id'] = $this->Auth->user('org_id');\n        }\n        $user = $this->User->find('first', array(\n                'conditions' => $conditions,\n                'recursive' => -1\n        ));\n        if (empty($user)) {\n            throw new NotFoundException(__('Invalid user'));\n        }\n        $fieldsDescrStr = 'User (' . $id . '): ' . $user['User']['email'];\n        if ($this->User->delete($id)) {\n            $this->User->extralog($this->Auth->user(), \"delete\", $fieldsDescrStr, '');\n            if ($this->_isRest()) {\n                return $this->RestResponse->saveSuccessResponse('User', 'admin_delete', $id, $this->response->type(), 'User deleted.');\n            } else {\n                $this->Flash->success(__('User deleted'));\n                $this->redirect(array('action' => 'index'));\n            }\n        }\n        $this->Flash->error(__('User was not deleted'));\n        $this->redirect(array('action' => 'index'));\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $this->User->extralog($this->Auth->user(), \"delete\", $fieldsDescrStr, '');"
+    ],
+    "deleted": [
+      "            $this->__extralog(\"delete\", $fieldsDescrStr, '');"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "MISP before 2.4.115 allows privilege escalation in certain situations. After updating to 2.4.115, escalation attempts are blocked by the __checkLoggedActions function with a \"This could be an indication of an attempted privilege escalation on older vulnerable versions of MISP (<2.4.115)\" message.",
+  "id": 676
+},
+{
+  "cve_id": "CVE-2019-16202",
+  "code_before_change": "    public function change_pw()\n    {\n        if (!$this->_isAdmin() && Configure::read('MISP.disableUserSelfManagement')) {\n            throw new MethodNotAllowedException('User self-management has been disabled on this instance.');\n        }\n        $id = $this->Auth->user('id');\n        $user = $this->User->find('first', array(\n            'conditions' => array('User.id' => $id),\n            'recursive' => -1\n        ));\n        if ($this->request->is('post') || $this->request->is('put')) {\n            if (!isset($this->request->data['User'])) {\n                $this->request->data = array('User' => $this->request->data);\n            }\n            $abortPost = false;\n            if (Configure::read('Security.require_password_confirmation')) {\n                if (!empty($this->request->data['User']['current_password'])) {\n                    $hashed = $this->User->verifyPassword($this->Auth->user('id'), $this->request->data['User']['current_password']);\n                    if (!$hashed) {\n                        $message = __('Invalid password. Please enter your current password to continue.');\n                        if ($this->_isRest()) {\n                            return $this->RestResponse->saveFailResponse('Users', 'change_pw', false, $message, $this->response->type());\n                        }\n                        $abortPost = true;\n                        $this->Flash->error($message);\n                    }\n                    unset($this->request->data['User']['current_password']);\n                } else if (!$this->_isRest()) {\n                    $message = __('Please enter your current password to continue.');\n                    if ($this->_isRest()) {\n                        return $this->RestResponse->saveFailResponse('Users', 'change_pw', false, $message, $this->response->type());\n                    }\n                    $abortPost = true;\n                    $this->Flash->info($message);\n                }\n            }\n            if (!$abortPost) {\n                // What fields should be saved (allowed to be saved)\n                $user['User']['change_pw'] = 0;\n                $user['User']['password'] = $this->request->data['User']['password'];\n                if ($this->_isRest()) {\n                    $user['User']['confirm_password'] = $this->request->data['User']['password'];\n                } else {\n                    $user['User']['confirm_password'] = $this->request->data['User']['confirm_password'];\n                }\n                $temp = $user['User']['password'];\n                // Save the data\n                if ($this->User->save($user)) {\n                    $message = __('Password Changed.');\n                    $this->__extralog(\"change_pw\");\n                    if ($this->_isRest()) {\n                        return $this->RestResponse->saveSuccessResponse('User', 'change_pw', false, $this->response->type(), $message);\n                    }\n                    $this->Flash->success($message);\n                    $this->_refreshAuth();\n                    $this->redirect(array('action' => 'view', $id));\n                } else {\n                    $message = __('The password could not be updated. Make sure you meet the minimum password length / complexity requirements.');\n                    if ($this->_isRest()) {\n                        return $this->RestResponse->saveFailResponse('Users', 'change_pw', false, $message, $this->response->type());\n                    }\n                    $this->Flash->error($message);\n                }\n            }\n        }\n        if ($this->_isRest()) {\n            return $this->RestResponse->describe('Users', 'change_pw', false, $this->response->type());\n        }\n        $this->loadModel('Server');\n        $this->set('complexity', !empty(Configure::read('Security.password_policy_complexity')) ? Configure::read('Security.password_policy_complexity') : $this->Server->serverSettings['Security']['password_policy_complexity']['value']);\n        $this->set('length', !empty(Configure::read('Security.password_policy_length')) ? Configure::read('Security.password_policy_length') : $this->Server->serverSettings['Security']['password_policy_length']['value']);\n        $this->User->recursive = 0;\n        $this->User->read(null, $id);\n        $this->User->set('password', '');\n        $this->request->data = $this->User->data;\n        $roles = $this->User->Role->find('list');\n        $this->set(compact('roles'));\n    }",
+  "code_after_change": "    public function change_pw()\n    {\n        if (!$this->_isAdmin() && Configure::read('MISP.disableUserSelfManagement')) {\n            throw new MethodNotAllowedException('User self-management has been disabled on this instance.');\n        }\n        $id = $this->Auth->user('id');\n        $user = $this->User->find('first', array(\n            'conditions' => array('User.id' => $id),\n            'recursive' => -1\n        ));\n        if ($this->request->is('post') || $this->request->is('put')) {\n            if (!isset($this->request->data['User'])) {\n                $this->request->data = array('User' => $this->request->data);\n            }\n            $abortPost = false;\n            if (Configure::read('Security.require_password_confirmation')) {\n                if (!empty($this->request->data['User']['current_password'])) {\n                    $hashed = $this->User->verifyPassword($this->Auth->user('id'), $this->request->data['User']['current_password']);\n                    if (!$hashed) {\n                        $message = __('Invalid password. Please enter your current password to continue.');\n                        if ($this->_isRest()) {\n                            return $this->RestResponse->saveFailResponse('Users', 'change_pw', false, $message, $this->response->type());\n                        }\n                        $abortPost = true;\n                        $this->Flash->error($message);\n                    }\n                    unset($this->request->data['User']['current_password']);\n                } else if (!$this->_isRest()) {\n                    $message = __('Please enter your current password to continue.');\n                    if ($this->_isRest()) {\n                        return $this->RestResponse->saveFailResponse('Users', 'change_pw', false, $message, $this->response->type());\n                    }\n                    $abortPost = true;\n                    $this->Flash->info($message);\n                }\n            }\n            if (!$abortPost) {\n                // What fields should be saved (allowed to be saved)\n                $user['User']['change_pw'] = 0;\n                $user['User']['password'] = $this->request->data['User']['password'];\n                if ($this->_isRest()) {\n                    $user['User']['confirm_password'] = $this->request->data['User']['password'];\n                } else {\n                    $user['User']['confirm_password'] = $this->request->data['User']['confirm_password'];\n                }\n                $temp = $user['User']['password'];\n                // Save the data\n                if ($this->User->save($user)) {\n                    $message = __('Password Changed.');\n                    $this->User->extralog($this->Auth->user(), \"change_pw\", null, null, $user);\n                    if ($this->_isRest()) {\n                        return $this->RestResponse->saveSuccessResponse('User', 'change_pw', false, $this->response->type(), $message);\n                    }\n                    $this->Flash->success($message);\n                    $this->_refreshAuth();\n                    $this->redirect(array('action' => 'view', $id));\n                } else {\n                    $message = __('The password could not be updated. Make sure you meet the minimum password length / complexity requirements.');\n                    if ($this->_isRest()) {\n                        return $this->RestResponse->saveFailResponse('Users', 'change_pw', false, $message, $this->response->type());\n                    }\n                    $this->Flash->error($message);\n                }\n            }\n        }\n        if ($this->_isRest()) {\n            return $this->RestResponse->describe('Users', 'change_pw', false, $this->response->type());\n        }\n        $this->loadModel('Server');\n        $this->set('complexity', !empty(Configure::read('Security.password_policy_complexity')) ? Configure::read('Security.password_policy_complexity') : $this->Server->serverSettings['Security']['password_policy_complexity']['value']);\n        $this->set('length', !empty(Configure::read('Security.password_policy_length')) ? Configure::read('Security.password_policy_length') : $this->Server->serverSettings['Security']['password_policy_length']['value']);\n        $this->User->recursive = 0;\n        $this->User->read(null, $id);\n        $this->User->set('password', '');\n        $this->request->data = $this->User->data;\n        $roles = $this->User->Role->find('list');\n        $this->set(compact('roles'));\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                    $this->User->extralog($this->Auth->user(), \"change_pw\", null, null, $user);"
+    ],
+    "deleted": [
+      "                    $this->__extralog(\"change_pw\");"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "MISP before 2.4.115 allows privilege escalation in certain situations. After updating to 2.4.115, escalation attempts are blocked by the __checkLoggedActions function with a \"This could be an indication of an attempted privilege escalation on older vulnerable versions of MISP (<2.4.115)\" message.",
+  "id": 677
+},
+{
+  "cve_id": "CVE-2019-16202",
+  "code_before_change": "    public function logout()\n    {\n        if ($this->Session->check('Auth.User')) {\n            $this->__extralog(\"logout\");\n        }\n        $this->Flash->info(__('Good-Bye'));\n        $user = $this->User->find('first', array(\n            'conditions' => array(\n                'User.id' => $this->Auth->user('id')\n            ),\n            'recursive' => -1\n        ));\n        unset($user['User']['password']);\n        $user['User']['action'] = 'logout';\n        $this->User->save($user['User'], true, array('id'));\n        $this->redirect($this->Auth->logout());\n    }",
+  "code_after_change": "    public function logout()\n    {\n        if ($this->Session->check('Auth.User')) {\n            $this->User->extralog($this->Auth->user(), \"logout\");\n        }\n        $this->Flash->info(__('Good-Bye'));\n        $user = $this->User->find('first', array(\n            'conditions' => array(\n                'User.id' => $this->Auth->user('id')\n            ),\n            'recursive' => -1\n        ));\n        unset($user['User']['password']);\n        $user['User']['action'] = 'logout';\n        $this->User->save($user['User'], true, array('id'));\n        $this->redirect($this->Auth->logout());\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $this->User->extralog($this->Auth->user(), \"logout\");"
+    ],
+    "deleted": [
+      "            $this->__extralog(\"logout\");"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "MISP before 2.4.115 allows privilege escalation in certain situations. After updating to 2.4.115, escalation attempts are blocked by the __checkLoggedActions function with a \"This could be an indication of an attempted privilege escalation on older vulnerable versions of MISP (<2.4.115)\" message.",
+  "id": 678
+},
+{
+  "cve_id": "CVE-2019-16202",
+  "code_before_change": "    public function resetauthkey($id = null)\n    {\n        if (!$this->_isAdmin() && Configure::read('MISP.disableUserSelfManagement')) {\n            throw new MethodNotAllowedException('User self-management has been disabled on this instance.');\n        }\n        if ($id == 'me') {\n            $id = $this->Auth->user('id');\n        }\n        if (!$this->userRole['perm_auth']) {\n            throw new MethodNotAllowedException('Invalid action.');\n        }\n        $this->User->id = $id;\n        if (!$id || !$this->User->exists($id)) {\n            throw new MethodNotAllowedException('Invalid user.');\n        }\n        $user = $this->User->read();\n        $oldKey = $this->User->data['User']['authkey'];\n        if (!$this->_isSiteAdmin() && !($this->_isAdmin() && $this->Auth->user('org_id') == $this->User->data['User']['org_id']) && ($this->Auth->user('id') != $id)) {\n            throw new MethodNotAllowedException('Invalid user.');\n        }\n        $newkey = $this->User->generateAuthKey();\n        $this->User->saveField('authkey', $newkey);\n        $this->__extralog(\n                'reset_auth_key',\n                'Authentication key for user ' . $user['User']['id'] . ' (' . $user['User']['email'] . ')',\n                $fieldsResult = 'authkey(' . $oldKey . ') => (' . $newkey . ')'\n        );\n        if (!$this->_isRest()) {\n            $this->Flash->success(__('New authkey generated.', true));\n            $this->_refreshAuth();\n            $this->redirect($this->referer());\n        } else {\n            return $this->RestResponse->saveSuccessResponse('User', 'resetauthkey', $id, $this->response->type(), 'Authkey updated: ' . $newkey);\n        }\n    }",
+  "code_after_change": "    public function resetauthkey($id = null, $alert = false)\n    {\n        if (!$this->_isAdmin() && Configure::read('MISP.disableUserSelfManagement')) {\n            throw new MethodNotAllowedException('User self-management has been disabled on this instance.');\n        }\n        if ($id == 'me') {\n            $id = $this->Auth->user('id');\n        }\n        if (!$this->userRole['perm_auth']) {\n            throw new MethodNotAllowedException(__('Invalid action.'));\n        }\n        $newkey = $this->User->resetauthkey($this->Auth->user(), $id, $alert);\n        if ($newkey === false) {\n            throw new MethodNotAllowedException(__('Invalid user.'));\n        }\n        if (!$this->_isRest()) {\n            $this->Flash->success(__('New authkey generated.', true));\n            $this->_refreshAuth();\n            $this->redirect($this->referer());\n        } else {\n            return $this->RestResponse->saveSuccessResponse('User', 'resetauthkey', $id, $this->response->type(), 'Authkey updated: ' . $newkey);\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "    public function resetauthkey($id = null, $alert = false)",
+      "            throw new MethodNotAllowedException(__('Invalid action.'));",
+      "        }",
+      "        $newkey = $this->User->resetauthkey($this->Auth->user(), $id, $alert);",
+      "        if ($newkey === false) {",
+      "            throw new MethodNotAllowedException(__('Invalid user.'));"
+    ],
+    "deleted": [
+      "    public function resetauthkey($id = null)",
+      "            throw new MethodNotAllowedException('Invalid action.');",
+      "        $this->User->id = $id;",
+      "        if (!$id || !$this->User->exists($id)) {",
+      "            throw new MethodNotAllowedException('Invalid user.');",
+      "        }",
+      "        $user = $this->User->read();",
+      "        $oldKey = $this->User->data['User']['authkey'];",
+      "        if (!$this->_isSiteAdmin() && !($this->_isAdmin() && $this->Auth->user('org_id') == $this->User->data['User']['org_id']) && ($this->Auth->user('id') != $id)) {",
+      "            throw new MethodNotAllowedException('Invalid user.');",
+      "        }",
+      "        $newkey = $this->User->generateAuthKey();",
+      "        $this->User->saveField('authkey', $newkey);",
+      "        $this->__extralog(",
+      "                'reset_auth_key',",
+      "                'Authentication key for user ' . $user['User']['id'] . ' (' . $user['User']['email'] . ')',",
+      "                $fieldsResult = 'authkey(' . $oldKey . ') => (' . $newkey . ')'",
+      "        );"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "MISP before 2.4.115 allows privilege escalation in certain situations. After updating to 2.4.115, escalation attempts are blocked by the __checkLoggedActions function with a \"This could be an indication of an attempted privilege escalation on older vulnerable versions of MISP (<2.4.115)\" message.",
+  "id": 679
+},
+{
+  "cve_id": "CVE-2019-16202",
+  "code_before_change": "            $description = \"User (\" . $this->User->id . \"): \" . $this->Auth->user('email');\n            $fieldsResult = \"Password changed.\";\n        }\n\n        // query\n        $this->Log = ClassRegistry::init('Log');\n        $this->Log->create();\n        $this->Log->save(array(\n            'org' => $this->Auth->user('Organisation')['name'],\n            'model' => $model,\n            'model_id' => $modelId,\n            'email' => $this->Auth->user('email'),\n            'action' => $action,\n            'title' => $description,\n            'change' => isset($fieldsResult) ? $fieldsResult : ''));\n\n        // write to syslogd as well\n        App::import('Lib', 'SysLog.SysLog');\n        $syslog = new SysLog();\n        if (isset($fieldsResult) && $fieldsResult) {\n            $syslog->write('notice', $description . ' -- ' . $action . ' -- ' . $fieldsResult);\n        } else {\n            $syslog->write('notice', $description . ' -- ' . $action);\n        }\n    }",
+  "code_after_change": "    public function arrayCopy(array $array)\n    {\n        $result = array();\n        foreach ($array as $key => $val) {\n            if (is_array($val)) {\n                $result[$key] = arrayCopy($val);\n            } elseif (is_object($val)) {\n                $result[$key] = clone $val;\n            } else {\n                $result[$key] = $val;\n            }\n        }\n        return $result;\n    }\n\n    public function checkAndCorrectPgps()\n    {\n        if (!self::_isAdmin()) {\n            throw new NotFoundException();\n        }\n        $this->set('fails', $this->User->checkAndCorrectPgps());\n    }\n\n    public function admin_quickEmail($user_id)\n    {",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "            $description = \"User (\" . $this->User->id . \"): \" . $this->Auth->user('email');",
+      "            $fieldsResult = \"Password changed.\";",
+      "        }",
+      "        // query",
+      "        $this->Log = ClassRegistry::init('Log');",
+      "        $this->Log->create();",
+      "        $this->Log->save(array(",
+      "            'org' => $this->Auth->user('Organisation')['name'],",
+      "            'model' => $model,",
+      "            'model_id' => $modelId,",
+      "            'email' => $this->Auth->user('email'),",
+      "            'action' => $action,",
+      "            'title' => $description,",
+      "            'change' => isset($fieldsResult) ? $fieldsResult : ''));",
+      "        // write to syslogd as well",
+      "        App::import('Lib', 'SysLog.SysLog');",
+      "        $syslog = new SysLog();",
+      "        if (isset($fieldsResult) && $fieldsResult) {",
+      "            $syslog->write('notice', $description . ' -- ' . $action . ' -- ' . $fieldsResult);",
+      "        } else {",
+      "            $syslog->write('notice', $description . ' -- ' . $action);",
+      "        }",
+      "    }"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "MISP before 2.4.115 allows privilege escalation in certain situations. After updating to 2.4.115, escalation attempts are blocked by the __checkLoggedActions function with a \"This could be an indication of an attempted privilege escalation on older vulnerable versions of MISP (<2.4.115)\" message.",
+  "id": 680
+},
+{
+  "cve_id": "CVE-2019-16202",
+  "code_before_change": "    private function __checkIfPulledEventExistsAndAddOrUpdate($event, $eventId, &$successes, &$fails, $eventModel, $server, $user, $jobId)\n    {\n        // check if the event already exist (using the uuid)\n        $existingEvent = $eventModel->find('first', array('conditions' => array('Event.uuid' => $event['Event']['uuid'])));\n        $passAlong = $server['Server']['id'];\n        if (!$existingEvent) {\n            // add data for newly imported events\n            $result = $eventModel->_add($event, true, $user, $server['Server']['org_id'], $passAlong, true, $jobId);\n            if ($result === true) {\n                $successes[] = $eventId;\n            } else {\n                $fails[$eventId] = __('Failed (partially?) because of errors: ') . $result;\n            }\n        } else {\n            if (!$existingEvent['Event']['locked'] && !$server['Server']['internal']) {\n                $fails[$eventId] = __('Blocked an edit to an event that was created locally. This can happen if a synchronised event that was created on this instance was modified by an administrator on the remote side.');\n            } else {\n                $result = $eventModel->_edit($event, $user, $existingEvent['Event']['id'], $jobId, $passAlong);\n                if ($result === true) {\n                    $successes[] = $eventId;\n                } elseif (isset($result['error'])) {\n                    $fails[$eventId] = $result['error'];\n                } else {\n                    $fails[$eventId] = json_encode($result);\n                }\n            }\n        }\n    }",
+  "code_after_change": "    private function __checkIfPulledEventExistsAndAddOrUpdate($event, $eventId, &$successes, &$fails, $eventModel, $server, $user, $jobId)\n    {\n        // check if the event already exist (using the uuid)\n        $existingEvent = $eventModel->find('first', array('conditions' => array('Event.uuid' => $event['Event']['uuid'])));\n        $passAlong = $server['Server']['id'];\n        if (!$existingEvent) {\n            // add data for newly imported events\n            $result = $eventModel->_add($event, true, $user, $server['Server']['org_id'], $passAlong, true, $jobId);\n            if ($result) {\n                $successes[] = $eventId;\n            } else {\n                $fails[$eventId] = __('Failed (partially?) because of validation errors: ') . json_encode($eventModel->validationErrors, true);\n            }\n        } else {\n            if (!$existingEvent['Event']['locked'] && !$server['Server']['internal']) {\n                $fails[$eventId] = __('Blocked an edit to an event that was created locally. This can happen if a synchronised event that was created on this instance was modified by an administrator on the remote side.');\n            } else {\n                $result = $eventModel->_edit($event, $user, $existingEvent['Event']['id'], $jobId, $passAlong);\n                if ($result === true) {\n                    $successes[] = $eventId;\n                } elseif (isset($result['error'])) {\n                    $fails[$eventId] = $result['error'];\n                } else {\n                    $fails[$eventId] = json_encode($result);\n                }\n            }\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            if ($result) {",
+      "                $fails[$eventId] = __('Failed (partially?) because of validation errors: ') . json_encode($eventModel->validationErrors, true);"
+    ],
+    "deleted": [
+      "            if ($result === true) {",
+      "                $fails[$eventId] = __('Failed (partially?) because of errors: ') . $result;"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "MISP before 2.4.115 allows privilege escalation in certain situations. After updating to 2.4.115, escalation attempts are blocked by the __checkLoggedActions function with a \"This could be an indication of an attempted privilege escalation on older vulnerable versions of MISP (<2.4.115)\" message.",
+  "id": 681
+},
+{
+  "cve_id": "CVE-2019-16202",
+  "code_before_change": "    private function __pullEvent($eventId, &$successes, &$fails, $eventModel, $server, $user, $jobId)\n    {\n        $event = $eventModel->downloadEventFromServer(\n                $eventId,\n                $server\n        );\n        if (!empty($event)) {\n            if ($this->__checkIfEventIsBlockedBeforePull($event)) {\n                return false;\n            }\n            $event = $this->__updatePulledEventBeforeInsert($event, $server, $user);\n            if (!$this->__checkIfEventSaveAble($event)) {\n                $fails[$eventId] = __('Empty event detected.');\n            } else {\n                $this->__checkIfPulledEventExistsAndAddOrUpdate($event, $eventId, $successes, $fails, $eventModel, $server, $user, $jobId);\n            }\n        } else {\n            // error\n            $fails[$eventId] = __('failed downloading the event') . ': ' . json_encode($event);\n        }\n        return true;\n    }",
+  "code_after_change": "    private function __pullEvent($eventId, &$successes, &$fails, $eventModel, $server, $user, $jobId)\n    {\n        $event = $eventModel->downloadEventFromServer(\n                $eventId,\n                $server\n        );\n        ;\n        if (!empty($event)) {\n            if ($this->__checkIfEventIsBlockedBeforePull($event)) {\n                return false;\n            }\n            $event = $this->__updatePulledEventBeforeInsert($event, $server, $user);\n            if (!$this->__checkIfEventSaveAble($event)) {\n                $fails[$eventId] = __('Empty event detected.');\n            } else {\n                $this->__checkIfPulledEventExistsAndAddOrUpdate($event, $eventId, $successes, $fails, $eventModel, $server, $user, $jobId);\n            }\n        } else {\n            // error\n            $fails[$eventId] = __('failed downloading the event');\n        }\n        return true;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        ;",
+      "            $fails[$eventId] = __('failed downloading the event');"
+    ],
+    "deleted": [
+      "            $fails[$eventId] = __('failed downloading the event') . ': ' . json_encode($event);"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "MISP before 2.4.115 allows privilege escalation in certain situations. After updating to 2.4.115, escalation attempts are blocked by the __checkLoggedActions function with a \"This could be an indication of an attempted privilege escalation on older vulnerable versions of MISP (<2.4.115)\" message.",
+  "id": 682
+},
+{
+  "cve_id": "CVE-2020-15248",
+  "code_before_change": "    protected function registerBackendPermissions()\n    {\n        BackendAuth::registerCallback(function ($manager) {\n            $manager->registerPermissions('October.Backend', [\n                'backend.access_dashboard' => [\n                    'label' => 'system::lang.permissions.view_the_dashboard',\n                    'tab'   => 'system::lang.permissions.name'\n                ],\n                'backend.manage_default_dashboard' => [\n                    'label' => 'system::lang.permissions.manage_default_dashboard',\n                    'tab'   => 'system::lang.permissions.name',\n                ],\n                'backend.manage_users' => [\n                    'label' => 'system::lang.permissions.manage_other_administrators',\n                    'tab'   => 'system::lang.permissions.name'\n                ],\n                'backend.impersonate_users' => [\n                    'label' => 'system::lang.permissions.impersonate_users',\n                    'tab'   => 'system::lang.permissions.name',\n                ],\n                'backend.manage_preferences' => [\n                    'label' => 'system::lang.permissions.manage_preferences',\n                    'tab'   => 'system::lang.permissions.name'\n                ],\n                'backend.manage_editor' => [\n                    'label' => 'system::lang.permissions.manage_editor',\n                    'tab'   => 'system::lang.permissions.name'\n                ],\n                'backend.manage_branding' => [\n                    'label' => 'system::lang.permissions.manage_branding',\n                    'tab'   => 'system::lang.permissions.name'\n                ],\n                'media.manage_media' => [\n                    'label' => 'backend::lang.permissions.manage_media',\n                    'tab' => 'system::lang.permissions.name',\n                ],\n                'backend.allow_unsafe_markdown' => [\n                    'label' => 'backend::lang.permissions.allow_unsafe_markdown',\n                    'tab' => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n            ]);\n        });\n    }",
+  "code_after_change": "    protected function registerBackendPermissions()\n    {\n        BackendAuth::registerCallback(function ($manager) {\n            $manager->registerPermissions('October.Backend', [\n                'backend.access_dashboard' => [\n                    'label' => 'system::lang.permissions.view_the_dashboard',\n                    'tab'   => 'system::lang.permissions.name',\n                ],\n                'backend.manage_default_dashboard' => [\n                    'label' => 'system::lang.permissions.manage_default_dashboard',\n                    'tab'   => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n                'backend.manage_users' => [\n                    'label' => 'system::lang.permissions.manage_other_administrators',\n                    'tab'   => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n                'backend.impersonate_users' => [\n                    'label' => 'system::lang.permissions.impersonate_users',\n                    'tab'   => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n                'backend.manage_preferences' => [\n                    'label' => 'system::lang.permissions.manage_preferences',\n                    'tab'   => 'system::lang.permissions.name',\n                ],\n                'backend.manage_editor' => [\n                    'label' => 'system::lang.permissions.manage_editor',\n                    'tab'   => 'system::lang.permissions.name',\n                ],\n                'backend.manage_branding' => [\n                    'label' => 'system::lang.permissions.manage_branding',\n                    'tab'   => 'system::lang.permissions.name',\n                ],\n                'media.manage_media' => [\n                    'label' => 'backend::lang.permissions.manage_media',\n                    'tab' => 'system::lang.permissions.name',\n                ],\n                'backend.allow_unsafe_markdown' => [\n                    'label' => 'backend::lang.permissions.allow_unsafe_markdown',\n                    'tab' => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n            ]);\n        });\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                    'tab'   => 'system::lang.permissions.name',",
+      "                    'roles' => UserRole::CODE_DEVELOPER,",
+      "                    'tab'   => 'system::lang.permissions.name',",
+      "                    'roles' => UserRole::CODE_DEVELOPER,",
+      "                    'roles' => UserRole::CODE_DEVELOPER,",
+      "                    'tab'   => 'system::lang.permissions.name',",
+      "                    'tab'   => 'system::lang.permissions.name',",
+      "                    'tab'   => 'system::lang.permissions.name',"
+    ],
+    "deleted": [
+      "                    'tab'   => 'system::lang.permissions.name'",
+      "                    'tab'   => 'system::lang.permissions.name'",
+      "                    'tab'   => 'system::lang.permissions.name'",
+      "                    'tab'   => 'system::lang.permissions.name'",
+      "                    'tab'   => 'system::lang.permissions.name'"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "October is a free, open-source, self-hosted CMS platform based on the Laravel PHP Framework. In October CMS from version 1.0.319 and before version 1.0.470, backend users with the default \"Publisher\" system role have access to create & manage users where they can choose which role the new user has. This means that a user with \"Publisher\" access has the ability to escalate their access to \"Developer\" access. Issue has been patched in Build 470 (v1.0.470) & v1.1.1.",
+  "id": 683
+},
+{
+  "cve_id": "CVE-2020-15248",
+  "code_before_change": "    protected function registerBackendPermissions()\n    {\n        BackendAuth::registerCallback(function ($manager) {\n            $manager->registerPermissions('October.System', [\n                'system.manage_updates' => [\n                    'label' => 'system::lang.permissions.manage_software_updates',\n                    'tab' => 'system::lang.permissions.name'\n                ],\n                'system.access_logs' => [\n                    'label' => 'system::lang.permissions.access_logs',\n                    'tab' => 'system::lang.permissions.name'\n                ],\n                'system.manage_mail_settings' => [\n                    'label' => 'system::lang.permissions.manage_mail_settings',\n                    'tab' => 'system::lang.permissions.name'\n                ],\n                'system.manage_mail_templates' => [\n                    'label' => 'system::lang.permissions.manage_mail_templates',\n                    'tab' => 'system::lang.permissions.name'\n                ]\n            ]);\n        });\n    }",
+  "code_after_change": "    protected function registerBackendPermissions()\n    {\n        BackendAuth::registerCallback(function ($manager) {\n            $manager->registerPermissions('October.System', [\n                'system.manage_updates' => [\n                    'label' => 'system::lang.permissions.manage_software_updates',\n                    'tab' => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n                'system.access_logs' => [\n                    'label' => 'system::lang.permissions.access_logs',\n                    'tab' => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n                'system.manage_mail_settings' => [\n                    'label' => 'system::lang.permissions.manage_mail_settings',\n                    'tab' => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ],\n                'system.manage_mail_templates' => [\n                    'label' => 'system::lang.permissions.manage_mail_templates',\n                    'tab' => 'system::lang.permissions.name',\n                    'roles' => UserRole::CODE_DEVELOPER,\n                ]\n            ]);\n        });\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                    'tab' => 'system::lang.permissions.name',",
+      "                    'roles' => UserRole::CODE_DEVELOPER,",
+      "                    'tab' => 'system::lang.permissions.name',",
+      "                    'roles' => UserRole::CODE_DEVELOPER,",
+      "                    'tab' => 'system::lang.permissions.name',",
+      "                    'roles' => UserRole::CODE_DEVELOPER,",
+      "                    'tab' => 'system::lang.permissions.name',",
+      "                    'roles' => UserRole::CODE_DEVELOPER,"
+    ],
+    "deleted": [
+      "                    'tab' => 'system::lang.permissions.name'",
+      "                    'tab' => 'system::lang.permissions.name'",
+      "                    'tab' => 'system::lang.permissions.name'",
+      "                    'tab' => 'system::lang.permissions.name'"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "October is a free, open-source, self-hosted CMS platform based on the Laravel PHP Framework. In October CMS from version 1.0.319 and before version 1.0.470, backend users with the default \"Publisher\" system role have access to create & manage users where they can choose which role the new user has. This means that a user with \"Publisher\" access has the ability to escalate their access to \"Developer\" access. Issue has been patched in Build 470 (v1.0.470) & v1.1.1.",
+  "id": 684
+},
+{
+  "cve_id": "CVE-2021-43835",
+  "code_before_change": "    public function putAction(Request $request)\n    {\n        $this->checkArguments($request);\n        $user = $this->tokenStorage->getToken()->getUser();\n        $this->userManager->save($request->request->all(), $request->get('locale'), $user->getId(), true);\n\n        $user->setFirstName($request->get('firstName'));\n        $user->setLastName($request->get('lastName'));\n\n        $this->objectManager->flush();\n\n        $view = View::create($user);\n\n        $context = new Context();\n        $context->setGroups(['profile']);\n\n        $view->setContext($context);\n\n        return $this->viewHandler->handle($view);\n    }",
+  "code_after_change": "    public function putAction(Request $request)\n    {\n        $this->checkArguments($request);\n        $user = $this->tokenStorage->getToken()->getUser();\n        $this->userManager->save($this->getData($request), $request->get('locale'), $user->getId(), true);\n\n        $user->setFirstName($request->get('firstName'));\n        $user->setLastName($request->get('lastName'));\n\n        $this->objectManager->flush();\n\n        $view = View::create($user);\n\n        $context = new Context();\n        $context->setGroups(['profile']);\n\n        $view->setContext($context);\n\n        return $this->viewHandler->handle($view);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $this->userManager->save($this->getData($request), $request->get('locale'), $user->getId(), true);"
+    ],
+    "deleted": [
+      "        $this->userManager->save($request->request->all(), $request->get('locale'), $user->getId(), true);"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "Sulu is an open-source PHP content management system based on the Symfony framework. In affected versions Sulu users who have access to any subset of the admin UI are able to elevate their privilege. Over the API it was possible for them to give themselves permissions to areas which they did not already had. This issue was introduced in 2.0.0-RC1 with the new ProfileController putAction. The versions have been patched in 2.2.18, 2.3.8 and 2.4.0. For users unable to upgrade the only known workaround is to apply a patch to the ProfileController manually.",
+  "id": 685
+},
+{
+  "cve_id": "CVE-2022-1397",
+  "code_before_change": "    public function auth()\n    {\n        try\n        {\n            // Bearer token. \n            $api_token = setting('api_token');\n\n            if ( ! empty($api_token) && $api_token === $this->get_bearer_token())\n            {\n                return;\n            }\n\n            // Basic auth.  \n            $username = $_SERVER['PHP_AUTH_USER'];\n\n            $password = $_SERVER['PHP_AUTH_PW'];\n\n            if ( ! $this->CI->accounts->check_login($username, $password))\n            {\n                throw new RuntimeException('The provided credentials do not match any admin user!', 401, 'Unauthorized');\n            }\n        }\n        catch (Throwable $e)\n        {\n            $this->request_authentication();\n        }\n    }",
+  "code_after_change": "    public function auth()\n    {\n        try\n        {\n            // Bearer token. \n            $api_token = setting('api_token');\n\n            if ( ! empty($api_token) && $api_token === $this->get_bearer_token())\n            {\n                return;\n            }\n\n            // Basic auth.  \n            $username = $_SERVER['PHP_AUTH_USER'];\n\n            $password = $_SERVER['PHP_AUTH_PW'];\n\n            $userdata = $this->CI->accounts->check_login($username, $password);\n\n            if (empty($userdata['role_slug']) || $userdata['role_slug'] !== DB_SLUG_ADMIN)\n            {\n                throw new RuntimeException('The provided credentials do not match any admin user!', 401, 'Unauthorized');\n            }\n        }\n        catch (Throwable $e)\n        {\n            $this->request_authentication();\n        }\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $userdata = $this->CI->accounts->check_login($username, $password);",
+      "            if (empty($userdata['role_slug']) || $userdata['role_slug'] !== DB_SLUG_ADMIN)"
+    ],
+    "deleted": [
+      "            if ( ! $this->CI->accounts->check_login($username, $password))"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "API Privilege Escalation in GitHub repository alextselegidis/easyappointments prior to 1.5.0. Full system takeover.",
+  "id": 686
+},
+{
+  "cve_id": "CVE-2023-28855",
+  "code_before_change": "            $dataitemtypes = json_decode($data['itemtypes']);\n            if (in_array($itemtype, $dataitemtypes) != false) {\n                $id = $data['id'];\n            }\n        }\n\n        //profiles restriction\n        if (isset($_SESSION['glpiactiveprofile']['id'])) {\n            $profile = new PluginFieldsProfile();\n            if (isset($id)) {\n                $found = $profile->find(['profiles_id' => $_SESSION['glpiactiveprofile']['id'],\n                    'plugin_fields_containers_id' => $id\n                ]);\n                $first_found = array_shift($found);\n                if ($first_found === null || $first_found['right'] == null || $first_found['right'] == 0) {\n                     return false;\n                }\n            }\n        }\n\n        return $id;\n    }",
+  "code_after_change": "            $dataitemtypes = json_decode($data['itemtypes']);\n            if (in_array($itemtype, $dataitemtypes) != false) {\n                $id = $data['id'];\n            }\n        }\n\n        //profiles restriction\n        if (isset($_SESSION['glpiactiveprofile']['id']) && $id > 0) {\n            $right = PluginFieldsProfile::getRightOnContainer($_SESSION['glpiactiveprofile']['id'], $id);\n            if ($right < READ) {\n                return false;\n            }\n        }\n\n        return $id;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        if (isset($_SESSION['glpiactiveprofile']['id']) && $id > 0) {",
+      "            $right = PluginFieldsProfile::getRightOnContainer($_SESSION['glpiactiveprofile']['id'], $id);",
+      "            if ($right < READ) {",
+      "                return false;"
+    ],
+    "deleted": [
+      "        if (isset($_SESSION['glpiactiveprofile']['id'])) {",
+      "            $profile = new PluginFieldsProfile();",
+      "            if (isset($id)) {",
+      "                $found = $profile->find(['profiles_id' => $_SESSION['glpiactiveprofile']['id'],",
+      "                    'plugin_fields_containers_id' => $id",
+      "                ]);",
+      "                $first_found = array_shift($found);",
+      "                if ($first_found === null || $first_found['right'] == null || $first_found['right'] == 0) {",
+      "                     return false;",
+      "                }"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "Fields is a GLPI plugin that allows users to add custom fields on GLPI items forms. Prior to versions 1.13.1 and 1.20.4, lack of access control check allows any authenticated user to write data to any fields container, including those to which they have no configured access. Versions 1.13.1 and 1.20.4 contain a patch for this issue.",
+  "id": 687
+},
+{
+  "cve_id": "CVE-2023-28855",
+  "code_before_change": "    public static function preItem(CommonDBTM $item)\n    {\n        //find container (if not exist, do nothing)\n        if (isset($_REQUEST['c_id'])) {\n            $c_id = $_REQUEST['c_id'];\n        } else {\n            $type = 'dom';\n            if (isset($_REQUEST['_plugin_fields_type'])) {\n                $type = $_REQUEST['_plugin_fields_type'];\n            }\n            $subtype = '';\n            if ($type == 'domtab') {\n                $subtype = $_REQUEST['_plugin_fields_subtype'];\n            }\n            if (false === ($c_id = self::findContainer(get_Class($item), $type, $subtype))) {\n                // tries for 'tab'\n                if (false === ($c_id = self::findContainer(get_Class($item)))) {\n                    return false;\n                }\n            }\n        }\n\n        //need to check if container is usable on this object entity\n        $loc_c = new PluginFieldsContainer();\n        $loc_c->getFromDB($c_id);\n        $entities = [$loc_c->fields['entities_id']];\n        if ($loc_c->fields['is_recursive']) {\n            $entities = getSonsOf(getTableForItemType('Entity'), $loc_c->fields['entities_id']);\n        }\n\n        //workaround: when a ticket is created from readdonly profile,\n        //it is not initialized; see https://github.com/glpi-project/glpi/issues/1438\n        if (!isset($item->fields) || count($item->fields) == 0) {\n            $item->fields = $item->input;\n        }\n\n        if ($item->isEntityAssign() && !in_array($item->getEntityID(), $entities)) {\n            return false;\n        }\n\n        if (false !== ($data = self::populateData($c_id, $item))) {\n            if (self::validateValues($data, $item::getType(), isset($_REQUEST['massiveaction'])) === false) {\n                return $item->input = [];\n            }\n            return $item->plugin_fields_data = $data;\n        }\n\n        return;\n    }",
+  "code_after_change": "    public static function preItem(CommonDBTM $item)\n    {\n        //find container (if not exist, do nothing)\n        if (isset($_REQUEST['c_id'])) {\n            $c_id = $_REQUEST['c_id'];\n        } else {\n            $type = 'dom';\n            if (isset($_REQUEST['_plugin_fields_type'])) {\n                $type = $_REQUEST['_plugin_fields_type'];\n            }\n            $subtype = '';\n            if ($type == 'domtab') {\n                $subtype = $_REQUEST['_plugin_fields_subtype'];\n            }\n            if (false === ($c_id = self::findContainer(get_Class($item), $type, $subtype))) {\n                // tries for 'tab'\n                if (false === ($c_id = self::findContainer(get_Class($item)))) {\n                    return false;\n                }\n            }\n        }\n\n        $loc_c = new PluginFieldsContainer();\n        $loc_c->getFromDB($c_id);\n\n        // check rights on $c_id\n        $right = PluginFieldsProfile::getRightOnContainer($_SESSION['glpiactiveprofile']['id'], $c_id);\n        if (($right > READ) === false) {\n            return;\n        }\n\n        // need to check if container is usable on this object entity\n        $entities = [$loc_c->fields['entities_id']];\n        if ($loc_c->fields['is_recursive']) {\n            $entities = getSonsOf(getTableForItemType('Entity'), $loc_c->fields['entities_id']);\n        }\n\n        //workaround: when a ticket is created from readdonly profile,\n        //it is not initialized; see https://github.com/glpi-project/glpi/issues/1438\n        if (!isset($item->fields) || count($item->fields) == 0) {\n            $item->fields = $item->input;\n        }\n\n        if ($item->isEntityAssign() && !in_array($item->getEntityID(), $entities)) {\n            return false;\n        }\n\n        if (false !== ($data = self::populateData($c_id, $item))) {\n            if (self::validateValues($data, $item::getType(), isset($_REQUEST['massiveaction'])) === false) {\n                return $item->input = [];\n            }\n            return $item->plugin_fields_data = $data;\n        }\n\n        return;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        // check rights on $c_id",
+      "        $right = PluginFieldsProfile::getRightOnContainer($_SESSION['glpiactiveprofile']['id'], $c_id);",
+      "        if (($right > READ) === false) {",
+      "            return;",
+      "        }",
+      "        // need to check if container is usable on this object entity"
+    ],
+    "deleted": [
+      "        //need to check if container is usable on this object entity"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "Fields is a GLPI plugin that allows users to add custom fields on GLPI items forms. Prior to versions 1.13.1 and 1.20.4, lack of access control check allows any authenticated user to write data to any fields container, including those to which they have no configured access. Versions 1.13.1 and 1.20.4 contain a patch for this issue.",
+  "id": 688
+},
+{
+  "cve_id": "CVE-2023-28855",
+  "code_before_change": "    public static function showForTab($params)\n    {\n        Html::requireJs('tinymce');\n\n        $item = $params['item'];\n\n        $functions = array_column(debug_backtrace(), 'function');\n\n        $subtype = isset($_SESSION['glpi_tabs'][strtolower($item::getType())]) ? $_SESSION['glpi_tabs'][strtolower($item::getType())] : \"\";\n        $type = substr($subtype, -strlen('$main')) === '$main'\n            || in_array('showForm', $functions)\n            || in_array('showPrimaryForm', $functions)\n            || in_array('showFormHelpdesk', $functions)\n                ? 'dom'\n                : 'domtab';\n        if ($subtype == -1) {\n            $type = 'dom';\n        }\n        // if we are in 'dom' or 'tab' type, no need for subtype ('domtab' specific)\n        if ($type != 'domtab') {\n            $subtype = \"\";\n        }\n        //find container (if not exist, do nothing)\n        if (isset($_REQUEST['c_id'])) {\n            $c_id = $_REQUEST['c_id'];\n        } else if (!$c_id = PluginFieldsContainer::findContainer(get_Class($item), $type, $subtype)) {\n            return false;\n        }\n\n        //need to check if container is usable on this object entity\n        $loc_c = new PluginFieldsContainer();\n        $loc_c->getFromDB($c_id);\n        $entities = [$loc_c->fields['entities_id']];\n        if ($loc_c->fields['is_recursive']) {\n            $entities = getSonsOf(getTableForItemType('Entity'), $loc_c->fields['entities_id']);\n        }\n\n        if ($item->isEntityAssign()) {\n            $current_entity = $item->getEntityID();\n            if (!in_array($current_entity, $entities)) {\n                return false;\n            }\n        }\n\n        //parse REQUEST_URI\n        if (!isset($_SERVER['REQUEST_URI'])) {\n            return false;\n        }\n        $current_url = $_SERVER['REQUEST_URI'];\n        if (\n            strpos($current_url, \".form.php\") === false\n            && strpos($current_url, \".injector.php\") === false\n            && strpos($current_url, \".public.php\") === false\n        ) {\n            return false;\n        }\n\n        //Retrieve dom container\n        $itemtypes = PluginFieldsContainer::getUsedItemtypes($type, true);\n\n        //if no dom containers defined for this itemtype, do nothing (in_array case insensitive)\n        if (!in_array(strtolower($item::getType()), array_map('strtolower', $itemtypes))) {\n            return false;\n        }\n\n        $html_id = 'plugin_fields_container_' . mt_rand();\n        echo \"<div id='{$html_id}'>\";\n        $display_condition = new PluginFieldsContainerDisplayCondition();\n        if ($display_condition->computeDisplayContainer($item, $c_id)) {\n            self::showDomContainer(\n                $c_id,\n                $item,\n                $type,\n                $subtype\n            );\n        }\n        echo \"</div>\";\n\n        //JS to trigger any change and check if container need to be display or not\n        $ajax_url   = Plugin::getWebDir('fields') . '/ajax/container.php';\n        $items_id = !$item->isNewItem() ? $item->getID() : 0;\n        echo Html::scriptBlock(<<<JAVASCRIPT\n            function refreshContainer() {\n                const data = $('#{$html_id}').closest('form').serializeArray().reduce(\n                    function(obj, item) {\n                        obj[item.name] = item.value;\n                        return obj;\n                    },\n                    {}\n                );\n\n                $.ajax(\n                    {\n                        url: '{$ajax_url}',\n                        type: 'GET',\n                        data: {\n                            action:   'get_fields_html',\n                            id:       {$c_id},\n                            itemtype: '{$item::getType()}',\n                            items_id: {$items_id},\n                            type:     '{$type}',\n                            subtype:  '{$subtype}',\n                            input:    data\n                        },\n                        success: function(data) {\n                            // Close open select2 dropdown that will be replaced\n                            $('#{$html_id}').find('.select2-hidden-accessible').select2('close');\n                            // Refresh fields HTML\n                            $('#{$html_id}').html(data);\n                        }\n                    }\n                );\n            }\n            $(\n                function () {\n                    const form = $('#{$html_id}').closest('form');\n                    form.on(\n                        'change',\n                        'input, select, textarea',\n                        function(evt) {\n                            if (evt.target.name == \"itilcategories_id\") {\n                                // Do not refresh tab container when form is reloaded\n                                // to prevent issues diues to duplicated calls\n                                return;\n                            }\n                            if ($(evt.target).closest('#{$html_id}').length > 0) {\n                                return; // Do nothing if element is inside fields container\n                            }\n                            refreshContainer();\n                        }\n                    );\n\n                    var refresh_timeout = null;\n                    form.find('textarea').each(\n                        function () {\n                            const editor = tinymce.get(this.id);\n                            if (editor !== null) {\n                                editor.on(\n                                    'change',\n                                    function(evt) {\n                                        if ($(evt.target.targetElm).closest('#{$html_id}').length > 0) {\n                                            return; // Do nothing if element is inside fields container\n                                        }\n\n                                        if (refresh_timeout !== null) {\n                                            window.clearTimeout(refresh_timeout);\n                                        }\n                                        refresh_timeout = window.setTimeout(refreshContainer, 1000);\n                                    }\n                                );\n                            }\n                        }\n                    );\n                }\n            );\nJAVASCRIPT\n        );\n    }",
+  "code_after_change": "    public static function showForTab($params)\n    {\n        $item = $params['item'];\n\n        $functions = array_column(debug_backtrace(), 'function');\n\n        $subtype = isset($_SESSION['glpi_tabs'][strtolower($item::getType())]) ? $_SESSION['glpi_tabs'][strtolower($item::getType())] : \"\";\n        $type = substr($subtype, -strlen('$main')) === '$main'\n            || in_array('showForm', $functions)\n            || in_array('showPrimaryForm', $functions)\n            || in_array('showFormHelpdesk', $functions)\n                ? 'dom'\n                : 'domtab';\n        if ($subtype == -1) {\n            $type = 'dom';\n        }\n        // if we are in 'dom' or 'tab' type, no need for subtype ('domtab' specific)\n        if ($type != 'domtab') {\n            $subtype = \"\";\n        }\n\n        //find container (if not exist, do nothing)\n        if (isset($_REQUEST['c_id'])) {\n            $c_id = $_REQUEST['c_id'];\n        } else if (!$c_id = PluginFieldsContainer::findContainer(get_Class($item), $type, $subtype)) {\n            return false;\n        }\n\n        $right = PluginFieldsProfile::getRightOnContainer($_SESSION['glpiactiveprofile']['id'], $c_id);\n        if ($right < READ) {\n            return;\n        }\n\n        Html::requireJs('tinymce');\n\n        //need to check if container is usable on this object entity\n        $loc_c = new PluginFieldsContainer();\n        $loc_c->getFromDB($c_id);\n        $entities = [$loc_c->fields['entities_id']];\n        if ($loc_c->fields['is_recursive']) {\n            $entities = getSonsOf(getTableForItemType('Entity'), $loc_c->fields['entities_id']);\n        }\n\n        if ($item->isEntityAssign()) {\n            $current_entity = $item->getEntityID();\n            if (!in_array($current_entity, $entities)) {\n                return false;\n            }\n        }\n\n        //parse REQUEST_URI\n        if (!isset($_SERVER['REQUEST_URI'])) {\n            return false;\n        }\n        $current_url = $_SERVER['REQUEST_URI'];\n        if (\n            strpos($current_url, \".form.php\") === false\n            && strpos($current_url, \".injector.php\") === false\n            && strpos($current_url, \".public.php\") === false\n        ) {\n            return false;\n        }\n\n        //Retrieve dom container\n        $itemtypes = PluginFieldsContainer::getUsedItemtypes($type, true);\n\n        //if no dom containers defined for this itemtype, do nothing (in_array case insensitive)\n        if (!in_array(strtolower($item::getType()), array_map('strtolower', $itemtypes))) {\n            return false;\n        }\n\n        $html_id = 'plugin_fields_container_' . mt_rand();\n        echo \"<div id='{$html_id}'>\";\n        $display_condition = new PluginFieldsContainerDisplayCondition();\n        if ($display_condition->computeDisplayContainer($item, $c_id)) {\n            self::showDomContainer(\n                $c_id,\n                $item,\n                $type,\n                $subtype\n            );\n        }\n        echo \"</div>\";\n\n        //JS to trigger any change and check if container need to be display or not\n        $ajax_url   = Plugin::getWebDir('fields') . '/ajax/container.php';\n        $items_id = !$item->isNewItem() ? $item->getID() : 0;\n        echo Html::scriptBlock(<<<JAVASCRIPT\n            function refreshContainer() {\n                const data = $('#{$html_id}').closest('form').serializeArray().reduce(\n                    function(obj, item) {\n                        obj[item.name] = item.value;\n                        return obj;\n                    },\n                    {}\n                );\n\n                $.ajax(\n                    {\n                        url: '{$ajax_url}',\n                        type: 'GET',\n                        data: {\n                            action:   'get_fields_html',\n                            id:       {$c_id},\n                            itemtype: '{$item::getType()}',\n                            items_id: {$items_id},\n                            type:     '{$type}',\n                            subtype:  '{$subtype}',\n                            input:    data\n                        },\n                        success: function(data) {\n                            // Close open select2 dropdown that will be replaced\n                            $('#{$html_id}').find('.select2-hidden-accessible').select2('close');\n                            // Refresh fields HTML\n                            $('#{$html_id}').html(data);\n                        }\n                    }\n                );\n            }\n            $(\n                function () {\n                    const form = $('#{$html_id}').closest('form');\n                    form.on(\n                        'change',\n                        'input, select, textarea',\n                        function(evt) {\n                            if (evt.target.name == \"itilcategories_id\") {\n                                // Do not refresh tab container when form is reloaded\n                                // to prevent issues diues to duplicated calls\n                                return;\n                            }\n                            if ($(evt.target).closest('#{$html_id}').length > 0) {\n                                return; // Do nothing if element is inside fields container\n                            }\n                            refreshContainer();\n                        }\n                    );\n\n                    var refresh_timeout = null;\n                    form.find('textarea').each(\n                        function () {\n                            const editor = tinymce.get(this.id);\n                            if (editor !== null) {\n                                editor.on(\n                                    'change',\n                                    function(evt) {\n                                        if ($(evt.target.targetElm).closest('#{$html_id}').length > 0) {\n                                            return; // Do nothing if element is inside fields container\n                                        }\n\n                                        if (refresh_timeout !== null) {\n                                            window.clearTimeout(refresh_timeout);\n                                        }\n                                        refresh_timeout = window.setTimeout(refreshContainer, 1000);\n                                    }\n                                );\n                            }\n                        }\n                    );\n                }\n            );\nJAVASCRIPT\n        );\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $right = PluginFieldsProfile::getRightOnContainer($_SESSION['glpiactiveprofile']['id'], $c_id);",
+      "        if ($right < READ) {",
+      "            return;",
+      "        }",
+      "        Html::requireJs('tinymce');"
+    ],
+    "deleted": [
+      "        Html::requireJs('tinymce');"
+    ]
+  },
+  "cwe": [
+    "CWE-269"
+  ],
+  "cve_description": "Fields is a GLPI plugin that allows users to add custom fields on GLPI items forms. Prior to versions 1.13.1 and 1.20.4, lack of access control check allows any authenticated user to write data to any fields container, including those to which they have no configured access. Versions 1.13.1 and 1.20.4 contain a patch for this issue.",
+  "id": 689
+}
+]

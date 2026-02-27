@@ -1,0 +1,58 @@
+[
+{
+  "cve_id": "CVE-2023-2666",
+  "code_before_change": "\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => $value,\\n\");\n\t\t\t\t} else {\n\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => '{$value}',\\n\");\n\t\t\t\t}\n\t\t\t} else {\n\t\t\t\t$str .= self::parseArrayToString($value, $key, ($depth + 1));\n\t\t\t}\n\t\t}",
+  "code_after_change": "\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => $value,\\n\");\n\t\t\t\t} else {\n\t\t\t\t\tif ($key == 'password') {\n\t\t\t\t\t\t// special case for passwords (nowdoc)\n\t\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => <<<'EOT'\\n{$value}\\nEOT,\\n\");\n\t\t\t\t\t} else {\n\t\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => '{$value}',\\n\");\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t} else {\n\t\t\t\t$str .= self::parseArrayToString($value, $key, ($depth + 1));\n\t\t\t}\n\t\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t\tif ($key == 'password') {",
+      "\t\t\t\t\t\t// special case for passwords (nowdoc)",
+      "\t\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => <<<'EOT'\\n{$value}\\nEOT,\\n\");",
+      "\t\t\t\t\t} else {",
+      "\t\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => '{$value}',\\n\");",
+      "\t\t\t\t\t}"
+    ],
+    "deleted": [
+      "\t\t\t\t\t$str .= self::tabPrefix($depth, \"'{$key}' => '{$value}',\\n\");"
+    ]
+  },
+  "cwe": [
+    "CWE-770"
+  ],
+  "cve_description": "Allocation of Resources Without Limits or Throttling in GitHub repository froxlor/froxlor prior to 2.0.16.",
+  "id": 2666
+},
+{
+  "cve_id": "CVE-2023-38492",
+  "code_before_change": "\tpublic function testValidatePasswordHttpCode()\n\t{\n\t\t$user = new User([\n\t\t\t'email'    => 'test@getkirby.com',\n\t\t\t'password' => User::hashPassword('correct-horse-battery-staple')\n\t\t]);\n\n\t\t$caught = 0;\n\n\t\ttry {\n\t\t\t$user->validatePassword('short');\n\t\t} catch (\\Kirby\\Exception\\InvalidArgumentException $e) {\n\t\t\t$this->assertSame(400, $e->getHttpCode());\n\t\t\t$caught++;\n\t\t}\n\n\t\ttry {\n\t\t\t$user->validatePassword('longbutinvalid');\n\t\t} catch (\\Kirby\\Exception\\InvalidArgumentException $e) {\n\t\t\t$this->assertSame(401, $e->getHttpCode());\n\t\t\t$caught++;\n\t\t}\n\n\t\t$this->assertSame(2, $caught);\n\t}",
+  "code_after_change": "\tpublic function testValidatePasswordHttpCode()\n\t{\n\t\t$user = new User([\n\t\t\t'email'    => 'test@getkirby.com',\n\t\t\t'password' => User::hashPassword('correct-horse-battery-staple')\n\t\t]);\n\n\t\t$caught = 0;\n\n\t\ttry {\n\t\t\t$user->validatePassword('short');\n\t\t} catch (\\Kirby\\Exception\\InvalidArgumentException $e) {\n\t\t\t$this->assertSame(\n\t\t\t\t'Please enter a valid password. Passwords must be at least 8 characters long.',\n\t\t\t\t$e->getMessage()\n\t\t\t);\n\t\t\t$this->assertSame(400, $e->getHttpCode());\n\t\t\t$caught++;\n\t\t}\n\n\t\ttry {\n\t\t\t$user->validatePassword(str_repeat('long', 300));\n\t\t} catch (\\Kirby\\Exception\\InvalidArgumentException $e) {\n\t\t\t$this->assertSame(\n\t\t\t\t'Please enter a valid password. Passwords must not be longer than 1000 characters.',\n\t\t\t\t$e->getMessage()\n\t\t\t);\n\t\t\t$this->assertSame(400, $e->getHttpCode());\n\t\t\t$caught++;\n\t\t}\n\n\t\ttry {\n\t\t\t$user->validatePassword('longbutinvalid');\n\t\t} catch (\\Kirby\\Exception\\InvalidArgumentException $e) {\n\t\t\t$this->assertSame('Wrong password', $e->getMessage());\n\t\t\t$this->assertSame(401, $e->getHttpCode());\n\t\t\t$caught++;\n\t\t}\n\n\t\t$this->assertSame(3, $caught);\n\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t$this->assertSame(",
+      "\t\t\t\t'Please enter a valid password. Passwords must be at least 8 characters long.',",
+      "\t\t\t\t$e->getMessage()",
+      "\t\t\t);",
+      "\t\t\t$this->assertSame(400, $e->getHttpCode());",
+      "\t\t\t$caught++;",
+      "\t\t}",
+      "\t\ttry {",
+      "\t\t\t$user->validatePassword(str_repeat('long', 300));",
+      "\t\t} catch (\\Kirby\\Exception\\InvalidArgumentException $e) {",
+      "\t\t\t$this->assertSame(",
+      "\t\t\t\t'Please enter a valid password. Passwords must not be longer than 1000 characters.',",
+      "\t\t\t\t$e->getMessage()",
+      "\t\t\t);",
+      "\t\t\t$this->assertSame('Wrong password', $e->getMessage());",
+      "\t\t$this->assertSame(3, $caught);"
+    ],
+    "deleted": [
+      "\t\t$this->assertSame(2, $caught);"
+    ]
+  },
+  "cwe": [
+    "CWE-770"
+  ],
+  "cve_description": "Kirby is a content management system. A vulnerability in versions prior to 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6 affects all Kirby sites with user accounts (unless Kirby's API and Panel are disabled in the config). The real-world impact of this vulnerability is limited, however we still recommend to update to one of the patch releases because they also fix more severe vulnerabilities.\n\nKirby's authentication endpoint did not limit the password length. This allowed attackers to provide a password with a length up to the server's maximum request body length. Validating that password against the user's actual password requires hashing the provided password, which requires more CPU and memory resources (and therefore processing time) the longer the provided password gets. This could be abused by an attacker to cause the website to become unresponsive or unavailable. Because Kirby comes with a built-in brute force protection, the impact of this vulnerability is limited to 10 failed logins from each IP address and 10 failed logins for each existing user per hour.\n\nThe problem has been patched in Kirby 3.5.8.3, 3.6.6.3, 3.7.5.2, 3.8.4.1, and 3.9.6. In all of the mentioned releases, the maintainers have added password length limits in the affected code so that passwords longer than 1000 bytes are immediately blocked, both when setting a password and when logging in.",
+  "id": 2667
+}
+]

@@ -1,0 +1,49 @@
+[
+{
+  "cve_id": "CVE-2023-27560",
+  "code_before_change": "    public function __construct(BigInteger $modulo)\n    {\n        //if (!$modulo->isPrime()) {\n        //    throw new \\UnexpectedValueException('PrimeField requires a prime number be passed to the constructor');\n        //}\n\n        $this->instanceID = self::$instanceCounter++;\n        Integer::setModulo($this->instanceID, $modulo);\n        Integer::setRecurringModuloFunction($this->instanceID, $modulo->createRecurringModuloFunction());\n    }",
+  "code_after_change": "    public function __construct(BigInteger $modulo)\n    {\n        if (!$modulo->isPrime()) {\n            throw new \\UnexpectedValueException('PrimeField requires a prime number be passed to the constructor');\n        }\n\n        $this->instanceID = self::$instanceCounter++;\n        Integer::setModulo($this->instanceID, $modulo);\n        Integer::setRecurringModuloFunction($this->instanceID, $modulo->createRecurringModuloFunction());\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        if (!$modulo->isPrime()) {",
+      "            throw new \\UnexpectedValueException('PrimeField requires a prime number be passed to the constructor');",
+      "        }"
+    ],
+    "deleted": [
+      "        //if (!$modulo->isPrime()) {",
+      "        //    throw new \\UnexpectedValueException('PrimeField requires a prime number be passed to the constructor');",
+      "        //}"
+    ]
+  },
+  "cwe": [
+    "CWE-835"
+  ],
+  "cve_description": "Math/PrimeField.php in phpseclib 3.x before 3.0.19 has an infinite loop with composite primefields.",
+  "id": 4114
+},
+{
+  "cve_id": "CVE-2023-27560",
+  "code_before_change": "    public function squareRoot()\n    {\n        static $one, $two;\n        if (!isset($one)) {\n            $one = new BigInteger(1);\n            $two = new BigInteger(2);\n        }\n        $reduce = static::$reduce[$this->instanceID];\n        $p_1 = static::$modulo[$this->instanceID]->subtract($one);\n        $q = clone $p_1;\n        $s = BigInteger::scan1divide($q);\n        list($pow) = $p_1->divide($two);\n        for ($z = $one; !$z->equals(static::$modulo[$this->instanceID]); $z = $z->add($one)) {\n            $temp = $z->powMod($pow, static::$modulo[$this->instanceID]);\n            if ($temp->equals($p_1)) {\n                break;\n            }\n        }\n\n        $m = new BigInteger($s);\n        $c = $z->powMod($q, static::$modulo[$this->instanceID]);\n        $t = $this->value->powMod($q, static::$modulo[$this->instanceID]);\n        list($temp) = $q->add($one)->divide($two);\n        $r = $this->value->powMod($temp, static::$modulo[$this->instanceID]);\n\n        while (!$t->equals($one)) {\n            $i = clone $one;\n\n            while (!$t->powMod($two->pow($i), static::$modulo[$this->instanceID])->equals($one)) {\n                $i = $i->add($one);\n            }\n\n            if ($i->compare($m) >= 0) {\n                return false;\n            }\n            $b = $c->powMod($two->pow($m->subtract($i)->subtract($one)), static::$modulo[$this->instanceID]);\n            $m = $i;\n            $c = $reduce($b->multiply($b));\n            $t = $reduce($t->multiply($c));\n            $r = $reduce($r->multiply($b));\n        }\n\n        return new static($this->instanceID, $r);\n    }",
+  "code_after_change": "    public function squareRoot()\n    {\n        static $one, $two;\n        if (!isset($one)) {\n            $one = new BigInteger(1);\n            $two = new BigInteger(2);\n        }\n        $reduce = static::$reduce[$this->instanceID];\n        $p_1 = static::$modulo[$this->instanceID]->subtract($one);\n        $q = clone $p_1;\n        $s = BigInteger::scan1divide($q);\n        list($pow) = $p_1->divide($two);\n        for ($z = $one; !$z->equals(static::$modulo[$this->instanceID]); $z = $z->add($one)) {\n            $temp = $z->powMod($pow, static::$modulo[$this->instanceID]);\n            if ($temp->equals($p_1)) {\n                break;\n            }\n        }\n\n        $m = new BigInteger($s);\n        $c = $z->powMod($q, static::$modulo[$this->instanceID]);\n        $t = $this->value->powMod($q, static::$modulo[$this->instanceID]);\n        list($temp) = $q->add($one)->divide($two);\n        $r = $this->value->powMod($temp, static::$modulo[$this->instanceID]);\n\n        while (!$t->equals($one)) {\n            for ($i == clone $one; $i->compare($m) < 0; $i = $i->add($one)) {\n                if ($t->powMod($two->pow($i), static::$modulo[$this->instanceID])->equals($one)) {\n                    break;\n                }\n            }\n\n            if ($i->compare($m) == 0) {\n                return false;\n            }\n            $b = $c->powMod($two->pow($m->subtract($i)->subtract($one)), static::$modulo[$this->instanceID]);\n            $m = $i;\n            $c = $reduce($b->multiply($b));\n            $t = $reduce($t->multiply($c));\n            $r = $reduce($r->multiply($b));\n        }\n\n        return new static($this->instanceID, $r);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            for ($i == clone $one; $i->compare($m) < 0; $i = $i->add($one)) {",
+      "                if ($t->powMod($two->pow($i), static::$modulo[$this->instanceID])->equals($one)) {",
+      "                    break;",
+      "                }",
+      "            if ($i->compare($m) == 0) {"
+    ],
+    "deleted": [
+      "            $i = clone $one;",
+      "            while (!$t->powMod($two->pow($i), static::$modulo[$this->instanceID])->equals($one)) {",
+      "                $i = $i->add($one);",
+      "            if ($i->compare($m) >= 0) {"
+    ]
+  },
+  "cwe": [
+    "CWE-835"
+  ],
+  "cve_description": "Math/PrimeField.php in phpseclib 3.x before 3.0.19 has an infinite loop with composite primefields.",
+  "id": 4115
+}
+]
