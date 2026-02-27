@@ -1,0 +1,68 @@
+[
+{
+  "cve_id": "CVE-2023-2665",
+  "code_before_change": "function _saveSalariesFile( $id )\n{\n\tglobal $error,\n\t\t$FileUploadsPath;\n\n\t$input = $id === 'new' ? 'FILE_ATTACHED' : 'FILE_ATTACHED_' . $id;\n\n\tif ( ! isset( $_FILES[ $input ] ) )\n\t{\n\t\treturn '';\n\t}\n\n\t$file_name_no_ext = no_accents( mb_substr(\n\t\t$_FILES[ $input ]['name'],\n\t\t0,\n\t\tmb_strrpos( $_FILES[ $input ]['name'], '.' )\n\t) );\n\n\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' );\n\n\t$file_attached = FileUpload(\n\t\t$input,\n\t\t$FileUploadsPath . UserSyear() . '/staff_' . UserStaffID() . '/',\n\t\tFileExtensionWhiteList(),\n\t\t0,\n\t\t$error,\n\t\t'',\n\t\t$file_name_no_ext\n\t);\n\n\t// Fix SQL error when quote in uploaded file name.\n\treturn DBEscapeString( $file_attached );\n}",
+  "code_after_change": "function _saveSalariesFile( $id )\n{\n\tglobal $error,\n\t\t$FileUploadsPath;\n\n\t$input = $id === 'new' ? 'FILE_ATTACHED' : 'FILE_ATTACHED_' . $id;\n\n\tif ( ! isset( $_FILES[ $input ] ) )\n\t{\n\t\treturn '';\n\t}\n\n\t$file_name_no_ext = no_accents( mb_substr(\n\t\t$_FILES[ $input ]['name'],\n\t\t0,\n\t\tmb_strrpos( $_FILES[ $input ]['name'], '.' )\n\t) );\n\n\t// @since 11.0 Add microseconds to filename format to make it harder to predict.\n\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' ) . '.' . substr( (string) microtime(), 2, 6 );\n\n\t$file_attached = FileUpload(\n\t\t$input,\n\t\t$FileUploadsPath . UserSyear() . '/staff_' . UserStaffID() . '/',\n\t\tFileExtensionWhiteList(),\n\t\t0,\n\t\t$error,\n\t\t'',\n\t\t$file_name_no_ext\n\t);\n\n\t// Fix SQL error when quote in uploaded file name.\n\treturn DBEscapeString( $file_attached );\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t// @since 11.0 Add microseconds to filename format to make it harder to predict.",
+      "\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' ) . '.' . substr( (string) microtime(), 2, 6 );"
+    ],
+    "deleted": [
+      "\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' );"
+    ]
+  },
+  "cwe": [
+    "CWE-922"
+  ],
+  "cve_description": "Storage of Sensitive Data in a Mechanism without Access Control in GitHub repository francoisjacquet/rosariosis prior to 11.0.",
+  "id": 7057
+},
+{
+  "cve_id": "CVE-2023-2665",
+  "code_before_change": "\t\t\telseif ( $columns['TITLE'] )\n\t\t\t{\n\t\t\t\t$_REQUEST['values']['new']['PUBLISHED_PROFILES'] = '';\n\n\t\t\t\tforeach ( [ 'admin', 'teacher', 'parent' ] as $profile_id )\n\t\t\t\t{\n\t\t\t\t\tif ( isset( $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t\t&& $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t{\n\t\t\t\t\t\t$_REQUEST['values']['new']['PUBLISHED_PROFILES'] .= $profile_id . ',';\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\tforeach ( (array) $profiles_RET as $profile )\n\t\t\t\t{\n\t\t\t\t\t$profile_id = $profile['ID'];\n\n\t\t\t\t\tif ( isset( $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t\t&& $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t{\n\t\t\t\t\t\t$_REQUEST['values']['new']['PUBLISHED_PROFILES'] .= $profile_id . ',';\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t$columns['PUBLISHED_PROFILES'] = $_REQUEST['values']['new']['PUBLISHED_PROFILES'] ?\n\t\t\t\t',' . $_REQUEST['values']['new']['PUBLISHED_PROFILES'] :\n\t\t\t\t'';\n\n\t\t\t\t$sql = \"INSERT INTO portal_notes \";\n\n\t\t\t\t//FJ file attached to portal notes\n\t\t\t\t$fields = 'SCHOOL_ID,SYEAR,PUBLISHED_DATE,PUBLISHED_USER,';\n\n\t\t\t\t$values = \"'\" . UserSchool() . \"','\" . UserSyear() . \"',CURRENT_TIMESTAMP,'\" . User( 'STAFF_ID' ) . \"',\";\n\t\t\t\t// @since 10.9 Fix security issue, unset any FILE_ATTACHED column first.\n\t\t\t\t$columns['FILE_ATTACHED'] = '';\n\n\t\t\t\tif ( isset( $_FILES['FILE_ATTACHED_FILE'] ) )\n\t\t\t\t{\n\t\t\t\t\t$columns['FILE_ATTACHED'] = FileUpload(\n\t\t\t\t\t\t'FILE_ATTACHED_FILE',\n\t\t\t\t\t\t$PortalNotesFilesPath,\n\t\t\t\t\t\tFileExtensionWhiteList(),\n\t\t\t\t\t\t0,\n\t\t\t\t\t\t$error\n\t\t\t\t\t);\n\n\t\t\t\t\t// @since 6.8 Fix SQL error when quote in uploaded file name.\n\t\t\t\t\t$columns['FILE_ATTACHED'] = DBEscapeString( $columns['FILE_ATTACHED'] );\n\t\t\t\t}\n\t\t\t\telseif ( filter_var( $columns['FILE_ATTACHED_EMBED'], FILTER_VALIDATE_URL ) !== false )\n\t\t\t\t{\n\t\t\t\t\t$columns['FILE_ATTACHED'] = $columns['FILE_ATTACHED_EMBED'];\n\t\t\t\t}\n\n\t\t\t\tunset( $columns['FILE_ATTACHED_EMBED'] );\n\n\t\t\t\t$go = 0;\n\n\t\t\t\tforeach ( (array) $columns as $column => $value )\n\t\t\t\t{\n\t\t\t\t\tif ( ! empty( $value ) || $value == '0' )\n\t\t\t\t\t{\n\t\t\t\t\t\t$fields .= DBEscapeIdentifier( $column ) . ',';\n\t\t\t\t\t\t$values .= \"'\" . $value . \"',\";\n\t\t\t\t\t\t$go = true;\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t$sql .= '(' . mb_substr( $fields, 0, -1 ) . ') values(' . mb_substr( $values, 0, -1 ) . ')';\n\n\t\t\t\tif ( $go && empty( $error ) )\n\t\t\t\t{\n\t\t\t\t\tDBQuery( $sql );\n\n\t\t\t\t\t// Global var used by Moodle plugin.\n\t\t\t\t\t$portal_note_id = DBLastInsertID();\n\n\t\t\t\t\t//hook\n\t\t\t\t\tdo_action( 'School_Setup/PortalNotes.php|create_portal_note' );\n\t\t\t\t}\n\t\t\t}",
+  "code_after_change": "\t\t\telseif ( $columns['TITLE'] )\n\t\t\t{\n\t\t\t\t$_REQUEST['values']['new']['PUBLISHED_PROFILES'] = '';\n\n\t\t\t\tforeach ( [ 'admin', 'teacher', 'parent' ] as $profile_id )\n\t\t\t\t{\n\t\t\t\t\tif ( isset( $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t\t&& $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t{\n\t\t\t\t\t\t$_REQUEST['values']['new']['PUBLISHED_PROFILES'] .= $profile_id . ',';\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\tforeach ( (array) $profiles_RET as $profile )\n\t\t\t\t{\n\t\t\t\t\t$profile_id = $profile['ID'];\n\n\t\t\t\t\tif ( isset( $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t\t&& $_REQUEST['profiles']['new'][$profile_id] )\n\t\t\t\t\t{\n\t\t\t\t\t\t$_REQUEST['values']['new']['PUBLISHED_PROFILES'] .= $profile_id . ',';\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t$columns['PUBLISHED_PROFILES'] = $_REQUEST['values']['new']['PUBLISHED_PROFILES'] ?\n\t\t\t\t',' . $_REQUEST['values']['new']['PUBLISHED_PROFILES'] :\n\t\t\t\t'';\n\n\t\t\t\t$sql = \"INSERT INTO portal_notes \";\n\n\t\t\t\t//FJ file attached to portal notes\n\t\t\t\t$fields = 'SCHOOL_ID,SYEAR,PUBLISHED_DATE,PUBLISHED_USER,';\n\n\t\t\t\t$values = \"'\" . UserSchool() . \"','\" . UserSyear() . \"',CURRENT_TIMESTAMP,'\" . User( 'STAFF_ID' ) . \"',\";\n\t\t\t\t// @since 10.9 Fix security issue, unset any FILE_ATTACHED column first.\n\t\t\t\t$columns['FILE_ATTACHED'] = '';\n\n\t\t\t\tif ( isset( $_FILES['FILE_ATTACHED_FILE'] ) )\n\t\t\t\t{\n\t\t\t\t\t$file_name_no_ext = no_accents( mb_substr(\n\t\t\t\t\t\t$_FILES['FILE_ATTACHED_FILE']['name'],\n\t\t\t\t\t\t0,\n\t\t\t\t\t\tmb_strrpos( $_FILES['FILE_ATTACHED_FILE']['name'], '.' )\n\t\t\t\t\t) );\n\n\t\t\t\t\t// @since 11.0 Add microseconds to filename format to make it harder to predict.\n\t\t\t\t\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' ) . '.' . substr( (string) microtime(), 2, 6 );\n\n\t\t\t\t\t// File attached to portal notes\n\t\t\t\t\t$columns['FILE_ATTACHED'] = FileUpload(\n\t\t\t\t\t\t'FILE_ATTACHED_FILE',\n\t\t\t\t\t\t$PortalNotesFilesPath,\n\t\t\t\t\t\tFileExtensionWhiteList(),\n\t\t\t\t\t\t0,\n\t\t\t\t\t\t$error,\n\t\t\t\t\t\t'',\n\t\t\t\t\t\t$file_name_no_ext\n\t\t\t\t\t);\n\n\t\t\t\t\t// @since 6.8 Fix SQL error when quote in uploaded file name.\n\t\t\t\t\t$columns['FILE_ATTACHED'] = DBEscapeString( $columns['FILE_ATTACHED'] );\n\t\t\t\t}\n\t\t\t\telseif ( filter_var( $columns['FILE_ATTACHED_EMBED'], FILTER_VALIDATE_URL ) !== false )\n\t\t\t\t{\n\t\t\t\t\t$columns['FILE_ATTACHED'] = $columns['FILE_ATTACHED_EMBED'];\n\t\t\t\t}\n\n\t\t\t\tunset( $columns['FILE_ATTACHED_EMBED'] );\n\n\t\t\t\t$go = 0;\n\n\t\t\t\tforeach ( (array) $columns as $column => $value )\n\t\t\t\t{\n\t\t\t\t\tif ( ! empty( $value ) || $value == '0' )\n\t\t\t\t\t{\n\t\t\t\t\t\t$fields .= DBEscapeIdentifier( $column ) . ',';\n\t\t\t\t\t\t$values .= \"'\" . $value . \"',\";\n\t\t\t\t\t\t$go = true;\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t$sql .= '(' . mb_substr( $fields, 0, -1 ) . ') values(' . mb_substr( $values, 0, -1 ) . ')';\n\n\t\t\t\tif ( $go && empty( $error ) )\n\t\t\t\t{\n\t\t\t\t\tDBQuery( $sql );\n\n\t\t\t\t\t// Global var used by Moodle plugin.\n\t\t\t\t\t$portal_note_id = DBLastInsertID();\n\n\t\t\t\t\t//hook\n\t\t\t\t\tdo_action( 'School_Setup/PortalNotes.php|create_portal_note' );\n\t\t\t\t}\n\t\t\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\t\t$file_name_no_ext = no_accents( mb_substr(",
+      "\t\t\t\t\t\t$_FILES['FILE_ATTACHED_FILE']['name'],",
+      "\t\t\t\t\t\t0,",
+      "\t\t\t\t\t\tmb_strrpos( $_FILES['FILE_ATTACHED_FILE']['name'], '.' )",
+      "\t\t\t\t\t) );",
+      "\t\t\t\t\t// @since 11.0 Add microseconds to filename format to make it harder to predict.",
+      "\t\t\t\t\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' ) . '.' . substr( (string) microtime(), 2, 6 );",
+      "\t\t\t\t\t// File attached to portal notes",
+      "\t\t\t\t\t\t$error,",
+      "\t\t\t\t\t\t'',",
+      "\t\t\t\t\t\t$file_name_no_ext"
+    ],
+    "deleted": [
+      "\t\t\t\t\t\t$error"
+    ]
+  },
+  "cwe": [
+    "CWE-922"
+  ],
+  "cve_description": "Storage of Sensitive Data in a Mechanism without Access Control in GitHub repository francoisjacquet/rosariosis prior to 11.0.",
+  "id": 7058
+},
+{
+  "cve_id": "CVE-2023-2665",
+  "code_before_change": "function _saveFeesFile( $id )\n{\n\tglobal $error,\n\t\t$FileUploadsPath;\n\n\t$input = $id === 'new' ? 'FILE_ATTACHED' : 'FILE_ATTACHED_' . $id;\n\n\tif ( ! isset( $_FILES[ $input ] ) )\n\t{\n\t\treturn '';\n\t}\n\n\t$file_name_no_ext = no_accents( mb_substr(\n\t\t$_FILES[ $input ]['name'],\n\t\t0,\n\t\tmb_strrpos( $_FILES[ $input ]['name'], '.' )\n\t) );\n\n\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' );\n\n\t$file_attached = FileUpload(\n\t\t$input,\n\t\t$FileUploadsPath . UserSyear() . '/student_' . UserStudentID() . '/',\n\t\tFileExtensionWhiteList(),\n\t\t0,\n\t\t$error,\n\t\t'',\n\t\t$file_name_no_ext\n\t);\n\n\t// Fix SQL error when quote in uploaded file name.\n\treturn DBEscapeString( $file_attached );\n}",
+  "code_after_change": "function _saveFeesFile( $id )\n{\n\tglobal $error,\n\t\t$FileUploadsPath;\n\n\t$input = $id === 'new' ? 'FILE_ATTACHED' : 'FILE_ATTACHED_' . $id;\n\n\tif ( ! isset( $_FILES[ $input ] ) )\n\t{\n\t\treturn '';\n\t}\n\n\t$file_name_no_ext = no_accents( mb_substr(\n\t\t$_FILES[ $input ]['name'],\n\t\t0,\n\t\tmb_strrpos( $_FILES[ $input ]['name'], '.' )\n\t) );\n\n\t// @since 11.0 Add microseconds to filename format to make it harder to predict.\n\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' ) . '.' . substr( (string) microtime(), 2, 6 );\n\n\t$file_attached = FileUpload(\n\t\t$input,\n\t\t$FileUploadsPath . UserSyear() . '/student_' . UserStudentID() . '/',\n\t\tFileExtensionWhiteList(),\n\t\t0,\n\t\t$error,\n\t\t'',\n\t\t$file_name_no_ext\n\t);\n\n\t// Fix SQL error when quote in uploaded file name.\n\treturn DBEscapeString( $file_attached );\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t// @since 11.0 Add microseconds to filename format to make it harder to predict.",
+      "\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' ) . '.' . substr( (string) microtime(), 2, 6 );"
+    ],
+    "deleted": [
+      "\t$file_name_no_ext .= '_' . date( 'Y-m-d_His' );"
+    ]
+  },
+  "cwe": [
+    "CWE-922"
+  ],
+  "cve_description": "Storage of Sensitive Data in a Mechanism without Access Control in GitHub repository francoisjacquet/rosariosis prior to 11.0.",
+  "id": 7059
+}
+]

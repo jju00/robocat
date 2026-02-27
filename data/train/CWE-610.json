@@ -1,0 +1,26 @@
+[
+{
+  "cve_id": "CVE-2020-5296",
+  "code_before_change": "    public function getFilePath($fileName = null)\n    {\n        if ($fileName === null) {\n            $fileName = $this->fileName;\n        }\n\n        return $this->theme->getPath().'/'.$this->dirName.'/'.$fileName;\n    }",
+  "code_after_change": "    public function getFilePath($fileName = null)\n    {\n        if ($fileName === null) {\n            $fileName = $this->fileName;\n        }\n\n        // Limit paths to those under the assets directory\n        $directory = $this->theme->getPath() . '/' . $this->dirName . '/';\n        $path = realpath($directory . $fileName);\n        if (!starts_with($path, $directory)) {\n            return false;\n        }\n\n        return $path;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        // Limit paths to those under the assets directory",
+      "        $directory = $this->theme->getPath() . '/' . $this->dirName . '/';",
+      "        $path = realpath($directory . $fileName);",
+      "        if (!starts_with($path, $directory)) {",
+      "            return false;",
+      "        }",
+      "        return $path;"
+    ],
+    "deleted": [
+      "        return $this->theme->getPath().'/'.$this->dirName.'/'.$fileName;"
+    ]
+  },
+  "cwe": [
+    "CWE-610"
+  ],
+  "cve_description": "In OctoberCMS (october/october composer package) versions from 1.0.319 and before 1.0.466, an attacker can exploit this vulnerability to delete arbitrary local files of an October CMS server. The vulnerability is only exploitable by an authenticated backend user with the `cms.manage_assets` permission. Issue has been patched in Build 466 (v1.0.466).",
+  "id": 1556
+}
+]

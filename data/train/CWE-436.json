@@ -1,0 +1,94 @@
+[
+{
+  "cve_id": "CVE-2022-29254",
+  "code_before_change": "    protected function markCompleted($endStatus, ServiceResponse $serviceResponse, $gatewayMessage)\n    {\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        $this->createMessage(Message\\CreateCardResponse::class, $gatewayMessage);\n        ErrorHandling::safeExtend($this->payment, 'onCardCreated', $serviceResponse);\n    }",
+  "code_after_change": "    protected function markCompleted($endStatus, ServiceResponse $serviceResponse, $gatewayMessage)\n    {\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        $this->createMessage(CreateCardResponse::class, $gatewayMessage);\n        ErrorHandling::safeExtend($this->payment, 'onCardCreated', $serviceResponse);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $this->createMessage(CreateCardResponse::class, $gatewayMessage);"
+    ],
+    "deleted": [
+      "        $this->createMessage(Message\\CreateCardResponse::class, $gatewayMessage);"
+    ]
+  },
+  "cwe": [
+    "CWE-436"
+  ],
+  "cve_description": "silverstripe-omnipay is a SilverStripe integration with Omnipay PHP payments library. For a subset of Omnipay gateways (those that use intermediary states like `isNotification()` or `isRedirect()`), if the payment identifier or success URL is exposed it is possible for payments to be prematurely marked as completed without payment being taken. This is mitigated by the fact that most payment gateways hide this information from users, however some issuing banks offer flawed 3DSecure implementations that may inadvertently expose this data. The following versions have been patched to fix this issue: `2.5.2`, `3.0.2`, `3.1.4`, and `3.2.1`. There are no known workarounds for this vulnerability.",
+  "id": 1414
+},
+{
+  "cve_id": "CVE-2022-29254",
+  "code_before_change": "    protected function markCompleted($endStatus, ServiceResponse $serviceResponse, $gatewayMessage)\n    {\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        $this->createMessage(Message\\PurchasedResponse::class, $gatewayMessage);\n        ErrorHandling::safeExtend($this->payment, 'onCaptured', $serviceResponse);\n    }",
+  "code_after_change": "    protected function markCompleted($endStatus, ServiceResponse $serviceResponse, $gatewayMessage)\n    {\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        $this->createMessage(PurchasedResponse::class, $gatewayMessage);\n        ErrorHandling::safeExtend($this->payment, 'onCaptured', $serviceResponse);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $this->createMessage(PurchasedResponse::class, $gatewayMessage);"
+    ],
+    "deleted": [
+      "        $this->createMessage(Message\\PurchasedResponse::class, $gatewayMessage);"
+    ]
+  },
+  "cwe": [
+    "CWE-436"
+  ],
+  "cve_description": "silverstripe-omnipay is a SilverStripe integration with Omnipay PHP payments library. For a subset of Omnipay gateways (those that use intermediary states like `isNotification()` or `isRedirect()`), if the payment identifier or success URL is exposed it is possible for payments to be prematurely marked as completed without payment being taken. This is mitigated by the fact that most payment gateways hide this information from users, however some issuing banks offer flawed 3DSecure implementations that may inadvertently expose this data. The following versions have been patched to fix this issue: `2.5.2`, `3.0.2`, `3.1.4`, and `3.2.1`. There are no known workarounds for this vulnerability.",
+  "id": 1415
+},
+{
+  "cve_id": "CVE-2022-29254",
+  "code_before_change": "                $payment->write();\n                $i++;\n            }\n\n            // Ugly hack to set the money amount\n            $this->payment->Status = 'Created';\n            $this->payment->setAmount($total);\n\n            // If not everything was refunded, the payment should still have the \"Captured\" status\n            if ($total > 0) {\n                $endStatus = 'Captured';\n            }\n        }\n\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        if ($endStatus === 'Captured') {\n            $this->createMessage(Message\\PartiallyRefundedResponse::class, $gatewayMessage);\n        } else {\n            $this->createMessage(Message\\RefundedResponse::class, $gatewayMessage);\n        }\n\n        ErrorHandling::safeExtend($this->payment, 'onRefunded', $serviceResponse);\n    }",
+  "code_after_change": "                $payment->write();\n                $i++;\n            }\n\n            // Ugly hack to set the money amount\n            $this->payment->Status = 'Created';\n            $this->payment->setAmount($total);\n\n            // If not everything was refunded, the payment should still have the \"Captured\" status\n            if ($total > 0) {\n                $endStatus = 'Captured';\n            }\n        }\n\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        if ($endStatus === 'Captured') {\n            $this->createMessage(PartiallyRefundedResponse::class, $gatewayMessage);\n        } else {\n            $this->createMessage(RefundedResponse::class, $gatewayMessage);\n        }\n\n        ErrorHandling::safeExtend($this->payment, 'onRefunded', $serviceResponse);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "            $this->createMessage(PartiallyRefundedResponse::class, $gatewayMessage);",
+      "            $this->createMessage(RefundedResponse::class, $gatewayMessage);"
+    ],
+    "deleted": [
+      "            $this->createMessage(Message\\PartiallyRefundedResponse::class, $gatewayMessage);",
+      "            $this->createMessage(Message\\RefundedResponse::class, $gatewayMessage);"
+    ]
+  },
+  "cwe": [
+    "CWE-436"
+  ],
+  "cve_description": "silverstripe-omnipay is a SilverStripe integration with Omnipay PHP payments library. For a subset of Omnipay gateways (those that use intermediary states like `isNotification()` or `isRedirect()`), if the payment identifier or success URL is exposed it is possible for payments to be prematurely marked as completed without payment being taken. This is mitigated by the fact that most payment gateways hide this information from users, however some issuing banks offer flawed 3DSecure implementations that may inadvertently expose this data. The following versions have been patched to fix this issue: `2.5.2`, `3.0.2`, `3.1.4`, and `3.2.1`. There are no known workarounds for this vulnerability.",
+  "id": 1416
+},
+{
+  "cve_id": "CVE-2022-29254",
+  "code_before_change": "    protected function markCompleted($endStatus, ServiceResponse $serviceResponse, $gatewayMessage)\n    {\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        $this->createMessage(Message\\VoidedResponse::class, $gatewayMessage);\n\n        ErrorHandling::safeExtend($this->payment, 'onVoid', $serviceResponse);\n    }",
+  "code_after_change": "    protected function markCompleted($endStatus, ServiceResponse $serviceResponse, $gatewayMessage)\n    {\n        parent::markCompleted($endStatus, $serviceResponse, $gatewayMessage);\n        $this->createMessage(VoidedResponse::class, $gatewayMessage);\n\n        ErrorHandling::safeExtend($this->payment, 'onVoid', $serviceResponse);\n    }",
+  "function_modified_lines": {
+    "added": [
+      "        $this->createMessage(VoidedResponse::class, $gatewayMessage);"
+    ],
+    "deleted": [
+      "        $this->createMessage(Message\\VoidedResponse::class, $gatewayMessage);"
+    ]
+  },
+  "cwe": [
+    "CWE-436"
+  ],
+  "cve_description": "silverstripe-omnipay is a SilverStripe integration with Omnipay PHP payments library. For a subset of Omnipay gateways (those that use intermediary states like `isNotification()` or `isRedirect()`), if the payment identifier or success URL is exposed it is possible for payments to be prematurely marked as completed without payment being taken. This is mitigated by the fact that most payment gateways hide this information from users, however some issuing banks offer flawed 3DSecure implementations that may inadvertently expose this data. The following versions have been patched to fix this issue: `2.5.2`, `3.0.2`, `3.1.4`, and `3.2.1`. There are no known workarounds for this vulnerability.",
+  "id": 1417
+},
+{
+  "cve_id": "CVE-2024-24753",
+  "code_before_change": "        foreach ($this->headers as $name => $values) {\n            $name = $this->capitalizeHeaderName($name);\n\n            if ($name === 'Set-Cookie') {\n                $cookies = is_array($values) ? $values : [$values];\n            } else {\n                // Make sure the values are never arrays\n                // because API Gateway v2 does not support multi-value headers\n                $headers[$name] = is_array($values) ? end($values) : $values;\n            }\n        }",
+  "code_after_change": "        foreach ($this->headers as $name => $values) {\n            $name = $this->capitalizeHeaderName($name);\n\n            if ($name === 'Set-Cookie') {\n                $cookies = is_array($values) ? $values : [$values];\n            } else {\n                // Make sure the values are never arrays\n                // because API Gateway v2 does not support multi-value headers\n                $headers[$name] = is_array($values) ? implode(', ', $values) : $values;\n            }\n        }",
+  "function_modified_lines": {
+    "added": [
+      "                $headers[$name] = is_array($values) ? implode(', ', $values) : $values;"
+    ],
+    "deleted": [
+      "                $headers[$name] = is_array($values) ? end($values) : $values;"
+    ]
+  },
+  "cwe": [
+    "CWE-436"
+  ],
+  "cve_description": "Bref enable serverless PHP on AWS Lambda. When Bref is used in combination with an API Gateway with the v2 format, it does not handle multiple values headers. If PHP generates a response with two headers having the same key but different values only the latest one is kept. If an application relies on multiple headers with the same key being set for security reasons, then Bref would lower the application security. For example, if an application sets multiple `Content-Security-Policy` headers, then Bref would just reflect the latest one. This vulnerability is patched in 2.1.13.",
+  "id": 1418
+}
+]
