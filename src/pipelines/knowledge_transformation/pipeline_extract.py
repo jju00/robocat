@@ -19,11 +19,8 @@ import sys
 import argparse
 from pathlib import Path
 
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
-from src.utils import llm_client
-from src.dto.vulnerability_knowledge_dto import VulnerabilityKnowledgeDTO, VulnerabilityBehavior
+from ...utils import llm_client
+from ...dto.vulnerability_knowledge_dto import VulnerabilityKnowledgeDTO, VulnerabilityBehavior
 from tqdm import tqdm
 import threading
 from concurrent.futures import ThreadPoolExecutor

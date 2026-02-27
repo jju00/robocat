@@ -2,9 +2,9 @@ import re
 import json
 from typing import List, Optional
 
-from src.dto.rawdiffdto import RawDiffDTO
-from src.dto.query_dto import StructuredQueryDTO
-from src.utils.llm_client import OpenAIClient
+from ...dto.rawdiffdto import RawDiffDTO
+from ...dto.query_dto import StructuredQueryDTO
+from ...utils.llm_client import OpenAIClient
 
 class QueryGenerator:
     """
