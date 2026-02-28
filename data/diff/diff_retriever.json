@@ -1,0 +1,102 @@
+[
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Common.php",
+        "function": "<global>",
+        "full_code": "",
+        "purpose": "\"The function is intended to perform a specific task or operation, but it contains a vulnerability that could be exploited.\"",
+        "function_summary": "1. 2. 3."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Command/TwigLintCommand.php",
+        "function": "TwigLintCommand::getFilesInfo",
+        "full_code": "    public function getFilesInfo(string $templatesPath): array\n    {\n        $filesInfo = [];\n        $filesFound = $this->findFiles($templatesPath);\n        foreach ($filesFound as $file) {\n            $filesInfo[] = $this->validate($this->getTemplateContents($file), $file);\n        }\n\n        return $filesInfo;\n    }",
+        "purpose": "\"To retrieve and validate the contents of template files located in a specified directory.\"",
+        "function_summary": "1. Initialize an empty array to store file information.  \n2. Find template files in the specified path.  \n3. Validate the contents of each found template file and store the results in the array.  \n4. Return the array of validated file information."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Command/TwigLintCommand.php",
+        "function": "<global>",
+        "full_code": "",
+        "purpose": "\"The function is intended to perform a specific task or operation, but it contains a vulnerability that could be exploited.\"",
+        "function_summary": "It seems that the code snippet you intended to provide is missing. Please provide the code snippet so I can summarize its functions for you."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Advisor.php",
+        "function": "Advisor::evaluateRuleExpression",
+        "full_code": "    private function evaluateRuleExpression(string $expression)\n    {\n        $variables = array_merge($this->variables, $this->globals);\n\n        // Set default values for missing InnoDB variables when InnoDB is disabled\n        if (! isset($variables['innodb_buffer_pool_size'])) {\n            $variables['innodb_buffer_pool_size'] = 0;\n        }\n\n        if (! isset($variables['innodb_log_file_size'])) {\n            $variables['innodb_log_file_size'] = 0;\n        }\n\n        if (! isset($variables['innodb_log_files_in_group'])) {\n            $variables['innodb_log_files_in_group'] = 0;\n        }\n\n        return $this->expression->evaluate($expression, $variables);\n    }",
+        "purpose": "\"The function evaluates a given expression using a set of variables, including default values for certain InnoDB-related variables if they are not already set.\"",
+        "function_summary": "1. Merges local variables with global variables.  \n2. Sets default values for specific InnoDB variables if they are not defined.  \n3. Evaluates a given expression using the merged variables."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Common.php",
+        "function": "Common::checkTokenRequestParam",
+        "full_code": "    public static function checkTokenRequestParam(): void\n    {\n        global $token_mismatch, $token_provided;\n\n        $token_mismatch = true;\n        $token_provided = false;\n\n        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {\n            return;\n        }\n\n        if (isset($_POST['token']) && is_scalar($_POST['token']) && strlen((string) $_POST['token']) > 0) {\n            $token_provided = true;\n            $token_mismatch = ! @hash_equals($_SESSION[' PMA_token '], (string) $_POST['token']);\n        }\n\n        if (! $token_mismatch) {\n            return;\n        }\n\n        // Warn in case the mismatch is result of failed setting of session cookie\n        if (isset($_POST['set_session']) && $_POST['set_session'] !== session_id()) {\n            trigger_error(\n                __(\n                    'Failed to set session cookie. Maybe you are using HTTP instead of HTTPS to access phpMyAdmin.'\n                ),\n                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING\n            );\n        }\n\n        /**\n         * We don't allow any POST operation parameters if the token is mismatched\n         * or is not provided.\n         */\n        $allowList = ['ajax_request'];\n        Sanitize::removeRequestVars($allowList);\n    }",
+        "purpose": "\"To validate a token provided in a POST request against a session token to prevent CSRF attacks.\"",
+        "function_summary": "1. Checks if the request method is POST.  \n2. Validates the provided token against a session token using `hash_equals`.  \n3. Sets flags for token mismatch and token provided status.  \n4. Triggers an error if there is a session cookie setting failure.  \n5. Removes specified request parameters if the token is mismatched or not provided."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Config.php",
+        "function": "Config::checkErrors",
+        "full_code": "    public function checkErrors(): void\n    {\n        if (! $this->errorConfigFile) {\n            return;\n        }\n\n        $error = '[strong]' . __('Failed to read configuration file!') . '[/strong]'\n            . '[br][br]'\n            . __('This usually means there is a syntax error in it, please check any errors shown below.')\n            . '[br][br]'\n            . '[conferr]';\n        trigger_error($error, PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING);\n    }",
+        "purpose": "\"The function checks for the presence of an error configuration file and triggers an error message if it is not found, indicating a potential syntax error in the configuration file.\"",
+        "function_summary": "1. Checks if the configuration file has errors.  \n2. If there are errors, constructs an error message indicating a failure to read the configuration file.  \n3. Triggers an error with the constructed message, using a different error level based on the PHP version."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Config.php",
+        "function": "Config::checkServers",
+        "full_code": "    public function checkServers(): void\n    {\n        // Do we have some server?\n        if (! isset($this->settings['Servers']) || count($this->settings['Servers']) === 0) {\n            // No server => create one with defaults\n            $this->settings['Servers'] = [1 => $this->defaultServer];\n\n            return;\n        }\n\n        // We have server(s) => apply default configuration\n        $new_servers = [];\n\n        foreach ($this->settings['Servers'] as $server_index => $each_server) {\n            // Detect wrong configuration\n            if (! is_int($server_index) || $server_index < 1) {\n                trigger_error(\n                    sprintf(__('Invalid server index: %s'), $server_index),\n                    PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING\n                );\n            }\n\n            $each_server = array_merge($this->defaultServer, $each_server);\n\n            // Final solution to bug #582890\n            // If we are using a socket connection\n            // and there is nothing in the verbose server name\n            // or the host field, then generate a name for the server\n            // in the form of \"Server 2\", localized of course!\n            if (empty($each_server['host']) && empty($each_server['verbose'])) {\n                $each_server['verbose'] = sprintf(__('Server %d'), $server_index);\n            }\n\n            $new_servers[$server_index] = $each_server;\n        }\n\n        $this->settings['Servers'] = $new_servers;\n    }",
+        "purpose": "\"The function checks the server configurations in the settings, creates a default server if none exist, and applies default values to existing servers while ensuring valid server indices.\"",
+        "function_summary": "1. Check if there are any server configurations present in the settings.  \n2. If no servers are configured, create a default server configuration.  \n3. Iterate through existing server configurations to validate and apply default settings.  \n4. Generate a verbose name for servers that lack a host and verbose name.  \n5. Update the settings with the newly configured servers."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Config.php",
+        "function": "Config::checkGd2",
+        "full_code": "    public function checkGd2(): void\n    {\n        if ($this->get('GD2Available') === 'yes') {\n            $this->set('PMA_IS_GD2', 1);\n        } elseif ($this->get('GD2Available') === 'no') {\n            $this->set('PMA_IS_GD2', 0);\n        } else {\n            $this->set('PMA_IS_GD2', (get_defined_constants()['GD_MAJOR_VERSION'] ?? 0) >= 2 ? 1 : 0);\n        }\n    }",
+        "purpose": "\"The function checks the availability of GD2 (a graphics library) and sets a corresponding flag indicating whether GD2 is available or not.\"",
+        "function_summary": "1. Checks if GD2 is available based on a configuration value.  \n2. Sets a flag (`PMA_IS_GD2`) to 1 if GD2 is available.  \n3. Sets a flag (`PMA_IS_GD2`) to 0 if GD2 is not available.  \n4. Defaults to checking the GD major version constant if the availability is unknown."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Config.php",
+        "function": "<global>",
+        "full_code": "",
+        "purpose": "\"The function is intended to perform a specific task or operation, but it contains a vulnerability that may compromise its intended functionality or security.\"",
+        "function_summary": "1. 2. 3."
+    },
+    {
+        "project": "phpmyadmin",
+        "from_version": "RELEASE_5_2_2",
+        "test_version": "RELEASE_5_2_3",
+        "file_path": "libraries/classes/Config/Form.php",
+        "function": "Form::getOptionValueList",
+        "full_code": "    public function getOptionValueList($optionPath)\n    {\n        $value = $this->configFile->getDbEntry($optionPath);\n        if ($value === null) {\n            trigger_error(\n                $optionPath . ' - select options not defined',\n                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING\n            );\n\n            return [];\n        }\n\n        if (! is_array($value)) {\n            trigger_error(\n                $optionPath . ' - not a static value list',\n                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING\n            );\n\n            return [];\n        }\n\n        // convert array('#', 'a', 'b') to array('a', 'b')\n        if (isset($value[0]) && $value[0] === '#') {\n            // remove first element ('#')\n            array_shift($value);\n\n            // $value has keys and value names, return it\n            return $value;\n        }\n\n        // convert value list array('a', 'b') to array('a' => 'a', 'b' => 'b')\n        $hasStringKeys = false;\n        $keys = [];\n        for ($i = 0, $nb = count($value); $i < $nb; $i++) {\n            if (! isset($value[$i])) {\n                $hasStringKeys = true;\n                break;\n            }\n\n            $keys[] = is_bool($value[$i]) ? (int) $value[$i] : $value[$i];\n        }\n\n        if (! $hasStringKeys) {\n            /** @var array $value */\n            $value = array_combine($keys, $value);\n        }\n\n        // $value has keys and value names, return it\n        return $value;\n    }",
+        "purpose": "\"The function retrieves a list of option values from a configuration file, processes them, and returns them in a specific format.\"",
+        "function_summary": "1. Retrieve a database entry based on the provided option path.  \n2. Trigger an error if the retrieved value is null or not an array.  \n3. Convert a specific array format (with a leading '#') into a simpler array.  \n4. Check for string keys in the array and create an associative array if no string keys are found.  \n5. Return the processed value list."
+    }
+]
