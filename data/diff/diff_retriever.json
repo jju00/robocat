@@ -3,31 +3,11 @@
         "project": "phpmyadmin",
         "from_version": "RELEASE_5_2_2",
         "test_version": "RELEASE_5_2_3",
-        "file_path": "libraries/classes/Common.php",
-        "function": "<global>",
-        "full_code": "",
-        "purpose": "\"The function is intended to perform a specific task or operation, but it contains a vulnerability that could be exploited.\"",
-        "function_summary": "1. 2. 3."
-    },
-    {
-        "project": "phpmyadmin",
-        "from_version": "RELEASE_5_2_2",
-        "test_version": "RELEASE_5_2_3",
         "file_path": "libraries/classes/Command/TwigLintCommand.php",
         "function": "TwigLintCommand::getFilesInfo",
         "full_code": "    public function getFilesInfo(string $templatesPath): array\n    {\n        $filesInfo = [];\n        $filesFound = $this->findFiles($templatesPath);\n        foreach ($filesFound as $file) {\n            $filesInfo[] = $this->validate($this->getTemplateContents($file), $file);\n        }\n\n        return $filesInfo;\n    }",
         "purpose": "\"To retrieve and validate the contents of template files located in a specified directory.\"",
         "function_summary": "1. Initialize an empty array to store file information.  \n2. Find template files in the specified path.  \n3. Validate the contents of each found template file and store the results in the array.  \n4. Return the array of validated file information."
-    },
-    {
-        "project": "phpmyadmin",
-        "from_version": "RELEASE_5_2_2",
-        "test_version": "RELEASE_5_2_3",
-        "file_path": "libraries/classes/Command/TwigLintCommand.php",
-        "function": "<global>",
-        "full_code": "",
-        "purpose": "\"The function is intended to perform a specific task or operation, but it contains a vulnerability that could be exploited.\"",
-        "function_summary": "It seems that the code snippet you intended to provide is missing. Please provide the code snippet so I can summarize its functions for you."
     },
     {
         "project": "phpmyadmin",
@@ -78,16 +58,6 @@
         "full_code": "    public function checkGd2(): void\n    {\n        if ($this->get('GD2Available') === 'yes') {\n            $this->set('PMA_IS_GD2', 1);\n        } elseif ($this->get('GD2Available') === 'no') {\n            $this->set('PMA_IS_GD2', 0);\n        } else {\n            $this->set('PMA_IS_GD2', (get_defined_constants()['GD_MAJOR_VERSION'] ?? 0) >= 2 ? 1 : 0);\n        }\n    }",
         "purpose": "\"The function checks the availability of GD2 (a graphics library) and sets a corresponding flag indicating whether GD2 is available or not.\"",
         "function_summary": "1. Checks if GD2 is available based on a configuration value.  \n2. Sets a flag (`PMA_IS_GD2`) to 1 if GD2 is available.  \n3. Sets a flag (`PMA_IS_GD2`) to 0 if GD2 is not available.  \n4. Defaults to checking the GD major version constant if the availability is unknown."
-    },
-    {
-        "project": "phpmyadmin",
-        "from_version": "RELEASE_5_2_2",
-        "test_version": "RELEASE_5_2_3",
-        "file_path": "libraries/classes/Config.php",
-        "function": "<global>",
-        "full_code": "",
-        "purpose": "\"The function is intended to perform a specific task or operation, but it contains a vulnerability that may compromise its intended functionality or security.\"",
-        "function_summary": "1. 2. 3."
     },
     {
         "project": "phpmyadmin",
