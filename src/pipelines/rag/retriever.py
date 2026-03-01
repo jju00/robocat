@@ -14,11 +14,21 @@ Stage 2: CVE 단위로 rank sum 최소 item 1개만 선택 → top-k CVE 반환
 """
 import json
 import os
+import sys
 import argparse
+from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 
-from ...utils.bm25_retriever import BM25Retriever
-from ...dto.retriever_output_dto import RetrievedKnowledgeDTO, VulnerabilityBehaviorDTO
+# 패키지 내 import (python -m) / 직접 실행 (python3 src/...) 양쪽 지원
+try:
+    from ...utils.bm25_retriever import BM25Retriever
+    from ...dto.retriever_output_dto import RetrievedKnowledgeDTO, VulnerabilityBehaviorDTO
+except ImportError:
+    _ROOT = Path(__file__).resolve().parents[3]   # NLD/
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    from src.utils.bm25_retriever import BM25Retriever
+    from src.dto.retriever_output_dto import RetrievedKnowledgeDTO, VulnerabilityBehaviorDTO
 
 
 # ─── 전역 캐시 ──────────────────────────────────────────────────────────────────
@@ -175,9 +185,10 @@ def retrieve_top_k(
 def main():
     args = parse_args()
 
-    knowledge_path = f"../data/knowledge/{args.knowledge_file_name}"
-    input_path     = f"../data/diff/{args.input_file_name}"
-    output_path    = f"../data/retriever/{args.output_file_name}"
+    _ROOT = Path(__file__).resolve().parents[3]   # NLD/
+    knowledge_path = str(_ROOT / args.knowledge_file_name)
+    input_path     = str(_ROOT / args.input_file_name)
+    output_path    = str(_ROOT / args.output_file_name)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 

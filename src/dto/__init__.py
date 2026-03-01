@@ -1,5 +1,5 @@
 from .rawdiffdto import RawDiffDTO
 from .vulnerability_knowledge_dto import VulnerabilityKnowledgeDTO, VulnerabilityBehavior
-from .query_dto import StructuredQueryDTO
+from .diff_retriever_dto import DiffQueryDTO
 
-__all__ = ['RawDiffDTO', 'VulnerabilityKnowledgeDTO', 'VulnerabilityBehavior', 'StructuredQueryDTO']
+__all__ = ['RawDiffDTO', 'VulnerabilityKnowledgeDTO', 'VulnerabilityBehavior', 'DiffQueryDTO']
