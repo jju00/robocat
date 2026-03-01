@@ -19,6 +19,8 @@ import sys
 import argparse
 from pathlib import Path
 
+import yaml
+
 from ...utils import llm_client
 from ...dto.vulnerability_knowledge_dto import VulnerabilityKnowledgeDTO, VulnerabilityBehavior
 from tqdm import tqdm
@@ -31,6 +33,18 @@ from functools import wraps
 MODEL_CLIENT = None
 output_lock = threading.Lock()
 file_lock = threading.Lock()
+
+_PROMPTS = None
+_PROMPTS_PATH = Path(__file__).parent.parent.parent / "prompts" / "extract_knowledge.yaml"
+
+
+def _load_prompts() -> dict:
+    """YAML 프롬프트 파일을 로드 (최초 1회만 읽음)"""
+    global _PROMPTS
+    if _PROMPTS is None:
+        with open(_PROMPTS_PATH, "r", encoding="utf-8") as f:
+            _PROMPTS = yaml.safe_load(f)
+    return _PROMPTS
 
 
 def retry_on_failure(max_retries: int = 5, delay: float = 1.0):
@@ -94,70 +108,37 @@ def parse_args():
 
 def generate_extract_prompt(cve_id, cve_description, modified_lines, code_before, code_after):
     """
-    단계별 프롬프트 생성
-    
+    단계별 프롬프트 생성 (src/prompts/extract_knowledge.yaml 기반)
+
     Returns:
         tuple: (purpose_prompt, function_prompt, analysis_prompt, knowledge_extraction_prompt)
     """
-    prefix_str = f"""This is a code snippet with a vulnerability {cve_id}:
-'''
-{code_before}
-'''
-The vulnerability is described as follows:
-{cve_description}
-"""
+    t = _load_prompts()
+
+    # 공통 prefix 렌더링
+    prefix = t["prefix"].format_map({
+        "cve_id": cve_id,
+        "code_before": code_before,
+        "cve_description": cve_description,
+    })
 
     # Step 1: Extract purpose
-    purpose_prompt = f"""{prefix_str}
-What is the purpose of the function in the above code snippet? \
-Please summarize the answer in one sentence with following format: Function purpose: \"\"
-"""
+    purpose_prompt = t["purpose"].format_map({"prefix": prefix})
 
     # Step 2: Extract function summary
-    function_prompt = f"""{prefix_str}
-Please summarize the functions of the above code snippet in the list format without other \
-explanation: \"The functions of the code snippet are: 1. 2. 3.\"
-"""
+    function_prompt = t["function_summary"].format_map({"prefix": prefix})
 
-    # Step 3: Extract analysis
-    analysis_prompt = f"""{prefix_str}
-The correct way to fix it is by adding/deleting
-'''
-{json.dumps(modified_lines, indent=2)}
-'''
-"""
-
+    # Step 3: Extract analysis (조건부 code_after 포함)
+    analysis_prompt = t["analysis_base"].format_map({
+        "prefix": prefix,
+        "modified_lines_json": json.dumps(modified_lines, indent=2),
+    })
     if modified_lines.get("added"):
-        analysis_prompt += f"""The code after modification is as follows:\n'''\n{code_after}\n'''\n"""
+        analysis_prompt += t["analysis_code_after"].format_map({"code_after": code_after})
+    analysis_prompt += t["analysis_suffix"]
 
-    analysis_prompt += """Why is the above modification necessary?"""
-
-    # Step 4: Knowledge extraction
-    knowledge_extraction_prompt = """
-I want you to act as a vulnerability detection expert and organize vulnerability knowledge based on the above \
-vulnerability repair information. Please summarize the generalizable specific behavior of the code that \
-leads to the vulnerability and the specific solution to fix it. Format your findings in JSON.
-
-Here are some examples to guide you on the level of detail expected in your extraction:
-
-Example 1:
-{
-    "vulnerability_behavior": {
-        "vulnerability_cause_description": "Lack of proper handling for asynchronous events during device removal process.",
-        "trigger_condition": "A physically proximate attacker unplugs a device while the removal function is executing, leading to a race condition and use-after-free vulnerability.",
-        "specific_code_behavior_causing_vulnerability": "The code does not cancel pending work associated with a specific functionality before proceeding with further cleanup during device removal. This can result in a use-after-free scenario if the device is unplugged at a critical moment."
-    }, 
-    "solution": "To mitigate the vulnerability, it is necessary to cancel any pending work related to the specific functionality before proceeding with further cleanup during device removal. This ensures that the code handles asynchronous events properly and prevents the use-after-free vulnerability."
-}
-
-IMPORTANT:
-- In the 'solution' field, describe the solution in natural language format.
-- Do NOT nest dictionaries or arrays within the 'solution' field.
-- Do NOT nest within other fields either.
-- Your answer should be exactly the same format as the example provided.
-- Omit specific resource names to ensure the knowledge remains generalized (e.g., use mutex_lock instead of mutex_lock(&dmxdev->mutex)).
-- Return ONLY valid JSON, no markdown formatting like ```json.
-"""
+    # Step 4: Knowledge extraction (변수 없음, 그대로 사용)
+    knowledge_extraction_prompt = t["knowledge_extraction"]
 
     return purpose_prompt, function_prompt, analysis_prompt, knowledge_extraction_prompt
 
