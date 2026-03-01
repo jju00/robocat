@@ -1,0 +1,59 @@
+# Knowledge Extraction Pipeline - Prompt Templates
+# 변수 치환: Python str.format_map() 방식 사용 → {variable_name}
+# 주의: knowledge_extraction은 변수 없이 그대로 사용 (JSON 예시의 { }는 리터럴)
+
+prefix: |
+  This is a code snippet with a vulnerability {cve_id}:
+  '''
+  {code_before}
+  '''
+  The vulnerability is described as follows:
+  {cve_description}
+
+purpose: |
+  {prefix}
+  What is the purpose of the function in the above code snippet? Please summarize the answer in one sentence with following format: Function purpose: ""
+
+function_summary: |
+  {prefix}
+  Please summarize the functions of the above code snippet in the list format without other explanation: "The functions of the code snippet are: 1. 2. 3."
+
+analysis_base: |
+  {prefix}
+  The correct way to fix it is by adding/deleting
+  '''
+  {modified_lines_json}
+  '''
+
+analysis_code_after: |
+  The code after modification is as follows:
+  '''
+  {code_after}
+  '''
+
+analysis_suffix: "Why is the above modification necessary?"
+
+knowledge_extraction: |
+  I want you to act as a vulnerability detection expert and organize vulnerability knowledge based on the above
+  vulnerability repair information. Please summarize the generalizable specific behavior of the code that
+  leads to the vulnerability and the specific solution to fix it. Format your findings in JSON.
+
+  Here are some examples to guide you on the level of detail expected in your extraction:
+
+  Example 1:
+  {
+      "vulnerability_behavior": {
+          "vulnerability_cause_description": "Lack of proper handling for asynchronous events during device removal process.",
+          "trigger_condition": "A physically proximate attacker unplugs a device while the removal function is executing, leading to a race condition and use-after-free vulnerability.",
+          "specific_code_behavior_causing_vulnerability": "The code does not cancel pending work associated with a specific functionality before proceeding with further cleanup during device removal. This can result in a use-after-free scenario if the device is unplugged at a critical moment."
+      },
+      "solution": "To mitigate the vulnerability, it is necessary to cancel any pending work related to the specific functionality before proceeding with further cleanup during device removal. This ensures that the code handles asynchronous events properly and prevents the use-after-free vulnerability."
+  }
+
+  IMPORTANT:
+  - In the 'solution' field, describe the solution in natural language format.
+  - Do NOT nest dictionaries or arrays within the 'solution' field.
+  - Do NOT nest within other fields either.
+  - Your answer should be exactly the same format as the example provided.
+  - Omit specific resource names to ensure the knowledge remains generalized (e.g., use mutex_lock instead of mutex_lock(&dmxdev->mutex)).
+  - Return ONLY valid JSON, no markdown formatting like ```json.
