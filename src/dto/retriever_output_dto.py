@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 
 class VulnerabilityBehaviorDTO(BaseModel):
@@ -10,3 +10,8 @@ class RetrievedKnowledgeDTO(BaseModel):
     cve_id: str = Field(..., description="CVE identifier, e.g. CVE-2013-7266")
     vulnerability_behavior: VulnerabilityBehaviorDTO
     solution_behavior: str
+
+class RetrieverResultDTO(BaseModel):
+    id: int = Field(..., description="Query/function identifier")
+    full_code: str = Field(..., description="Target function code")
+    retrieved_knowledge: List[RetrievedKnowledgeDTO]

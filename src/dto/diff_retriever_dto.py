@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field
 
 
 class DiffQueryDTO(BaseModel):
+    id: int = Field(..., description="Unique query identifier")
+
     project: str
     from_version: str
     test_version: str
