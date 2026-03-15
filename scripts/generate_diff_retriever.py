@@ -104,6 +104,7 @@ for file in data["files"]:
 
         # DTO 구조 생성
         dto = {
+            "id": len(results) + 1,
             "project": project,
             "from_version": from_version,
             "test_version": test_version,
