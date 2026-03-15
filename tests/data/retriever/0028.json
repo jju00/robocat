@@ -1,0 +1,186 @@
+{
+    "id": 28,
+    "full_code": "    public static function sendHeaderLocation(string $uri, bool $use_refresh = false): void\n    {\n        if ($GLOBALS['config']->get('PMA_IS_IIS') && mb_strlen($uri) > 600) {\n            ResponseRenderer::getInstance()->disable();\n\n            $template = new Template();\n            echo $template->render('header_location', ['uri' => $uri]);\n\n            return;\n        }\n\n        /*\n         * Avoid relative path redirect problems in case user entered URL\n         * like /phpmyadmin/index.php/ which some web servers happily accept.\n         */\n        if ($uri[0] === '.') {\n            $uri = $GLOBALS['config']->getRootPath() . substr($uri, 2);\n        }\n\n        $response = ResponseRenderer::getInstance();\n\n        session_write_close();\n        if ($response->headersSent()) {\n            trigger_error(\n                'Core::sendHeaderLocation called when headers are already sent!',\n                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING\n            );\n        }\n\n        // bug #1523784: IE6 does not like 'Refresh: 0', it\n        // results in a blank page\n        // but we need it when coming from the cookie login panel)\n        if ($GLOBALS['config']->get('PMA_IS_IIS') && $use_refresh) {\n            $response->header('Refresh: 0; ' . $uri);\n\n            return;\n        }\n\n        $response->header('Location: ' . $uri);\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2016-10096",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of input parameters that can lead to unexpected behavior and potential injection vulnerabilities.",
+                "trigger_condition": "The method is called without a valid URI, leading to the possibility of null values being processed, which can cause security issues.",
+                "specific_code_behavior_causing_vulnerability": "The code allows the URI parameter to be null, which can result in improper URI construction and validation, potentially exposing the application to injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to change the default value of the URI parameter from null to an empty string. This ensures that the method always receives a valid string input, promoting better input validation and reducing the risk of injection vulnerabilities."
+        },
+        {
+            "cve_id": "CVE-2022-31090",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of sensitive information in HTTP requests during redirects.",
+                "trigger_condition": "A redirect response is received that points to a different origin (host, scheme, or port) while the request includes an Authorization header.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks for differences in the host of the URI when deciding whether to unset the Authorization header, failing to account for changes in scheme or port, which could lead to sensitive information being sent to an unintended server."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a comprehensive check that determines if the redirect is cross-origin by evaluating the host, scheme, and port of the URIs. If a cross-origin redirect is detected, the code should unset any Authorization headers to prevent sensitive information from being sent to a different origin."
+        },
+        {
+            "cve_id": "CVE-2022-31091",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of URI changes during redirect handling, leading to potential exposure of sensitive headers.",
+                "trigger_condition": "A redirect response is received that changes the origin of the request (host, scheme, or port), allowing sensitive information to be sent to an unintended destination.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks for differences in the host of the original request and the redirected request, failing to account for changes in scheme or port, which can result in sensitive headers being retained and sent to a different origin."
+            },
+            "solution_behavior": "To fix the vulnerability, implement a comprehensive check for cross-origin requests by validating changes in the host, scheme, and port of the URI during redirect handling. If a cross-origin request is detected, remove sensitive headers such as Authorization and Cookie from the request before proceeding with the redirect."
+        },
+        {
+            "cve_id": "CVE-2020-11529",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation and sanitization of user-controlled input for redirect routes.",
+                "trigger_condition": "An attacker crafts a malicious route that is accepted by the application, leading to an arbitrary external redirect.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses the user-provided route for redirection without proper sanitization, allowing for potential external URLs to be processed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to sanitize the user-controlled input by cleaning the route before processing it for redirection. This ensures that only valid internal routes are accepted, preventing arbitrary external redirects and enhancing the application's security."
+        },
+        {
+            "cve_id": "CVE-2016-9021",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper input validation allows untrusted user input to be processed without sanitization.",
+                "trigger_condition": "An attacker submits a malicious coupon code that exploits the lack of input validation, potentially leading to SQL injection or other injection attacks.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user-provided input for processing without applying any escaping or validation, making it susceptible to injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to apply proper input validation and sanitization to all user-provided inputs before processing them. This can be achieved by using an escaping function to ensure that any potentially harmful characters are removed or encoded, thus preventing injection attacks."
+        },
+        {
+            "cve_id": "CVE-2020-17476",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-generated content in notification messages.",
+                "trigger_condition": "An attacker can control or influence the content of the operator's name, which is displayed in a notification message.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses the operator's name in the notification message without any sanitization, allowing for the injection of malicious scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize any user-generated content before rendering it in the output. This can be achieved by applying a function that converts special characters to HTML entities, ensuring that any HTML or JavaScript code is neutralized and cannot be executed in the user's browser."
+        },
+        {
+            "cve_id": "CVE-2023-28855",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Lack of access control checks for user permissions before allowing data manipulation in fields containers.",
+                "trigger_condition": "An authenticated user attempts to write data to a fields container without proper authorization, leading to unauthorized access and potential data corruption.",
+                "specific_code_behavior_causing_vulnerability": "The code allows any authenticated user to interact with fields containers without verifying their permissions, enabling unauthorized data writes."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement access control checks that verify a user's permissions on the fields container before allowing any data manipulation. This ensures that only users with the appropriate rights can interact with the data, preventing unauthorized access and maintaining data integrity."
+        },
+        {
+            "cve_id": "CVE-2023-51651",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of URI paths leading to potential path traversal vulnerabilities.",
+                "trigger_condition": "An attacker crafts a request containing Unix double-dot segments ('../') in the URI path, which could allow access to unauthorized resources.",
+                "specific_code_behavior_causing_vulnerability": "The code does not check for the presence of '../' in the relative path before constructing the final URI, allowing for directory traversal and unauthorized access to sensitive files."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a check for the presence of '../' in the relative path before proceeding with URI construction. If such segments are detected, the code should immediately halt further processing and return an error or a sanitized URI. This ensures that only valid and intended requests are processed, preventing unauthorized access."
+        },
+        {
+            "cve_id": "CVE-2015-5076",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation and sanitization of user input before processing it in the application.",
+                "trigger_condition": "An attacker submits crafted input containing malicious scripts or HTML, which is then processed and executed by the application.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user input in its processing logic without proper escaping or encoding, allowing for the injection of arbitrary web scripts or HTML."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement proper input validation and sanitization techniques. This includes encoding user input before processing it and ensuring that any data sent to the client is treated as data rather than executable code. Additionally, using secure authentication methods and improving error handling will further enhance the application's security."
+        },
+        {
+            "cve_id": "CVE-2015-3903",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Disabling SSL certificate verification allows for potential man-in-the-middle attacks.",
+                "trigger_condition": "An attacker intercepts the communication between the client and server, presenting a fraudulent SSL certificate.",
+                "specific_code_behavior_causing_vulnerability": "The code sets options to disable SSL verification, which means it does not check if the server's SSL certificate is valid or matches the expected hostname."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to enable SSL certificate verification by removing the options that disable host and peer verification. This ensures that the client only communicates with trusted servers and protects against man-in-the-middle attacks."
+        },
+        {
+            "cve_id": "CVE-2016-7780",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct use of user-supplied input in database queries without proper sanitization.",
+                "trigger_condition": "An attacker provides a specially crafted input that alters the intended SQL query, leading to arbitrary SQL command execution.",
+                "specific_code_behavior_causing_vulnerability": "The code directly passes user input to a database query function without escaping or sanitizing the input, allowing for the possibility of SQL injection."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize all user-supplied input before using it in database queries. This can be achieved by applying an escaping function to neutralize any potentially harmful characters, ensuring that the input does not alter the intended SQL command."
+        },
+        {
+            "cve_id": "CVE-2022-0666",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper sanitization of user input in redirect URL handling.",
+                "trigger_condition": "An attacker provides a redirect URL containing CRLF characters, which can manipulate HTTP headers and lead to response splitting or information disclosure.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user input for redirection without adequately filtering out CRLF characters, allowing for potential injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to sanitize the redirect URL by removing any CRLF characters before using it for redirection. This ensures that the application does not process any injected header manipulations and maintains the integrity of the HTTP response."
+        },
+        {
+            "cve_id": "CVE-2016-9026",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper input validation allows untrusted user input to be processed without sanitization.",
+                "trigger_condition": "An attacker submits a malicious discount code that exploits the lack of input validation, potentially leading to SQL injection or other forms of code injection.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user-provided input from a parameter without escaping or validating it before passing it to a method that interacts with the database."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize user input by escaping it before using it in any database queries or processing. This ensures that only safe and expected data is handled by the application, preventing potential exploitation."
+        },
+        {
+            "cve_id": "CVE-2023-4879",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of user-provided URLs leading to potential exploitation through malicious links.",
+                "trigger_condition": "An attacker submits a crafted URL that resolves to a private or reserved IP address, allowing unauthorized access to internal resources or execution of malicious scripts.",
+                "specific_code_behavior_causing_vulnerability": "The code allows URLs that can resolve to IP addresses without validating whether those addresses are public or safe, and it does not check if the host part of the URL is empty or unresolved."
+            },
+            "solution_behavior": "To mitigate the vulnerability, implement strict validation of user-provided URLs by checking that the host is not empty and that it resolves to a public IP address. Additionally, ensure that the resolved IP address does not belong to private or reserved ranges before processing the URL further."
+        },
+        {
+            "cve_id": "CVE-2021-3819",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of user input leading to potential unauthorized actions.",
+                "trigger_condition": "An attacker crafts a malicious request to disable a currency without the user's consent, exploiting the lack of checks on the currency identifier.",
+                "specific_code_behavior_causing_vulnerability": "The original code directly accepts a currency object as a parameter, allowing an attacker to manipulate the request and disable currencies without proper validation of the currency ID."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate user input by checking the currency ID from the request and ensuring it corresponds to a valid currency in the database before proceeding with any actions. This prevents unauthorized changes and ensures that only legitimate requests are processed."
+        },
+        {
+            "cve_id": "CVE-2015-5074",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient error handling during the email preparation process.",
+                "trigger_condition": "An error occurs when preparing the email content, leading to unhandled exceptions that can disrupt the normal flow of execution.",
+                "specific_code_behavior_causing_vulnerability": "The code directly calls a method to prepare email content without surrounding it with error handling mechanisms, allowing exceptions to propagate unchecked."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to wrap the email preparation call in a try-catch block to handle any exceptions that may arise. This ensures that the application can gracefully manage errors and prevents the disruption of the email sending process."
+        },
+        {
+            "cve_id": "CVE-2023-6127",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Unrestricted file extraction from a ZIP archive without proper validation or error handling.",
+                "trigger_condition": "An attacker uploads a ZIP file containing malicious files, which are then extracted and potentially executed on the server.",
+                "specific_code_behavior_causing_vulnerability": "The code directly extracts files from the ZIP archive without checking the file types or handling errors appropriately, allowing for the possibility of executing harmful scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement error handling around the file extraction process. This includes using try-catch blocks to catch exceptions during extraction, logging any errors, and deleting the ZIP file if an error occurs. Additionally, validating the file types before extraction can help prevent the execution of malicious files."
+        },
+        {
+            "cve_id": "CVE-2023-6130",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate error handling during file extraction from a zip archive allows for potential path traversal attacks.",
+                "trigger_condition": "An attacker provides a zip file containing paths that traverse the directory structure, leading to unauthorized access to sensitive files.",
+                "specific_code_behavior_causing_vulnerability": "The code attempts to extract files from a zip archive without validating the paths, which can result in the extraction of files to unintended locations if the paths are manipulated."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement proper error handling during the extraction process. This includes wrapping the extraction call in a try-catch block to catch exceptions, logging any errors encountered, and taking corrective actions such as deleting the zip file if an invalid path is detected. This ensures that the application does not proceed with potentially harmful operations and maintains the integrity of the file system."
+        },
+        {
+            "cve_id": "CVE-2023-6124",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient error handling during file extraction from a ZIP archive, allowing for potential exploitation through malformed or malicious files.",
+                "trigger_condition": "An attacker uploads a malicious ZIP file that, when extracted, could lead to unauthorized access or execution of code on the server.",
+                "specific_code_behavior_causing_vulnerability": "The code attempts to extract files from a ZIP archive without adequately handling exceptions or errors that may arise during the extraction process, leaving the server vulnerable to SSRF attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement proper error handling around the file extraction process. This includes using a try-catch block to catch exceptions, logging any errors that occur, and taking appropriate actions such as deleting the ZIP file if an error is encountered. This ensures that the code can handle unexpected situations gracefully and reduces the risk of exploitation."
+        },
+        {
+            "cve_id": "CVE-2023-6125",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation and error handling during file extraction from ZIP archives.",
+                "trigger_condition": "An attacker uploads a ZIP file containing a malicious PHP file, which could be executed if proper checks are not in place.",
+                "specific_code_behavior_causing_vulnerability": "The code extracts files from a ZIP archive without catching exceptions or validating the contents, allowing for potential code execution from extracted files."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement robust error handling around the file extraction process. This includes using try-catch blocks to catch exceptions, logging errors, and removing any potentially harmful files if an error occurs. Additionally, validating the contents of the ZIP file before extraction can help prevent the execution of malicious code."
+        }
+    ]
+}

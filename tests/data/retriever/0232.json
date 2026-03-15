@@ -1,0 +1,186 @@
+{
+    "id": 232,
+    "full_code": "    public function testGetDetailedProfilingStatsWithData(): void\n    {\n        $method = new ReflectionMethod($this->sql, 'getDetailedProfilingStats');\n        if (PHP_VERSION_ID < 80100) {\n            $method->setAccessible(true);\n        }\n\n        $profiling = [\n            ['Status' => 'Starting', 'Duration' => '0.000017'],\n            ['Status' => 'checking permissions', 'Duration' => '0.000003'],\n            ['Status' => 'Opening tables', 'Duration' => '0.000152'],\n            ['Status' => 'After opening tables', 'Duration' => '0.000004'],\n            ['Status' => 'System lock', 'Duration' => '0.000002'],\n            ['Status' => 'table lock', 'Duration' => '0.000003'],\n            ['Status' => 'Opening tables', 'Duration' => '0.000008'],\n            ['Status' => 'After opening tables', 'Duration' => '0.000002'],\n            ['Status' => 'System lock', 'Duration' => '0.000002'],\n            ['Status' => 'table lock', 'Duration' => '0.000012'],\n            ['Status' => 'Unlocking tables', 'Duration' => '0.000003'],\n            ['Status' => 'closing tables', 'Duration' => '0.000005'],\n            ['Status' => 'init', 'Duration' => '0.000007'],\n            ['Status' => 'Optimizing', 'Duration' => '0.000004'],\n            ['Status' => 'Statistics', 'Duration' => '0.000006'],\n            ['Status' => 'Preparing', 'Duration' => '0.000006'],\n            ['Status' => 'Executing', 'Duration' => '0.000002'],\n            ['Status' => 'Sending data', 'Duration' => '0.000029'],\n            ['Status' => 'End of update loop', 'Duration' => '0.000003'],\n            ['Status' => 'Query end', 'Duration' => '0.000002'],\n            ['Status' => 'Commit', 'Duration' => '0.000002'],\n            ['Status' => 'closing tables', 'Duration' => '0.000002'],\n            ['Status' => 'Unlocking tables', 'Duration' => '0.000001'],\n            ['Status' => 'closing tables', 'Duration' => '0.000002'],\n            ['Status' => 'Starting cleanup', 'Duration' => '0.000002'],\n            ['Status' => 'Freeing items', 'Duration' => '0.000002'],\n            ['Status' => 'Updating status', 'Duration' => '0.000007'],\n            ['Status' => 'Reset for next command', 'Duration' => '0.000009'],\n        ];\n        $expected = [\n            'total_time' => 0.000299,\n            'states' => [\n                'Starting' => ['total_time' => '0.000017', 'calls' => 1],\n                'Checking Permissions' => ['total_time' => '0.000003', 'calls' => 1],\n                'Opening Tables' => ['total_time' => 0.00016, 'calls' => 2],\n                'After Opening Tables' => ['total_time' => 6.0E-6, 'calls' => 2],\n                'System Lock' => ['total_time' => 4.0E-6, 'calls' => 2],\n                'Table Lock' => ['total_time' => 1.5E-5, 'calls' => 2],\n                'Unlocking Tables' => ['total_time' => 4.0E-6, 'calls' => 2],\n                'Closing Tables' => ['total_time' => 9.0E-6, 'calls' => 3],\n                'Init' => ['total_time' => '0.000007', 'calls' => 1],\n                'Optimizing' => ['total_time' => '0.000004', 'calls' => 1],\n                'Statistics' => ['total_time' => '0.000006', 'calls' => 1],\n                'Preparing' => ['total_time' => '0.000006', 'calls' => 1],\n                'Executing' => ['total_time' => '0.000002', 'calls' => 1],\n                'Sending Data' => ['total_time' => '0.000029', 'calls' => 1],\n                'End Of Update Loop' => ['total_time' => '0.000003', 'calls' => 1],\n                'Query End' => ['total_time' => '0.000002', 'calls' => 1],\n                'Commit' => ['total_time' => '0.000002', 'calls' => 1],\n                'Starting Cleanup' => ['total_time' => '0.000002', 'calls' => 1],\n                'Freeing Items' => ['total_time' => '0.000002', 'calls' => 1],\n                'Updating Status' => ['total_time' => '0.000007', 'calls' => 1],\n                'Reset For Next Command' => ['total_time' => '0.000009', 'calls' => 1],\n            ],\n            'chart' => [\n                'Starting' => '0.000017',\n                'Checking Permissions' => '0.000003',\n                'Opening Tables' => 0.00016,\n                'After Opening Tables' => 6.0E-6,\n                'System Lock' => 4.0E-6,\n                'Table Lock' => 1.5E-5,\n                'Unlocking Tables' => 4.0E-6,\n                'Closing Tables' => 9.0E-6,\n                'Init' => '0.000007',\n                'Optimizing' => '0.000004',\n                'Statistics' => '0.000006',\n                'Preparing' => '0.000006',\n                'Executing' => '0.000002',\n                'Sending Data' => '0.000029',\n                'End Of Update Loop' => '0.000003',\n                'Query End' => '0.000002',\n                'Commit' => '0.000002',\n                'Starting Cleanup' => '0.000002',\n                'Freeing Items' => '0.000002',\n                'Updating Status' => '0.000007',\n                'Reset For Next Command' => '0.000009',\n            ],\n            'profile' => [\n                ['status' => 'Starting', 'duration' => '17 µ', 'duration_raw' => '0.000017'],\n                ['status' => 'Checking Permissions', 'duration' => '3 µ', 'duration_raw' => '0.000003'],\n                ['status' => 'Opening Tables', 'duration' => '152 µ', 'duration_raw' => '0.000152'],\n                ['status' => 'After Opening Tables', 'duration' => '4 µ', 'duration_raw' => '0.000004'],\n                ['status' => 'System Lock', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Table Lock', 'duration' => '3 µ', 'duration_raw' => '0.000003'],\n                ['status' => 'Opening Tables', 'duration' => '8 µ', 'duration_raw' => '0.000008'],\n                ['status' => 'After Opening Tables', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'System Lock', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Table Lock', 'duration' => '12 µ', 'duration_raw' => '0.000012'],\n                ['status' => 'Unlocking Tables', 'duration' => '3 µ', 'duration_raw' => '0.000003'],\n                ['status' => 'Closing Tables', 'duration' => '5 µ', 'duration_raw' => '0.000005'],\n                ['status' => 'Init', 'duration' => '7 µ', 'duration_raw' => '0.000007'],\n                ['status' => 'Optimizing', 'duration' => '4 µ', 'duration_raw' => '0.000004'],\n                ['status' => 'Statistics', 'duration' => '6 µ', 'duration_raw' => '0.000006'],\n                ['status' => 'Preparing', 'duration' => '6 µ', 'duration_raw' => '0.000006'],\n                ['status' => 'Executing', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Sending Data', 'duration' => '29 µ', 'duration_raw' => '0.000029'],\n                ['status' => 'End Of Update Loop', 'duration' => '3 µ', 'duration_raw' => '0.000003'],\n                ['status' => 'Query End', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Commit', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Closing Tables', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Unlocking Tables', 'duration' => '1 µ', 'duration_raw' => '0.000001'],\n                ['status' => 'Closing Tables', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Starting Cleanup', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Freeing Items', 'duration' => '2 µ', 'duration_raw' => '0.000002'],\n                ['status' => 'Updating Status', 'duration' => '7 µ', 'duration_raw' => '0.000007'],\n                ['status' => 'Reset For Next Command', 'duration' => '9 µ', 'duration_raw' => '0.000009'],\n            ],\n        ];\n        self::assertSame($expected, $method->invoke($this->sql, $profiling));\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2015-8379",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct manipulation of server variables can lead to bypassing security mechanisms.",
+                "trigger_condition": "An attacker exploits the ability to manipulate the request method through parameters, which can allow CSRF protection to be circumvented.",
+                "specific_code_behavior_causing_vulnerability": "The code sets the request method directly in the server environment, which can be easily altered by an attacker, leading to potential CSRF token validation failures."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to set the request method through a controlled object or framework mechanism instead of manipulating server variables directly. This ensures that the request context is managed securely and that CSRF protection is effectively enforced."
+        },
+        {
+            "cve_id": "CVE-2016-9087",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input related to date and time values without validation or sanitization.",
+                "trigger_condition": "An attacker provides crafted input for date and time fields that can manipulate SQL queries, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code directly processes user input for date and time without ensuring it is in a safe format, allowing potential SQL injection through improperly sanitized values."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user input related to date and time values before processing. This includes using safe functions to convert and handle these values, ensuring that they are in a controlled format before any potential use in SQL queries."
+        },
+        {
+            "cve_id": "CVE-2016-9466",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper sanitization of user-controlled data in error messages returned to the client.",
+                "trigger_condition": "An attacker manipulates the exception message to include malicious scripts, which are then reflected back to the user in the error response.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs the error message using an exception message that can be influenced by user input, allowing for the injection of HTML or JavaScript code."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to replace any user-controlled data in error messages with static, predefined messages that do not contain any potentially harmful content. This ensures that the error responses are safe and do not allow for the injection of malicious scripts."
+        },
+        {
+            "cve_id": "CVE-2023-3491",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Unrestricted file upload functionality that does not validate file types or contents.",
+                "trigger_condition": "An attacker uploads a file with a dangerous type (e.g., executable scripts) without any restrictions or validation checks.",
+                "specific_code_behavior_causing_vulnerability": "The code allows for the upload of files without checking their types or ensuring they are safe, leading to potential execution of malicious code."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement strict validation checks on file types and contents before allowing any file uploads. This includes rejecting files that are of dangerous types and ensuring that only safe file formats are accepted."
+        },
+        {
+            "cve_id": "CVE-2016-8897",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input for date and time values without validation or sanitization.",
+                "trigger_condition": "An attacker provides malicious input in date fields that can manipulate SQL queries, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code directly processes user input for date and time without ensuring it is in a valid format or properly sanitized, allowing for potential SQL injection through crafted input."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate and sanitize all user input for date and time values before processing. This includes using functions that ensure the input is in a valid format and applying strict checks to prevent any malicious input from being executed in SQL queries."
+        },
+        {
+            "cve_id": "CVE-2023-38489",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient session expiration allows old session credentials to remain valid after a password change.",
+                "trigger_condition": "An attacker gains access to a user's session or password and continues to use it even after the legitimate user changes their password.",
+                "specific_code_behavior_causing_vulnerability": "The code does not invalidate user sessions associated with a password that has been changed, allowing unauthorized access through stale session data."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement session invalidation logic that checks if a user's password has changed since the session was created. If the password has changed, all active sessions for that user should be invalidated to prevent unauthorized access."
+        },
+        {
+            "cve_id": "CVE-2018-17552",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper sanitization of user input before using it in SQL queries.",
+                "trigger_condition": "An attacker manipulates the input value to include malicious SQL code, which is then executed by the database.",
+                "specific_code_behavior_causing_vulnerability": "The code uses a function that may not adequately sanitize input for SQL queries, allowing for the possibility of SQL injection when user-controlled data is directly included in SQL statements."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that all user inputs are properly sanitized before being used in SQL queries. This can be achieved by using type casting functions to enforce the expected data type, such as converting input values to integers, which prevents the execution of any malicious SQL code."
+        },
+        {
+            "cve_id": "CVE-2016-10096",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inaccurate handling of file statistics due to hardcoded values for block size and blocks.",
+                "trigger_condition": "The code retrieves file statistics using fstat() without accounting for the operating system's specific requirements for block size, leading to misleading information.",
+                "specific_code_behavior_causing_vulnerability": "The code sets the block size and blocks to fixed values of zero, which may not accurately represent the file's characteristics on different operating systems, potentially leading to incorrect assumptions about file handling."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to dynamically determine the block size based on the operating system. This can be achieved by checking the environment and setting the block size to an appropriate value, such as -1 for Windows or 0 for other systems, ensuring accurate file statistics are returned."
+        },
+        {
+            "cve_id": "CVE-2023-24070",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input in the referer field, allowing for potential injection of malicious scripts.",
+                "trigger_condition": "An attacker manipulates the referer field in a request, leading to the possibility of executing arbitrary JavaScript in the user's browser.",
+                "specific_code_behavior_causing_vulnerability": "The code uses the referer value directly from user input without validation or sanitization, which can include untrusted data that may contain malicious scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to construct the referer URL explicitly using known safe values, such as the action and model ID. This ensures that the referer is predictable and does not allow for the inclusion of unvalidated user input, thereby preventing potential XSS attacks."
+        },
+        {
+            "cve_id": "CVE-2014-125039",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper output handling of user-controlled data without sanitization.",
+                "trigger_condition": "An attacker injects malicious scripts into fields that are rendered on the web page, which are then executed in the context of the user's browser.",
+                "specific_code_behavior_causing_vulnerability": "The code directly outputs user-controlled data, such as titles and sentences, without applying any sanitization or escaping, allowing for potential XSS attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize all user-controlled output by using a function that converts special characters to HTML entities before rendering them on the web page. This ensures that any potentially harmful content is neutralized and displayed as plain text rather than executed as code."
+        },
+        {
+            "cve_id": "CVE-2016-7788",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input and lack of validation before using it in SQL queries.",
+                "trigger_condition": "An attacker provides crafted input that is not properly sanitized, leading to the execution of arbitrary SQL commands.",
+                "specific_code_behavior_causing_vulnerability": "The code processes user input without validating or sanitizing it, and directly uses it in SQL queries, which can allow for SQL injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate and sanitize all user inputs before using them in SQL queries. This includes ensuring that inputs conform to expected formats and escaping any special characters to prevent injection attacks."
+        },
+        {
+            "cve_id": "CVE-2021-3692",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Use of predictable algorithms in random number generation, leading to insufficient randomness.",
+                "trigger_condition": "The application relies on a random number generator that may not meet security standards, especially in environments where certain libraries or conditions are not satisfied.",
+                "specific_code_behavior_causing_vulnerability": "The code includes a condition that skips tests if specific library versions are not present, allowing the application to fall back on potentially insecure random number generation methods."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to remove any conditions that allow the application to skip security checks or tests related to random number generation. The application should rely solely on secure and robust methods for generating random numbers, ensuring that all environments use a secure random number generator that meets cryptographic standards."
+        },
+        {
+            "cve_id": "CVE-2023-3490",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user inputs during file upload processes, leading to potential SQL Injection vulnerabilities.",
+                "trigger_condition": "An attacker uploads a file with malicious content that is not properly sanitized, allowing for SQL injection attacks when the application processes the uploaded data.",
+                "specific_code_behavior_causing_vulnerability": "The code directly interacts with the database using user-provided data without adequate validation or sanitization, making it susceptible to SQL Injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement proper input validation and sanitization for all user inputs related to file uploads. Additionally, ensure that any database interactions are performed using prepared statements or parameterized queries to prevent SQL injection."
+        },
+        {
+            "cve_id": "CVE-2021-3689",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Use of predictable algorithms in random number generation can lead to insecure cryptographic operations.",
+                "trigger_condition": "The application falls back on less secure random number generation methods when certain conditions are not met, potentially allowing attackers to predict generated values.",
+                "specific_code_behavior_causing_vulnerability": "The code includes a condition that skips tests for random key generation if specific libraries or environments are not available, which may lead to reliance on insecure randomness."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that all tests for random key generation are executed regardless of the environment. This will enforce the use of secure random number generation methods and eliminate reliance on potentially insecure alternatives."
+        },
+        {
+            "cve_id": "CVE-2016-8900",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of untrusted input data leading to potential object injection.",
+                "trigger_condition": "An attacker manipulates input data that is used to create or modify objects, resulting in unexpected behavior or execution of arbitrary code.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses unvalidated input to create objects and perform calculations without sufficient checks, allowing for the possibility of injecting malicious data."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate and sanitize all input data before using it to create or manipulate objects. This includes ensuring that the data conforms to expected formats and ranges, as well as handling errors properly to avoid suppressing critical issues."
+        },
+        {
+            "cve_id": "CVE-2020-28456",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input without sanitization or escaping.",
+                "trigger_condition": "An attacker submits malicious input through a form that is directly used in the application without validation.",
+                "specific_code_behavior_causing_vulnerability": "The code directly assigns user input to a data structure that is later processed and stored, allowing for the possibility of executing injected scripts in the user's browser."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize all user input before processing or storing it. This can be achieved by applying a cleaning function to remove or escape potentially harmful characters or scripts, ensuring that any malicious content is neutralized."
+        },
+        {
+            "cve_id": "CVE-2023-6599",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inconsistent data structure usage for media handling, leading to potential errors in processing and lack of standardized error handling.",
+                "trigger_condition": "The media handling functions expect a specific key in the data structure, but the code uses a different key, resulting in failures to retrieve or process media correctly.",
+                "specific_code_behavior_causing_vulnerability": "The code uses the key 'src' instead of a standardized key like 'filename', which can lead to errors when the media handling functions attempt to access the media data."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to standardize the data structure used for media handling by replacing the key 'src' with 'filename'. This ensures that all media handling functions operate on a consistent data structure, improving error handling and reducing the likelihood of processing errors."
+        },
+        {
+            "cve_id": "CVE-2015-0917",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input for action method invocation without validation or sanitization.",
+                "trigger_condition": "An attacker sends a crafted request with a malicious action parameter, leading to the execution of unintended methods and potential XSS attacks.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs a method name based on the user-controlled action parameter without validating its contents, allowing for arbitrary method invocation."
+            },
+            "solution_behavior": "To mitigate the vulnerability, ensure that the action parameter is validated and sanitized before being used to construct method names. Only allow predefined, safe actions to be processed, and reject any input that does not conform to expected values."
+        },
+        {
+            "cve_id": "CVE-2023-45957",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of error messages that may contain untrusted data.",
+                "trigger_condition": "An attacker triggers an exception that generates an error message containing malicious scripts or HTML.",
+                "specific_code_behavior_causing_vulnerability": "The code directly adds the exception message to an error array without sanitization, allowing potentially harmful content to be rendered in the user interface."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize any error messages before adding them to the error array. This ensures that any potentially harmful content is neutralized and cannot be executed in the browser, thereby preventing XSS attacks."
+        },
+        {
+            "cve_id": "CVE-2015-5074",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate user context handling and insufficient visibility checks in event retrieval logic.",
+                "trigger_condition": "An authenticated user uploads a file with a .pht extension, potentially leading to unauthorized access to sensitive events.",
+                "specific_code_behavior_causing_vulnerability": "The code hardcodes a specific username for event retrieval and does not account for user associations, which can expose events to unauthorized users."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to dynamically retrieve user context instead of hardcoding usernames. Additionally, the visibility checks in the event retrieval logic should be expanded to include user associations, ensuring that only authorized events are accessible based on the current user's context."
+        }
+    ]
+}

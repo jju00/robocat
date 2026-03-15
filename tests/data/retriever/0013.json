@@ -1,0 +1,186 @@
+{
+    "id": 13,
+    "full_code": "    protected function isRowCountApproximated(\n        array $currentTable,\n        bool $tableIsView\n    ): array {\n        $approxRows = false;\n        $showSuperscript = '';\n\n        // there is a null value in the ENGINE\n        // - when the table needs to be repaired, or\n        // - when it's a view\n        //  so ensure that we'll display \"in use\" below for a table\n        //  that needs to be repaired\n        if (isset($currentTable['TABLE_ROWS']) && ($currentTable['ENGINE'] != null || $tableIsView)) {\n            // InnoDB/TokuDB table: we did not get an accurate row count\n            $approxRows = ! $tableIsView\n                && in_array($currentTable['ENGINE'], ['CSV', 'InnoDB', 'TokuDB'])\n                && ! $currentTable['COUNTED'];\n\n            if ($tableIsView && $currentTable['TABLE_ROWS'] >= $GLOBALS['cfg']['MaxExactCountViews']) {\n                $approxRows = true;\n                $showSuperscript = Generator::showHint(\n                    Sanitize::sanitizeMessage(\n                        sprintf(\n                            __(\n                                'This view has at least this number of rows. Please refer to %sdocumentation%s.'\n                            ),\n                            '[doc@cfg_MaxExactCountViews]',\n                            '[/doc]'\n                        )\n                    )\n                );\n            }\n        }\n\n        return [\n            $approxRows,\n            $showSuperscript,\n        ];\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2022-3123",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct output of user-controlled data into HTML without proper sanitization.",
+                "trigger_condition": "An attacker manipulates user input that is reflected in the output, leading to the execution of arbitrary JavaScript code in the user's browser.",
+                "specific_code_behavior_causing_vulnerability": "The code directly concatenates user-controlled data into an HTML string without escaping special characters, allowing for potential XSS attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize any user-controlled data before including it in the HTML output. This can be achieved by using a function that escapes HTML special characters, ensuring that any potentially harmful content is rendered harmless."
+        },
+        {
+            "cve_id": "CVE-2023-32066",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-generated content without sanitization before rendering in the user interface.",
+                "trigger_condition": "A logged-in user enters notes containing JavaScript code, which is then displayed without escaping, leading to potential execution of malicious scripts in other users' browsers.",
+                "specific_code_behavior_causing_vulnerability": "The code directly sets the title of a field using user input without applying any escaping or sanitization, allowing for the injection of executable JavaScript code."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize user-generated content by applying a function that converts special characters to HTML entities before rendering it in the user interface. This ensures that any potentially harmful scripts are displayed as plain text rather than being executed."
+        },
+        {
+            "cve_id": "CVE-2020-17476",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-generated content in messages without sanitization.",
+                "trigger_condition": "An attacker submits a crafted user name containing malicious scripts or HTML tags, which are then included in messages sent to users.",
+                "specific_code_behavior_causing_vulnerability": "The code directly includes user names in messages without escaping special characters, allowing for the execution of injected scripts in the user's browser."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize all user-generated content by escaping special characters before including them in any output. This ensures that any potentially harmful scripts are rendered harmless and prevents XSS attacks."
+        },
+        {
+            "cve_id": "CVE-2019-14670",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-supplied data in session flash messages without sanitization.",
+                "trigger_condition": "An attacker inputs malicious JavaScript code into a user-controlled field, which is then stored and later rendered in the application, leading to execution of the script in the context of other users' browsers.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user-supplied data (bill name) in a session flash message without escaping it, allowing for potential XSS attacks when the message is displayed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize user-supplied data by escaping it before rendering it in the application. This ensures that any potentially harmful characters are converted to their HTML entity equivalents, preventing the execution of malicious scripts."
+        },
+        {
+            "cve_id": "CVE-2016-7788",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or parameterization.",
+                "trigger_condition": "An attacker manipulates input values that are used in SQL queries, leading to the execution of arbitrary SQL commands.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by directly appending user-controlled variables, allowing for potential SQL injection attacks if the input is not validated or escaped."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use prepared statements or parameterized queries when constructing SQL queries. This ensures that user input is treated as data rather than executable code, preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-8897",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user-controlled input into SQL queries without sanitization or validation.",
+                "trigger_condition": "An attacker manipulates the input value that is used in the SQL query, leading to potential SQL injection.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by directly appending user input to the query string, allowing for the execution of arbitrary SQL commands if the input is crafted maliciously."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use prepared statements or parameterized queries when constructing SQL queries. This ensures that user input is treated as data rather than executable code, preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-8900",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input leading to object injection vulnerabilities.",
+                "trigger_condition": "An attacker manipulates input to pass an arbitrary object to a function that does not validate the object's type or properties.",
+                "specific_code_behavior_causing_vulnerability": "The code directly accesses properties of the input object without validating its type or ensuring it has the expected properties, allowing for potential exploitation through crafted input."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement input validation to ensure that the input is of the expected type and contains the required properties. Additionally, error handling should be added to manage cases where the input does not meet these criteria, preventing unauthorized access and potential exploitation."
+        },
+        {
+            "cve_id": "CVE-2016-9087",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or validation.",
+                "trigger_condition": "An attacker manipulates input parameters to inject malicious SQL commands, leading to unauthorized data access or manipulation.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by directly appending user-controlled variables, which allows for SQL injection if those variables contain malicious input."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use prepared statements or parameterized queries when constructing SQL queries. This ensures that user input is treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2012-5339",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-generated content in HTML output without escaping.",
+                "trigger_condition": "An attacker manipulates the name of a database routine to include malicious scripts, which are then rendered in the browser when the page is viewed.",
+                "specific_code_behavior_causing_vulnerability": "The code directly outputs user-controlled data into the HTML without applying any escaping, allowing for the injection of arbitrary HTML or JavaScript."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to escape all user-generated content before including it in the HTML output. This can be achieved by using a function that converts special characters to their corresponding HTML entities, ensuring that any potentially malicious input is rendered harmless."
+        },
+        {
+            "cve_id": "CVE-2016-9020",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or parameterization.",
+                "trigger_condition": "An attacker manipulates the input value that is used in the SQL query, allowing for arbitrary SQL commands to be executed.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by directly appending user-controlled variables, which can lead to SQL injection if the input is not validated or sanitized."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use prepared statements or parameterized queries when constructing SQL commands. This ensures that user input is treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-7781",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or validation.",
+                "trigger_condition": "An attacker manipulates the input value that is used in the SQL query, leading to the execution of arbitrary SQL commands.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs a SQL query by directly appending user-controlled data (e.g., section parent ID) into the query string, which can be exploited for SQL injection."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use parameterized queries or prepared statements when constructing SQL queries. This ensures that user input is treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2015-5076",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-generated content in HTML output without adequate sanitization or encoding.",
+                "trigger_condition": "An attacker manipulates input parameters that are rendered in the HTML, leading to potential injection of malicious scripts.",
+                "specific_code_behavior_causing_vulnerability": "The code directly outputs user-controlled data into the HTML without proper encoding or validation, allowing for XSS attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to ensure that all user-generated content is properly sanitized and encoded before being rendered in the HTML. This includes using safe output functions that handle localization and prevent the injection of malicious scripts."
+        },
+        {
+            "cve_id": "CVE-2023-0995",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input when constructing SQL queries, leading to potential SQL injection vulnerabilities.",
+                "trigger_condition": "An attacker provides malicious input that is not properly validated or sanitized, allowing them to manipulate the SQL query structure.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries using user input without sufficient validation and sanitization, particularly in the handling of table names and other dynamic query components."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to ensure that all user inputs are properly validated and sanitized before being used in SQL queries. This includes using prepared statements or parameterized queries to prevent SQL injection and ensuring that variable names are correctly defined and used consistently throughout the code."
+        },
+        {
+            "cve_id": "CVE-2018-17552",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct string concatenation in SQL query construction without proper input sanitization.",
+                "trigger_condition": "An attacker provides specially crafted input that alters the intended SQL query, leading to unauthorized access or data manipulation.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by concatenating user input directly into the query string, which allows for SQL injection attacks if the input is not properly escaped."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use parameterized queries instead of direct string concatenation when constructing SQL queries. This ensures that user inputs are treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2023-24070",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input in the referer field, allowing for potential injection of malicious scripts.",
+                "trigger_condition": "An attacker manipulates the referer field in a request, leading to the possibility of executing arbitrary JavaScript in the user's browser.",
+                "specific_code_behavior_causing_vulnerability": "The code uses the referer value directly from user input without validation or sanitization, which can include untrusted data that may contain malicious scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to construct the referer URL explicitly using known safe values, such as the action and model ID. This ensures that the referer is predictable and does not allow for the inclusion of unvalidated user input, thereby preventing potential XSS attacks."
+        },
+        {
+            "cve_id": "CVE-2016-8899",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation and sanitization of user-controlled objects leading to potential object injection vulnerabilities.",
+                "trigger_condition": "An attacker manipulates the input to create or modify an object that is processed by the application, allowing unauthorized access or manipulation of application behavior.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses properties of the input object without validating its structure or content, which can lead to unauthorized access if the object is crafted maliciously."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate the structure and content of the input object before using it. This includes checking that the object is of the expected type and that it contains the necessary properties. Additionally, any user-controlled data should be sanitized to prevent malicious input from being processed."
+        },
+        {
+            "cve_id": "CVE-2015-5074",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Incomplete blacklist vulnerability in file upload handling that allows execution of arbitrary PHP code.",
+                "trigger_condition": "An authenticated user uploads a file with a .pht extension, which is not properly validated, leading to potential remote code execution.",
+                "specific_code_behavior_causing_vulnerability": "The code does not adequately restrict file types that can be uploaded, allowing dangerous file extensions that can be executed on the server."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement strict validation of file uploads by allowing only safe file types and explicitly rejecting any potentially harmful extensions. This ensures that the application does not accept files that could be executed as code."
+        },
+        {
+            "cve_id": "CVE-2022-4665",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improperly formatted SQL query leading to potential SQL injection vulnerabilities.",
+                "trigger_condition": "An attacker manipulates input that is concatenated into the SQL query, exploiting the lack of space in the query syntax.",
+                "specific_code_behavior_causing_vulnerability": "The SQL query concatenates a parameter without proper spacing, allowing for the possibility of injecting malicious SQL code if the input is not sanitized."
+            },
+            "solution_behavior": "To mitigate the vulnerability, ensure that SQL queries are properly formatted with appropriate spacing and syntax. Additionally, always use parameterized queries or prepared statements to handle user input safely, preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2021-4033",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper construction of form field names based on user input can lead to confusion and security vulnerabilities.",
+                "trigger_condition": "An attacker manipulates the input data used to generate form field names, potentially leading to Cross-Site Request Forgery (CSRF) attacks.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs form field names by concatenating a prefix with user-provided data without sufficient validation, which can result in incorrect field names and unexpected behavior."
+            },
+            "solution_behavior": "To mitigate the vulnerability, ensure that form field names are constructed based on validated and sanitized input. Default to using only the user-provided data when there is no prefix, and only concatenate with the prefix when it is valid. This approach prevents the creation of misleading field names and reduces the risk of CSRF attacks."
+        },
+        {
+            "cve_id": "CVE-2023-0455",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of uploaded file types, allowing potentially harmful files to be uploaded.",
+                "trigger_condition": "An attacker uploads a file with a valid extension but a malicious content type, bypassing security checks.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks the file extension against a list of valid extensions without verifying the MIME type, allowing for the upload of files that could execute harmful actions on the server."
+            },
+            "solution_behavior": "To mitigate the vulnerability, implement a dual validation mechanism that checks both the file extension and the MIME type against predefined lists of acceptable types. This ensures that only files that genuinely match the expected criteria are accepted for upload, reducing the risk of malicious file uploads."
+        }
+    ]
+}

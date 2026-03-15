@@ -1,0 +1,186 @@
+{
+    "id": 103,
+    "full_code": "    public function testInitRelationParamsDisabledTrackingOthersExist(): void\n    {\n        parent::setGlobalDbi();\n\n        $GLOBALS['db'] = '';\n        $GLOBALS['server'] = 1;\n        $GLOBALS['cfg']['Server'] = [];\n        $GLOBALS['cfg']['Server']['user'] = '';\n        $GLOBALS['cfg']['Server']['pmadb'] = 'PMA-storage';\n        $GLOBALS['cfg']['Server']['bookmarktable'] = '';\n        $GLOBALS['cfg']['Server']['relation'] = '';\n        $GLOBALS['cfg']['Server']['table_info'] = '';\n        $GLOBALS['cfg']['Server']['table_coords'] = '';\n        $GLOBALS['cfg']['Server']['column_info'] = '';\n        $GLOBALS['cfg']['Server']['pdf_pages'] = '';\n        $GLOBALS['cfg']['Server']['history'] = '';\n        $GLOBALS['cfg']['Server']['recent'] = '';\n        $GLOBALS['cfg']['Server']['favorite'] = 'pma__favorite_custom';\n        $GLOBALS['cfg']['Server']['table_uiprefs'] = '';\n        $GLOBALS['cfg']['Server']['tracking'] = false;\n        $GLOBALS['cfg']['Server']['userconfig'] = '';\n        $GLOBALS['cfg']['Server']['users'] = '';\n        $GLOBALS['cfg']['Server']['usergroups'] = '';\n        $GLOBALS['cfg']['Server']['navigationhiding'] = '';\n        $GLOBALS['cfg']['Server']['savedsearches'] = '';\n        $GLOBALS['cfg']['Server']['central_columns'] = '';\n        $GLOBALS['cfg']['Server']['designer_settings'] = '';\n        $GLOBALS['cfg']['Server']['export_templates'] = '';\n\n        $this->dummyDbi->removeDefaultResults();\n        $this->dummyDbi->addSelectDb('PMA-storage');\n        $this->dummyDbi->addResult(\n            'SHOW TABLES FROM `PMA-storage`;',\n            [\n                ['pma__favorite_custom'],\n            ],\n            ['Tables_in_PMA-storage']\n        );\n\n        $this->dummyDbi->addResult(\n            'SHOW TABLES FROM `PMA-storage`',\n            [\n                ['pma__favorite_custom'],\n            ],\n            ['Tables_in_PMA-storage']\n        );\n\n        $this->dummyDbi->addResult(\n            'SELECT NULL FROM `pma__favorite_custom` LIMIT 0',\n            [\n                ['NULL'],\n            ],\n            ['NULL']\n        );\n\n        $_SESSION['relation'] = [];\n        $_SESSION['tmpval'] = [];\n        $recentFavoriteTableInstances = (new ReflectionClass(RecentFavoriteTable::class))->getProperty('instances');\n        if (PHP_VERSION_ID < 80100) {\n            $recentFavoriteTableInstances->setAccessible(true);\n        }\n\n        $recentFavoriteTableInstances->setValue(null, []);\n\n        $relation = new Relation($this->dbi);\n        $relation->initRelationParamsCache();\n\n        self::assertArrayHasKey('relation', $_SESSION, 'The cache is expected to be filled because the custom override'\n        . 'was understood');\n\n        $this->assertAllQueriesConsumed();\n        $this->assertAllSelectsConsumed();\n\n        $this->dummyDbi->addSelectDb('PMA-storage');\n\n        $this->dummyDbi->addResult(\n            'SHOW TABLES FROM `PMA-storage`',\n            [\n                ['pma__favorite_custom'],\n            ],\n            ['Tables_in_PMA-storage']\n        );\n\n        $this->dummyDbi->addResult(\n            'SELECT NULL FROM `pma__favorite_custom` LIMIT 0',\n            [\n                ['NULL'],\n            ],\n            ['NULL']\n        );\n\n        /** @psalm-suppress EmptyArrayAccess */\n        unset($_SESSION['relation'][$GLOBALS['server']]);\n        $relationData = $relation->getRelationParameters();\n        $this->assertAllSelectsConsumed();\n\n        $relationParameters = RelationParameters::fromArray([\n            'db' => 'PMA-storage',\n            'trackingwork' => false,\n            'tracking' => false,\n            'favorite' => 'pma__favorite_custom',\n            'favoritework' => true,\n        ]);\n        self::assertSame($relationParameters->toArray(), $relationData->toArray());\n        self::assertNull($relationParameters->trackingFeature, 'The feature should not be enabled');\n\n        self::assertSame([\n            'user' => '',\n            'pmadb' => 'PMA-storage',\n            'bookmarktable' => '',\n            'relation' => '',\n            'table_info' => '',\n            'table_coords' => '',\n            'column_info' => '',\n            'pdf_pages' => '',\n            'history' => '',\n            'recent' => '',\n            'favorite' => 'pma__favorite_custom',\n            'table_uiprefs' => '',\n            'tracking' => false,\n            'userconfig' => '',\n            'users' => '',\n            'usergroups' => '',\n            'navigationhiding' => '',\n            'savedsearches' => '',\n            'central_columns' => '',\n            'designer_settings' => '',\n            'export_templates' => '',\n        ], $GLOBALS['cfg']['Server']);\n\n        $this->assertAllQueriesConsumed();\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2016-5097",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of session tokens in URLs during navigation.",
+                "trigger_condition": "Tokens are included in query strings when redirecting users, which can be logged or intercepted by attackers.",
+                "specific_code_behavior_causing_vulnerability": "The code does not strip sensitive tokens from the URL before performing external navigation, leading to potential exposure of sensitive session information."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that sensitive tokens are not included in URLs during redirects. This can be achieved by implementing a mechanism that cleans the URL of any session identifiers or tokens before sending the response to the client."
+        },
+        {
+            "cve_id": "CVE-2015-5074",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Incomplete blacklist vulnerability in file upload handling allows execution of arbitrary code.",
+                "trigger_condition": "An authenticated user uploads a file with a .pht extension, which is not properly validated or restricted, leading to potential remote code execution.",
+                "specific_code_behavior_causing_vulnerability": "The code does not adequately validate file extensions or sanitize input, allowing malicious files to be uploaded and executed on the server."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement strict validation of file types during the upload process, ensuring that only safe and expected file extensions are allowed. Additionally, any links generated in the application should be constructed securely to prevent exposure to malicious actions, and unnecessary parameters should be removed to limit the attack surface."
+        },
+        {
+            "cve_id": "CVE-2016-10096",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper session management leading to potential session fixation or hijacking vulnerabilities.",
+                "trigger_condition": "The session is started without ensuring that the storage handler is properly initialized, allowing attackers to manipulate session data.",
+                "specific_code_behavior_causing_vulnerability": "The code checks if the session save handler is active after calling session_start(), but does not verify if the storage handler is correctly configured, which can lead to inconsistencies in session management."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that the session is managed securely by verifying that the storage handler is properly initialized before starting the session. Remove any misleading assertions that could give a false sense of security regarding session management."
+        },
+        {
+            "cve_id": "CVE-2015-5076",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input in email content generation, leading to potential Cross-Site Scripting (XSS) vulnerabilities.",
+                "trigger_condition": "An attacker manipulates user-controlled data, such as email addresses or unsubscribe link text, which is then directly included in the email content without proper sanitization.",
+                "specific_code_behavior_causing_vulnerability": "The code directly incorporates user input into the email content and URL parameters without adequate validation or encoding, allowing for the injection of malicious scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to sanitize and validate all user input before incorporating it into the email content. This includes using proper encoding for URLs and controlling the text used in links to prevent the execution of any injected scripts."
+        },
+        {
+            "cve_id": "CVE-2023-3394",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate session management during user authentication processes.",
+                "trigger_condition": "An attacker can set or predict the session ID before a user logs in, allowing them to hijack the session after authentication.",
+                "specific_code_behavior_causing_vulnerability": "The code uses a session management class that does not regenerate session IDs upon user login, leaving the application vulnerable to session fixation attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a session management system that regenerates session IDs upon user authentication. This ensures that each user session is unique and unpredictable, thereby preventing session fixation attacks."
+        },
+        {
+            "cve_id": "CVE-2016-8897",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input parameters leading to SQL injection vulnerabilities.",
+                "trigger_condition": "User-supplied input is directly used in SQL queries without adequate validation or sanitization, allowing an attacker to manipulate the SQL command.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries using user input parameters without employing prepared statements or parameterized queries, making it susceptible to SQL injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to use prepared statements or parameterized queries when constructing SQL commands. This ensures that user input is treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2021-3603",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of function name collisions in a validation mechanism.",
+                "trigger_condition": "A user-defined function with the same name as a built-in validator exists in the global namespace, leading to unintended execution of the user-defined function instead of the intended built-in validator.",
+                "specific_code_behavior_causing_vulnerability": "The code allows the use of simple strings as validator function names, which can be overridden by user-defined functions in the global scope, resulting in potential arbitrary code execution."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to disallow the use of simple strings as validator function names and ensure that any non-existent validator names fall back to built-in validators. This prevents the execution of unintended global functions and maintains the integrity of the validation process."
+        },
+        {
+            "cve_id": "CVE-2016-9020",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input parameters in SQL queries.",
+                "trigger_condition": "An attacker manipulates input parameters such as 'limit' or 'order' to inject arbitrary SQL commands, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user-supplied input in SQL queries without validation or sanitization, allowing for the execution of malicious SQL code."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user inputs before using them in SQL queries. This includes checking input against a whitelist of acceptable values and using prepared statements or parameterized queries to ensure that user inputs are treated as data rather than executable code."
+        },
+        {
+            "cve_id": "CVE-2020-17476",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-generated content in notification messages.",
+                "trigger_condition": "An attacker can control or influence the content of the operator's name, which is displayed in a notification message.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses the operator's name in the notification message without any sanitization, allowing for the injection of malicious scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize any user-generated content before rendering it in the output. This can be achieved by applying a function that converts special characters to HTML entities, ensuring that any HTML or JavaScript code is neutralized and cannot be executed in the user's browser."
+        },
+        {
+            "cve_id": "CVE-2016-8900",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of object state due to incorrect code structure.",
+                "trigger_condition": "An attacker manipulates input parameters that are not properly validated or sanitized, leading to unintended execution paths.",
+                "specific_code_behavior_causing_vulnerability": "The presence of an extra closing brace in the code leads to premature termination of a code block, which can allow for unexpected behavior and potential object injection vulnerabilities."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that the code structure is correct by removing any unnecessary or misplaced closing braces. This will help maintain the intended logical flow of the program and prevent unintended execution paths that could be exploited."
+        },
+        {
+            "cve_id": "CVE-2016-5730",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper validation of user input leading to potential information disclosure through error messages.",
+                "trigger_condition": "An attacker provides unexpected or empty values for critical configuration parameters, which the code does not adequately validate before using them.",
+                "specific_code_behavior_causing_vulnerability": "The code uses strict equality checks to determine if configuration parameters are empty, which may not handle all falsy values correctly, allowing the function to proceed with invalid data and potentially expose sensitive information in error messages."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use a more robust method of input validation, such as the empty() function, to check for empty values. This ensures that all falsy values are treated as empty, preventing the function from executing with invalid data and reducing the risk of information disclosure through error messages."
+        },
+        {
+            "cve_id": "CVE-2015-6830",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of CAPTCHA responses during the authentication process.",
+                "trigger_condition": "An attacker provides a correct response to a single CAPTCHA challenge, allowing them to bypass multiple CAPTCHA checks intended to prevent brute-force credential guessing.",
+                "specific_code_behavior_causing_vulnerability": "The code incorrectly retains a session variable indicating a valid CAPTCHA response from previous attempts, which allows attackers to reuse this response for subsequent login attempts without needing to solve a new CAPTCHA."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that the system requires a fresh CAPTCHA response for each authentication attempt. This can be achieved by removing any session variables that indicate a valid CAPTCHA response from previous attempts and properly configuring CAPTCHA keys to enforce the requirement for multiple challenges."
+        },
+        {
+            "cve_id": "CVE-2023-4005",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient session expiration management in the application.",
+                "trigger_condition": "A user remains logged in without proper session expiration, allowing potential unauthorized access if the session is hijacked.",
+                "specific_code_behavior_causing_vulnerability": "The code does not properly manage user sessions, failing to implement a mechanism that ensures sessions are expired after a certain period of inactivity or upon user logout."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a robust session management system that includes automatic session expiration after a defined period of inactivity and ensures that sessions are invalidated upon user logout. This will help prevent unauthorized access and enhance overall application security."
+        },
+        {
+            "cve_id": "CVE-2022-27157",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insecure deserialization of user-controlled data without restrictions on allowed classes.",
+                "trigger_condition": "An attacker manipulates the serialized data being deserialized, potentially injecting malicious objects or data.",
+                "specific_code_behavior_causing_vulnerability": "The code uses unserialize() without any restrictions, allowing for the instantiation of arbitrary classes, which can lead to remote code execution or data manipulation."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to restrict the deserialization process by using options that prevent the instantiation of any classes. Additionally, implement robust error handling to gracefully manage any issues that arise during deserialization, ensuring that only valid data is processed."
+        },
+        {
+            "cve_id": "CVE-2023-4649",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-controlled input when setting critical application paths.",
+                "trigger_condition": "An attacker manipulates the input that defines the application's document root, potentially leading to session fixation or path traversal vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code uses a method that does not adequately sanitize or validate the input for setting the document root, allowing for exploitation through crafted input."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a more secure method for setting the document root that includes proper input validation and sanitization. This can be achieved by using regular expressions to ensure that the input is treated as a literal string and does not allow for unintended path manipulations."
+        },
+        {
+            "cve_id": "CVE-2021-3692",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Use of predictable algorithms in random number generation, leading to insufficient randomness.",
+                "trigger_condition": "The application relies on a random number generator that may not meet security standards, especially in environments where certain libraries or conditions are not satisfied.",
+                "specific_code_behavior_causing_vulnerability": "The code includes a condition that skips tests if specific library versions are not present, allowing the application to fall back on potentially insecure random number generation methods."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to remove any conditions that allow the application to skip security checks or tests related to random number generation. The application should rely solely on secure and robust methods for generating random numbers, ensuring that all environments use a secure random number generator that meets cryptographic standards."
+        },
+        {
+            "cve_id": "CVE-2021-3689",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Use of predictable algorithms in random number generation can lead to insecure cryptographic operations.",
+                "trigger_condition": "The application falls back on less secure random number generation methods when certain conditions are not met, potentially allowing attackers to predict generated values.",
+                "specific_code_behavior_causing_vulnerability": "The code includes a condition that skips tests for random key generation if specific libraries or environments are not available, which may lead to reliance on insecure randomness."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that all tests for random key generation are executed regardless of the environment. This will enforce the use of secure random number generation methods and eliminate reliance on potentially insecure alternatives."
+        },
+        {
+            "cve_id": "CVE-2016-8899",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-controlled data leading to object injection vulnerabilities.",
+                "trigger_condition": "An attacker provides specially crafted input that is serialized and processed by the application, allowing for the injection of malicious objects.",
+                "specific_code_behavior_causing_vulnerability": "The code serializes user-controlled objects or arrays without validation, which can lead to the execution of arbitrary code or manipulation of application behavior."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to avoid serializing user-controlled data without proper validation and sanitization. Additionally, remove any debugging code that may expose sensitive information, ensuring that the application does not leak internal state details that could be exploited."
+        },
+        {
+            "cve_id": "CVE-2023-6599",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inconsistent data structure used for media handling, leading to potential errors and unhandled exceptions.",
+                "trigger_condition": "The application attempts to save or retrieve media data using an incorrect key, resulting in failure to process the media correctly.",
+                "specific_code_behavior_causing_vulnerability": "The code uses the key 'src' instead of the expected key 'filename' when defining media attributes, which can lead to improper handling of media data and potential security issues."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use the correct key 'filename' instead of 'src' in the data structure for media handling. This ensures that the application processes media data consistently and correctly, allowing for proper error handling and reducing the risk of vulnerabilities."
+        },
+        {
+            "cve_id": "CVE-2022-1177",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate access control mechanisms for sensitive patient data.",
+                "trigger_condition": "An unauthorized user role, such as an accounting user, attempts to access patient reports that should be restricted.",
+                "specific_code_behavior_causing_vulnerability": "The code grants excessive permissions to user roles, allowing them to access sensitive patient information that they should not be able to view or download."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to review and restrict the access control lists for user roles, ensuring that only authorized users can access sensitive patient data. This involves removing permissions that allow unauthorized roles to view or download patient reports."
+        }
+    ]
+}

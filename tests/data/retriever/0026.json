@@ -1,0 +1,186 @@
+{
+    "id": 26,
+    "full_code": "    public static function downloadHeader(\n        string $filename,\n        string $mimetype,\n        int $length = 0,\n        bool $noCache = true\n    ): void {\n        $headers = self::getDownloadHeaders($filename, $mimetype, $length, $noCache);\n\n        // The default output in PMA uses gzip,\n        // so if we want to output uncompressed file, we should reset the encoding.\n        // See PHP bug https://github.com/php/php-src/issues/8218\n        header_remove('Content-Encoding');\n\n        foreach ($headers as $name => $value) {\n            header(sprintf('%s: %s', $name, $value));\n        }\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2014-125090",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input leading to unsanitized output in error messages.",
+                "trigger_condition": "An attacker manipulates the input to the file download function, causing the application to output potentially malicious content in the error message.",
+                "specific_code_behavior_causing_vulnerability": "The code directly includes user-controlled input in the output without sanitization, allowing for the injection of HTML or JavaScript code."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize any user-controlled input before including it in output. This can be achieved by using functions that convert special characters to their corresponding HTML entities, ensuring that any potentially harmful content is displayed as plain text rather than executed in the browser."
+        },
+        {
+            "cve_id": "CVE-2016-10096",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of HTTP response headers related to content encoding and length.",
+                "trigger_condition": "An attacker sends a response with manipulated content-encoding or content-length headers, which are not properly validated or preserved, leading to potential data integrity issues.",
+                "specific_code_behavior_causing_vulnerability": "The code uses loose comparison operators and removes original headers without preserving their values, which can lead to incorrect assumptions about the response data and potential security vulnerabilities."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use strict comparison operators when checking header values and to preserve original header values by storing them in new headers before any modifications are made. This ensures that the integrity of the response is maintained and reduces the risk of security issues related to header manipulation."
+        },
+        {
+            "cve_id": "CVE-2023-4878",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of user-supplied URLs leading to potential Server-Side Request Forgery (SSRF) attacks.",
+                "trigger_condition": "An attacker provides a malicious URL that points to internal resources or services, allowing unauthorized access to sensitive data or services.",
+                "specific_code_behavior_causing_vulnerability": "The code allows any URL that passes initial validation checks without ensuring that the resolved IP address does not point to reserved or private ranges, thus enabling potential access to internal services."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate the resolved IP address of the host against reserved and private IP ranges. This ensures that the application only processes requests to safe, publicly accessible URLs and prevents access to internal services that could be exploited by an attacker."
+        },
+        {
+            "cve_id": "CVE-2019-14749",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Directly exporting unvalidated user input into a CSV format without sanitization.",
+                "trigger_condition": "A user inputs data that starts with characters interpreted as formulas (e.g., '=', '-', '+', '@'), which can be executed by spreadsheet applications when the CSV is opened.",
+                "specific_code_behavior_causing_vulnerability": "The code writes user input directly to the CSV output without checking for potentially harmful characters, allowing malicious formulas to be executed in spreadsheet applications."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize user input by checking for characters that may indicate a formula and prefixing such inputs with a single quote. This ensures that spreadsheet applications treat the input as plain text rather than executing it as a formula."
+        },
+        {
+            "cve_id": "CVE-2021-41750",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of user-supplied file names and types, allowing for the inclusion of potentially malicious content.",
+                "trigger_condition": "An attacker crafts a request with a base64 encoded URL pointing to a malicious web page and a file name that includes an executable script, such as an SVG file.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks if the file extension is empty or included in a list of allowed extensions, failing to specifically disallow dangerous file types like SVG that can contain executable scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement stricter validation of file types by explicitly disallowing file extensions that can contain executable content, such as SVG. This ensures that the application does not process potentially harmful files and reduces the risk of cross-site scripting attacks."
+        },
+        {
+            "cve_id": "CVE-2022-31091",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of URI changes during redirect handling, leading to potential exposure of sensitive headers.",
+                "trigger_condition": "A redirect response is received that changes the origin of the request (host, scheme, or port), allowing sensitive information to be sent to an unintended destination.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks for differences in the host of the original request and the redirected request, failing to account for changes in scheme or port, which can result in sensitive headers being retained and sent to a different origin."
+            },
+            "solution_behavior": "To fix the vulnerability, implement a comprehensive check for cross-origin requests by validating changes in the host, scheme, and port of the URI during redirect handling. If a cross-origin request is detected, remove sensitive headers such as Authorization and Cookie from the request before proceeding with the redirect."
+        },
+        {
+            "cve_id": "CVE-2023-4879",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of user-provided URLs leading to potential exploitation through malicious links.",
+                "trigger_condition": "An attacker submits a crafted URL that resolves to a private or reserved IP address, allowing unauthorized access to internal resources or execution of malicious scripts.",
+                "specific_code_behavior_causing_vulnerability": "The code allows URLs that can resolve to IP addresses without validating whether those addresses are public or safe, and it does not check if the host part of the URL is empty or unresolved."
+            },
+            "solution_behavior": "To mitigate the vulnerability, implement strict validation of user-provided URLs by checking that the host is not empty and that it resolves to a public IP address. Additionally, ensure that the resolved IP address does not belong to private or reserved ranges before processing the URL further."
+        },
+        {
+            "cve_id": "CVE-2022-0848",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of file uploads allows potentially dangerous file types to be uploaded.",
+                "trigger_condition": "An attacker uploads a file with a dangerous extension that is not properly checked, leading to the possibility of executing malicious code on the server.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks for the presence of '.php' in the filename, which can be easily bypassed by using alternative naming conventions for malicious files."
+            },
+            "solution_behavior": "To mitigate the vulnerability, implement a comprehensive validation mechanism that checks uploaded files against a predefined list of unsafe file extensions. This ensures that any file with a dangerous extension is rejected, thereby preventing the upload of potentially executable files."
+        },
+        {
+            "cve_id": "CVE-2019-14748",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of file types during file upload, allowing potentially malicious files to be served inline.",
+                "trigger_condition": "A user uploads a file with a potentially harmful content type (e.g., HTML) that is served with a Content-Disposition of inline, leading to execution in the user's browser.",
+                "specific_code_behavior_causing_vulnerability": "The code defaults the Content-Disposition to inline without checking the file type, allowing any file to be displayed directly in the browser, which can lead to XSS attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate the file type before setting the Content-Disposition header. Only allow inline display for safe file types, such as images, and default to attachment for all other file types. This prevents the execution of potentially harmful content in the user's browser."
+        },
+        {
+            "cve_id": "CVE-2021-44674",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct use of user-controlled input for file paths without validation or sanitization.",
+                "trigger_condition": "An authenticated attacker manipulates the filename to include directory traversal sequences, allowing access to files outside the intended directory.",
+                "specific_code_behavior_causing_vulnerability": "The code directly reads the filename from user input and uses it in file operations without ensuring it is restricted to a specific directory, leading to potential unauthorized file access."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to restrict file access to a specific directory by concatenating the base directory path with the sanitized filename. Use functions like basename to ensure that only the base filename is used, preventing directory traversal attacks and ensuring that only files from the designated directory can be accessed."
+        },
+        {
+            "cve_id": "CVE-2020-11529",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation and sanitization of user-controlled input for redirect routes.",
+                "trigger_condition": "An attacker crafts a malicious route that is accepted by the application, leading to an arbitrary external redirect.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses the user-provided route for redirection without proper sanitization, allowing for potential external URLs to be processed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to sanitize the user-controlled input by cleaning the route before processing it for redirection. This ensures that only valid internal routes are accepted, preventing arbitrary external redirects and enhancing the application's security."
+        },
+        {
+            "cve_id": "CVE-2016-7781",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input without validation or sanitization before database operations.",
+                "trigger_condition": "An attacker submits crafted input through parameters that are directly used in SQL queries, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user-supplied parameters in database operations without validating or sanitizing them, allowing for arbitrary SQL commands to be executed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate user input to ensure it meets expected formats and types, sanitize the input to remove any potentially harmful characters, and use prepared statements for all database queries involving user input. This ensures that user input is treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2023-6130",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper validation of user input leading to path traversal vulnerabilities.",
+                "trigger_condition": "An attacker manipulates file paths or file extensions in a way that allows access to unauthorized files on the server.",
+                "specific_code_behavior_causing_vulnerability": "The code checks for allowed file extensions without ensuring that the input is safe and valid, allowing potential exploitation through crafted input."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement strict validation of user input by checking that file extensions are not only present but also explicitly match a predefined list of allowed values. This ensures that only safe and expected data is processed, preventing unauthorized access to files."
+        },
+        {
+            "cve_id": "CVE-2015-6567",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Lack of validation for file types during file upload process.",
+                "trigger_condition": "A registered user with upload permissions attempts to upload a file without restrictions on file extensions.",
+                "specific_code_behavior_causing_vulnerability": "The code does not check the file extension of the uploaded file, allowing potentially harmful files (e.g., PHP scripts) to be uploaded and executed on the server."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement validation for the file extensions of uploaded files. This involves checking the file extension against a list of disallowed types and rejecting any uploads that match these extensions. This ensures that only safe file types can be uploaded, preventing the execution of malicious code."
+        },
+        {
+            "cve_id": "CVE-2023-6849",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input when constructing ZIP file headers, leading to potential server-side request forgery vulnerabilities.",
+                "trigger_condition": "An attacker manipulates the input path used in the ZIP file creation process, which could allow them to control the output and potentially exploit the server.",
+                "specific_code_behavior_causing_vulnerability": "The code does not adequately validate or sanitize the input used for constructing ZIP file headers, which can lead to unintended consequences when the ZIP file is processed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement proper input validation and sanitization for any user-provided data used in constructing ZIP file headers. This ensures that the application does not inadvertently process malicious input that could lead to server-side request forgery or other security issues."
+        },
+        {
+            "cve_id": "CVE-2016-7788",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input without validation or sanitization before using it in SQL queries.",
+                "trigger_condition": "An attacker provides malicious input through the user ID parameter, which is then directly used in SQL queries, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code instantiates a user object using a user ID derived from user input without validating or sanitizing it, allowing for arbitrary SQL commands to be executed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate the user ID parameter to ensure it is a valid and expected format, such as an integer. Additionally, any SQL queries that utilize this user ID should use prepared statements or parameterized queries to prevent SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2023-4652",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input when processing file uploads, leading to potential XSS vulnerabilities.",
+                "trigger_condition": "An attacker submits a crafted URL that points to a malicious file, which is then processed without adequate validation or sanitization.",
+                "specific_code_behavior_causing_vulnerability": "The code extracts filenames and allows file uploads based on user input without sufficient checks on the content or the filename, which can lead to the execution of malicious scripts if the uploaded file is later displayed or executed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement strict sanitization of user input, particularly filenames, and to validate the content of uploaded files before processing. Additionally, remove any checks that could allow harmful content to be uploaded based on file extensions, and ensure that error handling is clear and prevents further processing of invalid data."
+        },
+        {
+            "cve_id": "CVE-2023-37306",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper validation and handling of uploaded certificate files, allowing for potential exploitation through malicious file uploads.",
+                "trigger_condition": "An attacker uploads a file with an invalid or unexpected extension, or a file that is not a valid certificate, leading to sensitive information exposure or application instability.",
+                "specific_code_behavior_causing_vulnerability": "The code does not adequately check if the uploaded file is a valid uploaded file, does not validate the file extension against a whitelist, and lacks checks to ensure the file is a valid X.509 certificate."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement checks to ensure that the uploaded file is indeed an uploaded file, validate the file extension against a predefined list of allowed extensions, and verify that the file is a valid X.509 certificate. This will help prevent the processing of malicious or malformed files and enhance the overall security of the application."
+        },
+        {
+            "cve_id": "CVE-2023-6125",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of user input leading to potential code injection vulnerabilities.",
+                "trigger_condition": "An attacker provides a malicious or unexpected value for a file extension, which is then processed without proper validation.",
+                "specific_code_behavior_causing_vulnerability": "The code checks if a file extension is in an allowed list without first ensuring that the extension is not empty, allowing for the possibility of processing invalid or harmful input."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate that the file extension is not empty before checking if it is in the allowed list. This ensures that only valid and expected input is processed, reducing the risk of code injection."
+        },
+        {
+            "cve_id": "CVE-2013-2093",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper sanitization of user input before passing it to a shell command.",
+                "trigger_condition": "An attacker provides specially crafted input that exploits the lack of adequate input validation, leading to arbitrary command execution.",
+                "specific_code_behavior_causing_vulnerability": "The code uses string manipulation functions to escape quotes in user input, which is insufficient to prevent command injection attacks. This allows attackers to inject additional commands or arguments."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use a dedicated function designed for safely escaping shell arguments. This ensures that any special characters in user input are properly handled, preventing command injection vulnerabilities. Additionally, implement robust error handling to capture and respond to execution errors effectively."
+        }
+    ]
+}

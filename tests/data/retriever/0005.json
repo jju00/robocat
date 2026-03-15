@@ -1,0 +1,186 @@
+{
+    "id": 5,
+    "full_code": "    public static function checkTokenRequestParam(): void\n    {\n        global $token_mismatch, $token_provided;\n\n        $token_mismatch = true;\n        $token_provided = false;\n\n        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {\n            return;\n        }\n\n        if (isset($_POST['token']) && is_scalar($_POST['token']) && strlen((string) $_POST['token']) > 0) {\n            $token_provided = true;\n            $token_mismatch = ! @hash_equals($_SESSION[' PMA_token '], (string) $_POST['token']);\n        }\n\n        if (! $token_mismatch) {\n            return;\n        }\n\n        // Warn in case the mismatch is result of failed setting of session cookie\n        if (isset($_POST['set_session']) && $_POST['set_session'] !== session_id()) {\n            trigger_error(\n                __(\n                    'Failed to set session cookie. Maybe you are using HTTP instead of HTTPS to access phpMyAdmin.'\n                ),\n                PHP_VERSION_ID < 80400 ? E_USER_ERROR : E_USER_WARNING\n            );\n        }\n\n        /**\n         * We don't allow any POST operation parameters if the token is mismatched\n         * or is not provided.\n         */\n        $allowList = ['ajax_request'];\n        Sanitize::removeRequestVars($allowList);\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2020-24085",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of user input parameters, specifically the 'path' parameter.",
+                "trigger_condition": "An attacker submits a crafted POST request containing malicious JavaScript code in the 'path' parameter, which is not properly validated before being processed.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses the 'path' parameter from the request data without adequate checks for its structure or content, allowing potentially harmful scripts to be executed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement proper validation checks for the 'path' parameter. This includes verifying that the parameter exists and is in the expected format before processing it. Additionally, throw an exception if the parameter is missing or empty to prevent further execution with invalid data."
+        },
+        {
+            "cve_id": "CVE-2015-8379",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of request methods in the CSRF protection mechanism.",
+                "trigger_condition": "An attacker manipulates the _method parameter in a request, potentially bypassing CSRF checks.",
+                "specific_code_behavior_causing_vulnerability": "The code sets the request method directly in the $_SERVER superglobal, which can be easily manipulated and does not accurately reflect a legitimate HTTP request environment."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to set the request method within the request object itself using an appropriate environment parameter. This ensures that the request is treated as a legitimate HTTP request, allowing the CSRF protection mechanism to function correctly and preventing potential bypassing of security checks."
+        },
+        {
+            "cve_id": "CVE-2019-18986",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Distinct error messages are returned for different failure conditions in the password reset functionality.",
+                "trigger_condition": "An attacker attempts to guess valid usernames by exploiting the 'forgot password' feature, receiving specific feedback based on the validity of the username.",
+                "specific_code_behavior_causing_vulnerability": "The code provides unique error messages for various user account states (inactive, no email, unknown user), allowing attackers to infer the existence of usernames based on the responses."
+            },
+            "solution_behavior": "To mitigate the vulnerability, implement a uniform error handling mechanism that returns a generic error message for all failure conditions related to username validation. This prevents attackers from gaining insights into user account statuses while still allowing legitimate users to use the password reset functionality."
+        },
+        {
+            "cve_id": "CVE-2022-31090",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of sensitive information in HTTP requests during redirects.",
+                "trigger_condition": "A redirect response is received that points to a different origin (host, scheme, or port) while the request includes an Authorization header.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks for differences in the host of the URI when deciding whether to unset the Authorization header, failing to account for changes in scheme or port, which could lead to sensitive information being sent to an unintended server."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a comprehensive check that determines if the redirect is cross-origin by evaluating the host, scheme, and port of the URIs. If a cross-origin redirect is detected, the code should unset any Authorization headers to prevent sensitive information from being sent to a different origin."
+        },
+        {
+            "cve_id": "CVE-2021-4241",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "The use of a predictable delimiter in cookie data leads to potential session hijacking.",
+                "trigger_condition": "An attacker manipulates the cookie format to create a valid authentication token, bypassing security checks.",
+                "specific_code_behavior_causing_vulnerability": "The code uses a colon as a delimiter in the cookie data, allowing attackers to exploit the predictable structure to forge valid cookies."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to change the delimiter used in the cookie data to a less predictable character. Additionally, the hash generation should be updated to reflect this new delimiter, ensuring that the integrity of the cookie is maintained and making it more difficult for attackers to forge valid authentication tokens."
+        },
+        {
+            "cve_id": "CVE-2022-31091",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of URI changes during redirect handling, leading to potential exposure of sensitive headers.",
+                "trigger_condition": "A redirect response is received that changes the origin of the request (host, scheme, or port), allowing sensitive information to be sent to an unintended destination.",
+                "specific_code_behavior_causing_vulnerability": "The code only checks for differences in the host of the original request and the redirected request, failing to account for changes in scheme or port, which can result in sensitive headers being retained and sent to a different origin."
+            },
+            "solution_behavior": "To fix the vulnerability, implement a comprehensive check for cross-origin requests by validating changes in the host, scheme, and port of the URI during redirect handling. If a cross-origin request is detected, remove sensitive headers such as Authorization and Cookie from the request before proceeding with the redirect."
+        },
+        {
+            "cve_id": "CVE-2016-10096",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper use of loose comparisons in path matching logic, which can lead to unexpected behavior due to type juggling.",
+                "trigger_condition": "An attacker manipulates input values that could be loosely compared to expected string values, potentially leading to incorrect path matching and unauthorized access.",
+                "specific_code_behavior_causing_vulnerability": "The code uses the loose equality operator (==) for comparisons, allowing for type coercion that can result in unintended matches or logic flow."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use strict equality comparisons (===) instead of loose comparisons (==) in the path matching logic. This ensures that both the value and type of the operands are checked, preventing unexpected behavior due to type juggling."
+        },
+        {
+            "cve_id": "CVE-2021-41560",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct usage of user-supplied filenames without validation or sanitization.",
+                "trigger_condition": "An attacker uploads a file with a malicious name, potentially leading to arbitrary code execution if the file is later accessed or executed.",
+                "specific_code_behavior_causing_vulnerability": "The code assigns the uploaded file's name directly from the user input, allowing for the possibility of executing harmful scripts or binaries."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a filename sanitization function that cleanses the user-supplied filename by removing or altering any potentially dangerous characters or extensions. This ensures that only safe filenames are accepted, preventing the execution of arbitrary code."
+        },
+        {
+            "cve_id": "CVE-2022-1036",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Lack of maximum length validation for user input fields, specifically passwords.",
+                "trigger_condition": "An attacker submits a password that exceeds the expected length, leading to memory corruption or integer overflow.",
+                "specific_code_behavior_causing_vulnerability": "The code allows for an unrestricted length of the password input, which can lead to buffer overflows or memory corruption due to excessive memory allocation."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a maximum length constraint on the password input field. This ensures that any password submitted by the user is within a safe and reasonable limit, preventing potential memory corruption or integer overflow issues."
+        },
+        {
+            "cve_id": "CVE-2015-6567",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of file types during file rename operations.",
+                "trigger_condition": "A user with access to the file manager attempts to rename a file to a potentially executable file type, such as PHP.",
+                "specific_code_behavior_causing_vulnerability": "The code allows renaming files without checking if the new name corresponds to a dangerous file extension, which could lead to the execution of arbitrary PHP code if the renamed file is accessed."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a check that validates the file extension of the new name being proposed for the rename operation. This check should prevent renaming files to extensions that are associated with executable code, such as PHP, thereby reducing the risk of unauthorized code execution."
+        },
+        {
+            "cve_id": "CVE-2015-6568",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of file extensions during file renaming operations.",
+                "trigger_condition": "A registered user with file upload permissions renames a file to an executable extension, such as .php, allowing for potential code execution.",
+                "specific_code_behavior_causing_vulnerability": "The code does not check the new file name's extension before performing the rename operation, allowing users to change file types to potentially harmful formats."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a check that prevents users from renaming files to certain dangerous extensions, such as .php, .php3, .php4, and .inc. This ensures that the application does not allow the execution of arbitrary code through renamed files."
+        },
+        {
+            "cve_id": "CVE-2015-10077",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper sanitization of user input before using it in SQL queries.",
+                "trigger_condition": "An attacker provides specially crafted input that is not adequately sanitized, leading to the possibility of executing arbitrary SQL commands.",
+                "specific_code_behavior_causing_vulnerability": "The code uses a function intended for XML conversion to sanitize input for SQL queries, which does not provide sufficient protection against SQL injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use a function specifically designed for SQL input sanitization before using user input in SQL queries. This ensures that the input is properly escaped and safe to use, preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2015-3903",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Disabling SSL certificate verification allows for potential man-in-the-middle attacks.",
+                "trigger_condition": "An attacker intercepts the communication between the client and server, presenting a fraudulent SSL certificate.",
+                "specific_code_behavior_causing_vulnerability": "The code sets options to disable SSL verification, which means it does not check if the server's SSL certificate is valid or matches the expected hostname."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to enable SSL certificate verification by removing the options that disable host and peer verification. This ensures that the client only communicates with trusted servers and protects against man-in-the-middle attacks."
+        },
+        {
+            "cve_id": "CVE-2021-32693",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate isolation of authentication tokens across multiple firewalls in an application.",
+                "trigger_condition": "An application defines multiple firewalls, allowing a user authenticated in one part of the application to be considered authenticated in other parts.",
+                "specific_code_behavior_causing_vulnerability": "The code does not verify that the session associated with the authentication token matches the specific firewall context, leading to potential unauthorized access across different application areas."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to ensure that the session associated with the authentication token is validated against the specific firewall context before allowing access. This prevents tokens from one firewall being used in another, thereby enhancing security."
+        },
+        {
+            "cve_id": "CVE-2015-5074",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate protection against file upload vulnerabilities due to insufficient validation of file types.",
+                "trigger_condition": "An authenticated user uploads a file with a .pht extension, which is not properly restricted, allowing execution of arbitrary PHP code.",
+                "specific_code_behavior_causing_vulnerability": "The code does not implement a comprehensive validation mechanism to restrict file uploads based on their extensions, leading to the possibility of executing malicious code."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement strict validation checks for file uploads, ensuring that only allowed file types are accepted. This includes rejecting any files with potentially dangerous extensions, such as .pht, to prevent the execution of arbitrary code."
+        },
+        {
+            "cve_id": "CVE-2015-8033",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insecure handling of password reset tokens that do not securely associate a hash with a user account.",
+                "trigger_condition": "An attacker can exploit the predictable nature of the token generation process to reset a user's password without authorization.",
+                "specific_code_behavior_causing_vulnerability": "The code generates a confirmation token using a simple hash of the nonce and username, which can be easily guessed or replicated, leading to potential unauthorized access."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to generate a confirmation token using a secure hash that combines the nonce, a randomly generated selector, and the user's password. Additionally, implement an expiry mechanism for the token and ensure that only one valid reset token exists at any time for a user. This approach enhances security by making the token unique and time-limited, while also obscuring user account existence."
+        },
+        {
+            "cve_id": "CVE-2021-4130",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate handling of user actions leading to potential unauthorized requests.",
+                "trigger_condition": "An attacker exploits the lack of CSRF protection by tricking an authenticated user into making unintended requests.",
+                "specific_code_behavior_causing_vulnerability": "The code allows for specific success messages to be returned without proper validation of the request's authenticity, which can mislead users and create opportunities for CSRF attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to ensure that all user actions are validated against CSRF tokens and that success messages are generic enough to avoid misleading users about the outcomes of their actions. This helps prevent unauthorized requests and enhances the overall security of the application."
+        },
+        {
+            "cve_id": "CVE-2019-16202",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate logging of user actions during sensitive operations, leading to potential privilege escalation.",
+                "trigger_condition": "An unauthorized user attempts to perform an action that should be restricted to administrators, and the logging mechanism does not capture the identity of the user performing the action.",
+                "specific_code_behavior_causing_vulnerability": "The code uses a logging method that does not include the context of the currently authenticated user, making it difficult to trace unauthorized actions and detect privilege escalation attempts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to modify the logging mechanism to include the identity of the user performing the action. This ensures that all sensitive operations are logged with the appropriate user context, allowing for better auditing and detection of unauthorized actions."
+        },
+        {
+            "cve_id": "CVE-2017-20158",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct exposure of user-generated content in error messages without proper sanitization.",
+                "trigger_condition": "An attacker manipulates input to include malicious scripts, which are then included in the error response sent to the client.",
+                "specific_code_behavior_causing_vulnerability": "The code retrieves error messages directly from the model and includes them in the response without encoding, allowing for potential execution of embedded scripts in the browser."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to encode any user-generated content, such as error messages, before including them in the response. This ensures that special characters are converted to their HTML entity equivalents, preventing the browser from interpreting them as executable code."
+        },
+        {
+            "cve_id": "CVE-2019-13240",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper invalidation of password reset tokens after a successful password reset.",
+                "trigger_condition": "An attacker knows the email address of a user and attempts to reset the password multiple times within a 24-hour period after a successful reset.",
+                "specific_code_behavior_causing_vulnerability": "The code does not properly invalidate the password reset token and its associated timestamp after a successful password reset, allowing repeated password changes using the same token."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to set the password reset token date to a proper invalid state after a successful password reset. This ensures that the token cannot be reused for subsequent password changes within the specified time frame, thereby preventing unauthorized access."
+        }
+    ]
+}
