@@ -1,0 +1,186 @@
+{
+    "id": 32,
+    "full_code": "    public function postConnect(): void\n    {\n        $version = $this->fetchSingleRow('SELECT @@version, @@version_comment');\n\n        if (is_array($version)) {\n            $this->setVersion($version);\n        }\n\n        if ($this->versionInt > 50503) {\n            $default_charset = 'utf8mb4';\n            $default_collation = 'utf8mb4_general_ci';\n        } else {\n            $default_charset = 'utf8';\n            $default_collation = 'utf8_general_ci';\n        }\n\n        $GLOBALS['collation_connection'] = $default_collation;\n        $GLOBALS['charset_connection'] = $default_charset;\n        $this->query(sprintf('SET NAMES \\'%s\\' COLLATE \\'%s\\';', $default_charset, $default_collation));\n\n        /* Locale for messages */\n        $locale = LanguageManager::getInstance()->getCurrentLanguage()->getMySQLLocale();\n        if ($locale) {\n            $this->tryQuery(\"SET lc_messages = '\" . $locale . \"';\");\n        }\n\n        // Set timezone for the session, if required.\n        if ($GLOBALS['cfg']['Server']['SessionTimeZone'] != '') {\n            $sql_query_tz = 'SET ' . Util::backquote('time_zone') . ' = '\n                . '\\''\n                . $this->escapeString($GLOBALS['cfg']['Server']['SessionTimeZone'])\n                . '\\'';\n\n            if (! $this->tryQuery($sql_query_tz)) {\n                $error_message_tz = sprintf(\n                    __(\n                        'Unable to use timezone \"%1$s\" for server %2$d. '\n                        . 'Please check your configuration setting for '\n                        . '[em]$cfg[\\'Servers\\'][%3$d][\\'SessionTimeZone\\'][/em]. '\n                        . 'phpMyAdmin is currently using the default time zone '\n                        . 'of the database server.'\n                    ),\n                    $GLOBALS['cfg']['Server']['SessionTimeZone'],\n                    $GLOBALS['server'],\n                    $GLOBALS['server']\n                );\n\n                trigger_error($error_message_tz, E_USER_WARNING);\n            }\n        }\n\n        /* Loads closest context to this version. */\n        Context::loadClosest(($this->isMariaDb ? 'MariaDb' : 'MySql') . $this->versionInt);\n\n        /**\n         * the DatabaseList class as a stub for the ListDatabase class\n         */\n        $GLOBALS['dblist'] = new DatabaseList();\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2016-2038",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper error handling during database operations that can expose sensitive information.",
+                "trigger_condition": "An attacker sends a crafted request that causes a database operation to fail, leading to the exposure of detailed error messages.",
+                "specific_code_behavior_causing_vulnerability": "The code directly executes a query to set the collation connection without checking for success, which can result in detailed error messages being displayed to the user if the query fails."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement proper error handling by checking the success of database operations before proceeding. If an operation fails, log a generic error message instead of exposing detailed error information. This prevents sensitive information from being disclosed through error messages."
+        },
+        {
+            "cve_id": "CVE-2021-4246",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input, specifically the X-Forwarded-For header, leading to SQL injection vulnerabilities.",
+                "trigger_condition": "An attacker manipulates the X-Forwarded-For header to inject malicious SQL code, which is then executed by the database due to lack of input validation.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses user input from the X-Forwarded-For header in SQL queries without proper sanitization or parameterization, allowing for arbitrary SQL execution."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate and sanitize all user input, including headers like X-Forwarded-For. Additionally, use prepared statements with bound parameters for any SQL queries to ensure that user input is treated as data rather than executable code, thus preventing SQL injection."
+        },
+        {
+            "cve_id": "CVE-2022-27157",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insecure deserialization of user-controlled data without restrictions on allowed classes.",
+                "trigger_condition": "An attacker manipulates the serialized data being deserialized, potentially injecting malicious objects or data.",
+                "specific_code_behavior_causing_vulnerability": "The code uses unserialize() without any restrictions, allowing for the instantiation of arbitrary classes, which can lead to remote code execution or data manipulation."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to restrict the deserialization process by using options that prevent the instantiation of any classes. Additionally, implement robust error handling to gracefully manage any issues that arise during deserialization, ensuring that only valid data is processed."
+        },
+        {
+            "cve_id": "CVE-2022-27158",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Deserialization of untrusted data without proper validation or restrictions.",
+                "trigger_condition": "An attacker manipulates the contents of a serialized data file, leading to the execution of arbitrary code during deserialization.",
+                "specific_code_behavior_causing_vulnerability": "The code uses unserialize() to deserialize data from a file without any restrictions, allowing for the possibility of executing malicious payloads embedded in serialized objects."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to restrict the deserialization process by using options like 'allowed_classes' set to false. This prevents the creation of class instances during deserialization and reduces the risk of executing malicious code. Additionally, implement error handling to manage exceptions during deserialization and validate the deserialized data to ensure it meets expected criteria."
+        },
+        {
+            "cve_id": "CVE-2016-8900",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper initialization and handling of output variables can lead to injection vulnerabilities.",
+                "trigger_condition": "An attacker provides untrusted input that is directly used in generating HTML output, potentially allowing for injection of malicious content.",
+                "specific_code_behavior_causing_vulnerability": "The code initializes output variables in a way that does not ensure a clean state, leading to the risk of including unintended or malicious content in the generated HTML."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to initialize output variables to a clean state before use and to conditionally include content based on trusted configurations. This ensures that only safe and expected content is output, reducing the risk of injection attacks."
+        },
+        {
+            "cve_id": "CVE-2021-43515",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input in output messages that are included in CSV exports.",
+                "trigger_condition": "An attacker provides malicious input in a field that is later included in a CSV file, leading to potential execution of harmful formulas when the file is opened in spreadsheet applications.",
+                "specific_code_behavior_causing_vulnerability": "The code includes user-controlled data in output messages without proper sanitization, allowing for the injection of malicious payloads that can be executed in spreadsheet applications."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to avoid including user-controlled data in output messages that are exported to CSV files. Instead, use sanitized or fixed messages that do not allow for user input to influence the output, thereby preventing potential CSV injection attacks."
+        },
+        {
+            "cve_id": "CVE-2018-17552",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or parameterization.",
+                "trigger_condition": "An attacker manipulates input values that are used in SQL queries, potentially allowing for unauthorized access or data manipulation.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by directly inserting user-controlled variables into the query string, which can lead to SQL injection if the input is not properly sanitized."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use parameterized queries instead of concatenating user input directly into SQL statements. This ensures that user input is treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2022-1177",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate access control mechanisms for sensitive patient data.",
+                "trigger_condition": "An unauthorized user role, such as an accounting user, attempts to access patient reports that should be restricted.",
+                "specific_code_behavior_causing_vulnerability": "The code grants excessive permissions to user roles, allowing them to access sensitive patient information that they should not be able to view or download."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to review and restrict the access control lists for user roles, ensuring that only authorized users can access sensitive patient data. This involves removing permissions that allow unauthorized roles to view or download patient reports."
+        },
+        {
+            "cve_id": "CVE-2016-8899",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input from configuration arrays without validation or sanitization.",
+                "trigger_condition": "An attacker manipulates the input configuration array, potentially injecting malicious objects or code that can be executed by the application.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses values from the configuration array to construct HTML output without validating or sanitizing these values, leading to potential object injection and XSS vulnerabilities."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user input from configuration arrays before using them in the application. This includes initializing output variables properly and ensuring that only expected and safe values are included in generated HTML output."
+        },
+        {
+            "cve_id": "CVE-2023-2848",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient validation of incoming WebSocket connections, allowing unauthorized access.",
+                "trigger_condition": "An attacker sends a WebSocket connection request that appears legitimate, potentially hijacking a session of an authenticated user.",
+                "specific_code_behavior_causing_vulnerability": "The code does not check whether the incoming WebSocket connection is from a trusted source, allowing untrusted connections to proceed and interact with user sessions."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a validation check for incoming WebSocket connections to ensure they originate from trusted sources. If a connection is deemed untrusted, it should be closed immediately to prevent unauthorized access and session hijacking."
+        },
+        {
+            "cve_id": "CVE-2016-5730",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper validation of user input leading to potential information disclosure through error messages.",
+                "trigger_condition": "An attacker provides unexpected or empty values for critical configuration parameters, which the code does not adequately validate before using them.",
+                "specific_code_behavior_causing_vulnerability": "The code uses strict equality checks to determine if configuration parameters are empty, which may not handle all falsy values correctly, allowing the function to proceed with invalid data and potentially expose sensitive information in error messages."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use a more robust method of input validation, such as the empty() function, to check for empty values. This ensures that all falsy values are treated as empty, preventing the function from executing with invalid data and reducing the risk of information disclosure through error messages."
+        },
+        {
+            "cve_id": "CVE-2015-0917",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct assignment of user-controlled input to internal state without validation or sanitization.",
+                "trigger_condition": "An attacker manipulates the input parameter, allowing the injection of arbitrary scripts or HTML content.",
+                "specific_code_behavior_causing_vulnerability": "The code assigns the value of a user-controlled parameter directly to an internal property, which can lead to execution of malicious scripts when the property is rendered in the application."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use setter methods for handling user-controlled input. These methods should include validation and sanitization of the input before assigning it to internal properties. This ensures that any potentially harmful input is either cleaned or rejected, thereby preventing XSS attacks."
+        },
+        {
+            "cve_id": "CVE-2022-4582",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input without validation or sanitization, leading to potential injection of malicious scripts.",
+                "trigger_condition": "An attacker crafts a URL with a malicious payload in the 'theme' parameter, which is then processed by the application without proper checks.",
+                "specific_code_behavior_causing_vulnerability": "The code directly retrieves and uses the 'theme' parameter from the URL without validating or sanitizing it, allowing for the execution of arbitrary scripts in the user's browser."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement input validation and sanitization for user-supplied parameters. Specifically, decode the input using a secure method and ensure that only expected values are processed before using them in the application."
+        },
+        {
+            "cve_id": "CVE-2023-1034",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation of user input used for file path construction, leading to potential unauthorized file access.",
+                "trigger_condition": "An attacker manipulates input parameters to include path traversal sequences, allowing access to sensitive files outside the intended directory structure.",
+                "specific_code_behavior_causing_vulnerability": "The code directly incorporates user input into file paths without sufficient sanitization or validation, enabling attackers to exploit this to navigate the file system and access restricted files."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement strict validation and sanitization of user input used in file path construction. This includes rejecting any input that contains path traversal sequences and ensuring that only expected and safe file paths are processed. Additionally, access controls should be enforced to restrict access to sensitive files."
+        },
+        {
+            "cve_id": "CVE-2016-9020",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input when generating HTML meta tags and header information.",
+                "trigger_condition": "An attacker provides malicious input through configuration parameters that are not properly validated or sanitized, leading to potential SQL injection or other injection attacks.",
+                "specific_code_behavior_causing_vulnerability": "The code directly incorporates user input into the output without sufficient validation or escaping, which can allow for the execution of arbitrary SQL commands if the input is not controlled."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to initialize output variables properly, validate and sanitize all user input before use, and conditionally include meta tags based on configuration settings. This ensures that the generated output is safe and reduces the risk of injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-7788",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input and output encoding in the generation of HTML meta tags.",
+                "trigger_condition": "An attacker provides malicious input that is not properly sanitized or encoded, leading to potential XSS attacks when the input is rendered in the HTML output.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs HTML output directly from user-provided data without ensuring that the data is properly escaped or validated, allowing for the injection of malicious scripts."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to ensure that all user input is properly sanitized and encoded before being included in the HTML output. This can be achieved by initializing output variables and using appropriate encoding functions to escape any user-provided data, thereby preventing XSS attacks."
+        },
+        {
+            "cve_id": "CVE-2016-9087",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input when generating HTML output, leading to potential SQL injection vulnerabilities.",
+                "trigger_condition": "An attacker manipulates the input parameters used in the header information generation, allowing for arbitrary SQL commands to be executed.",
+                "specific_code_behavior_causing_vulnerability": "The code directly incorporates user-controlled data into the HTML output without sufficient validation or sanitization, making it susceptible to injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to sanitize and validate all user input before using it to generate HTML output. This includes explicitly defining the structure of the output and ensuring that any user-controlled data is properly escaped or filtered to prevent injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-7781",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user-generated content in HTML output generation.",
+                "trigger_condition": "An attacker provides malicious input through configuration parameters, which is then directly included in the HTML output without proper validation or sanitization.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs HTML meta tags and other elements using user-provided configuration values without escaping or validating them, allowing for potential injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize and validate all user-generated input before including it in the HTML output. This includes escaping special characters and ensuring that only safe and expected values are processed, thereby preventing injection attacks."
+        },
+        {
+            "cve_id": "CVE-2022-45962",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper error handling during database connection initialization can lead to the exposure of sensitive information and potential SQL injection vulnerabilities.",
+                "trigger_condition": "The database connection fails, and the error message is retrieved from an invalid connection resource, leading to undefined behavior.",
+                "specific_code_behavior_causing_vulnerability": "The code attempts to access an error message from a connection resource that may not be valid, which can result in misleading error messages or the potential for SQL injection if user input is not properly sanitized."
+            },
+            "solution_behavior": "To mitigate the vulnerability, ensure that the database connection is always properly initialized before attempting to retrieve error messages. Use the appropriate error handling methods associated with the connection object to capture error information reliably, and ensure that user input is sanitized before being used in SQL queries."
+        },
+        {
+            "cve_id": "CVE-2023-3142",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input data during database operations, leading to potential XSS vulnerabilities.",
+                "trigger_condition": "User input is directly inserted into the database without adequate sanitization or validation, allowing malicious scripts to be stored and executed in the user's browser.",
+                "specific_code_behavior_causing_vulnerability": "The code uses direct insertion methods for user data without employing any sanitization or validation mechanisms, making it susceptible to XSS attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use a dedicated method for data insertion that includes built-in validation and sanitization processes. This ensures that user input is properly handled before being stored in the database, thus preventing the risk of XSS attacks."
+        }
+    ]
+}

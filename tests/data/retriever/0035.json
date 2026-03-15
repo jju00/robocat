@@ -1,0 +1,186 @@
+{
+    "id": 35,
+    "full_code": "    public function getTable(\n        ResultInterface $dtResult,\n        array &$displayParts,\n        array $analyzedSqlResults,\n        $isLimitedDisplay = false\n    ) {\n        // The statement this table is built for.\n        if (isset($analyzedSqlResults['statement'])) {\n            /** @var SelectStatement $statement */\n            $statement = $analyzedSqlResults['statement'];\n        } else {\n            $statement = null;\n        }\n\n        // Following variable are needed for use in isset/empty or\n        // use with array indexes/safe use in foreach\n        $fieldsMeta = $this->properties['fields_meta'];\n        $showTable = $this->properties['showtable'];\n        $printView = $this->properties['printview'];\n\n        /**\n         * @todo move this to a central place\n         * @todo for other future table types\n         */\n        $isInnodb = (isset($showTable['Type'])\n            && $showTable['Type'] === self::TABLE_TYPE_INNO_DB);\n\n        if ($isInnodb && Sql::isJustBrowsing($analyzedSqlResults, true)) {\n            $preCount = '~';\n            $afterCount = Generator::showHint(\n                Sanitize::sanitizeMessage(\n                    __('May be approximate. See [doc@faq3-11]FAQ 3.11[/doc].')\n                )\n            );\n        } else {\n            $preCount = '';\n            $afterCount = '';\n        }\n\n        // 1. ----- Prepares the work -----\n\n        // 1.1 Gets the information about which functionalities should be\n        //     displayed\n\n        [\n            $displayParts,\n            $total,\n        ] = $this->setDisplayPartsAndTotal($displayParts);\n\n        // 1.2 Defines offsets for the next and previous pages\n        $posNext = 0;\n        $posPrev = 0;\n        if ($displayParts['nav_bar'] == '1') {\n            [$posNext, $posPrev] = $this->getOffsets();\n        }\n\n        // 1.3 Extract sorting expressions.\n        //     we need $sort_expression and $sort_expression_nodirection\n        //     even if there are many table references\n        $sortExpression = [];\n        $sortExpressionNoDirection = [];\n        $sortDirection = [];\n\n        if ($statement !== null && ! empty($statement->order)) {\n            foreach ($statement->order as $o) {\n                $sortExpression[] = $o->expr->expr . ' ' . $o->type;\n                $sortExpressionNoDirection[] = $o->expr->expr;\n                $sortDirection[] = $o->type;\n            }\n        } else {\n            $sortExpression[] = '';\n            $sortExpressionNoDirection[] = '';\n            $sortDirection[] = '';\n        }\n\n        // 1.4 Prepares display of first and last value of the sorted column\n        $sortedColumnMessage = '';\n        foreach ($sortExpressionNoDirection as $expression) {\n            $sortedColumnMessage .= $this->getSortedColumnMessage($dtResult, $expression);\n        }\n\n        // 2. ----- Prepare to display the top of the page -----\n\n        // 2.1 Prepares a messages with position information\n        $sqlQueryMessage = '';\n        if ($displayParts['nav_bar'] == '1') {\n            $message = $this->setMessageInformation(\n                $sortedColumnMessage,\n                $analyzedSqlResults,\n                $total,\n                $posNext,\n                $preCount,\n                $afterCount\n            );\n\n            $sqlQueryMessage = Generator::getMessage($message, $this->properties['sql_query'], 'success');\n        } elseif (($printView === null || $printView != '1') && ! $isLimitedDisplay) {\n            $message = Message::success(__('Your SQL query has been executed successfully.'));\n\n            if ($this->properties['querytime'] > 0) {\n                $message->addText('(');\n\n                $messageQueryTime = Message::notice(__('Query took %01.4f seconds.') . ')');\n                $messageQueryTime->addParam($this->properties['querytime']);\n\n                $message->addMessage($messageQueryTime, '');\n            }\n\n            $sqlQueryMessage = Generator::getMessage(\n                $message,\n                $this->properties['sql_query'],\n                'success'\n            );\n        }\n\n        // 2.3 Prepare the navigation bars\n        if ($this->properties['table'] === '' && $analyzedSqlResults['querytype'] === 'SELECT') {\n            // table does not always contain a real table name,\n            // for example in MySQL 5.0.x, the query SHOW STATUS\n            // returns STATUS as a table name\n            $this->properties['table'] = $fieldsMeta[0]->table;\n        }\n\n        $sortByKeyData = [];\n        // can the result be sorted?\n        if ($displayParts['sort_lnk'] == '1' && isset($analyzedSqlResults['statement'])) {\n            $unsortedSqlQuery = Query::replaceClause(\n                $analyzedSqlResults['statement'],\n                $analyzedSqlResults['parser']->list,\n                'ORDER BY',\n                ''\n            );\n\n            // Data is sorted by indexes only if there is only one table.\n            if ($this->isSelect($analyzedSqlResults)) {\n                $sortByKeyData = $this->getSortByKeyDropDown(\n                    $sortExpression,\n                    $unsortedSqlQuery\n                );\n            }\n        }\n\n        $navigation = [];\n        if ($displayParts['nav_bar'] == '1' && $statement !== null && empty($statement->limit)) {\n            $navigation = $this->getTableNavigation($posNext, $posPrev, $isInnodb, $sortByKeyData);\n        }\n\n        // 2b ----- Get field references from Database -----\n        // (see the 'relation' configuration variable)\n\n        // initialize map\n        $map = [];\n\n        if ($this->properties['table'] !== '') {\n            // This method set the values for $map array\n            $map = $this->setParamForLinkForeignKeyRelatedTables($map);\n\n            // Coming from 'Distinct values' action of structure page\n            // We manipulate relations mechanism to show a link to related rows.\n            if ($this->properties['is_browse_distinct']) {\n                $map[$fieldsMeta[1]->name] = [\n                    $this->properties['table'],\n                    $fieldsMeta[1]->name,\n                    '',\n                    $this->properties['db'],\n                ];\n            }\n        }\n\n        // end 2b\n\n        // 3. ----- Prepare the results table -----\n        $headers = $this->getTableHeaders(\n            $displayParts,\n            $analyzedSqlResults,\n            $sortExpression,\n            $sortExpressionNoDirection,\n            $sortDirection,\n            $isLimitedDisplay\n        );\n\n        $body = $this->getTableBody($dtResult, $displayParts, $map, $analyzedSqlResults, $isLimitedDisplay);\n\n        $this->properties['display_params'] = null;\n\n        // 4. ----- Prepares the link for multi-fields edit and delete\n        $bulkLinks = $this->getBulkLinks($dtResult, $analyzedSqlResults, $displayParts['del_lnk']);\n\n        // 5. ----- Prepare \"Query results operations\"\n        $operations = [];\n        if (($printView === null || $printView != '1') && ! $isLimitedDisplay) {\n            $operations = $this->getResultsOperations($displayParts['pview_lnk'], $analyzedSqlResults);\n        }\n\n        $relationParameters = $this->relation->getRelationParameters();\n\n        return $this->template->render('display/results/table', [\n            'sql_query_message' => $sqlQueryMessage,\n            'navigation' => $navigation,\n            'headers' => $headers,\n            'body' => $body,\n            'bulk_links' => $bulkLinks,\n            'operations' => $operations,\n            'db' => $this->properties['db'],\n            'table' => $this->properties['table'],\n            'unique_id' => $this->properties['unique_id'],\n            'sql_query' => $this->properties['sql_query'],\n            'goto' => $this->properties['goto'],\n            'unlim_num_rows' => $this->properties['unlim_num_rows'],\n            'displaywork' => $relationParameters->displayFeature !== null,\n            'relwork' => $relationParameters->relationFeature !== null,\n            'save_cells_at_once' => $GLOBALS['cfg']['SaveCellsAtOnce'],\n            'default_sliders_state' => $GLOBALS['cfg']['InitialSlidersState'],\n            'text_dir' => $this->properties['text_dir'],\n        ]);\n    }\n",
+    "retrieved_knowledge": [
+        {
+            "cve_id": "CVE-2023-2552",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of database error messages can expose sensitive information, leading to potential exploitation in CSRF attacks.",
+                "trigger_condition": "An attacker tricks a user into executing a request that generates a database error, which is then displayed or logged insecurely, revealing internal application details.",
+                "specific_code_behavior_causing_vulnerability": "The code directly stores database error messages in a publicly accessible variable, which could be exploited to gain insights into the application's structure and vulnerabilities."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to implement a secure error handling mechanism that centralizes error logging and avoids exposing sensitive information directly to users. This can be achieved by using a dedicated error variable and ensuring that error messages are logged securely without being displayed to the user."
+        },
+        {
+            "cve_id": "CVE-2023-0995",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input when constructing SQL queries, leading to potential SQL injection vulnerabilities.",
+                "trigger_condition": "An attacker provides malicious input that is not properly validated or sanitized, allowing them to manipulate the SQL query structure.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries using user input without sufficient validation and sanitization, particularly in the handling of table names and other dynamic query components."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to ensure that all user inputs are properly validated and sanitized before being used in SQL queries. This includes using prepared statements or parameterized queries to prevent SQL injection and ensuring that variable names are correctly defined and used consistently throughout the code."
+        },
+        {
+            "cve_id": "CVE-2016-8899",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input in SQL query construction without validation or sanitization.",
+                "trigger_condition": "An attacker manipulates user input parameters to inject malicious SQL code, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code directly incorporates user-supplied parameters into SQL queries without sufficient checks, allowing for potential manipulation of the SQL execution context."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user input before using it in SQL queries. Additionally, limit the parameters that can be used in the SQL construction to only those that are necessary, and consider using prepared statements or parameterized queries to prevent SQL injection."
+        },
+        {
+            "cve_id": "CVE-2016-7788",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper validation or sanitization.",
+                "trigger_condition": "An attacker provides specially crafted input that alters the structure of the SQL query, allowing for arbitrary SQL commands to be executed.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by appending user input directly to the SQL string, which can lead to SQL injection if the input is not properly sanitized."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to use prepared statements or parameterized queries for all SQL commands. This separates SQL logic from user data, ensuring that user input is treated as data only and not executable code. Additionally, implement robust input validation and sanitization to ensure that all user inputs conform to expected formats and types."
+        },
+        {
+            "cve_id": "CVE-2016-7781",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or parameterization.",
+                "trigger_condition": "An attacker provides specially crafted input through parameters that are directly included in SQL statements, leading to arbitrary SQL command execution.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by appending user input directly into the query strings, allowing for potential SQL injection if the input is not properly validated or sanitized."
+            },
+            "solution_behavior": "To mitigate the vulnerability, use prepared statements with bound parameters instead of concatenating user input directly into SQL queries. This ensures that user input is treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-8900",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of untrusted user input leading to object injection vulnerabilities.",
+                "trigger_condition": "An attacker provides crafted input that is directly used in object instantiation or property access without validation, allowing manipulation of object properties.",
+                "specific_code_behavior_causing_vulnerability": "The code directly incorporates user input into SQL queries and object properties without sufficient validation or sanitization, making it susceptible to object injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate and sanitize all user input before using it in SQL queries or object instantiation. This includes implementing strict checks on the data format and using prepared statements or parameterized queries to prevent injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-10096",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Inadequate validation and sanitization of user input, particularly in authentication and data handling processes.",
+                "trigger_condition": "An attacker provides malicious input through parameters such as authentication credentials or JSON data, which can lead to SQL injection or other injection attacks.",
+                "specific_code_behavior_causing_vulnerability": "The code does not enforce strict validation on the format and type of input parameters, allowing for potential injection of malicious data that can be executed by the server."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to implement strict validation and sanitization of all user inputs, ensuring that parameters such as authentication credentials and JSON data are properly formatted and validated before processing. This includes checking that authentication options are arrays and that the sink option is not a boolean, as well as using safe encoding methods for JSON data."
+        },
+        {
+            "cve_id": "CVE-2016-9087",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or parameterization.",
+                "trigger_condition": "An attacker provides specially crafted input that alters the intended SQL command, allowing for arbitrary SQL execution.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by appending user input directly into the SQL strings, which can be manipulated to execute unintended SQL commands."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use prepared statements or parameterized queries when constructing SQL commands. This ensures that user input is treated as data rather than executable code, preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-9020",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or parameterization.",
+                "trigger_condition": "An attacker provides malicious input through user-controlled parameters, leading to arbitrary SQL command execution.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by appending user inputs directly into the query strings, allowing an attacker to manipulate the SQL execution flow."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to use prepared statements or parameterized queries for all SQL operations. This approach ensures that user inputs are treated as data rather than executable code, effectively preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2023-45957",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of error messages that may contain untrusted data.",
+                "trigger_condition": "An attacker triggers an exception that generates an error message containing malicious scripts or HTML.",
+                "specific_code_behavior_causing_vulnerability": "The code directly adds the exception message to an error array without sanitization, allowing potentially harmful content to be rendered in the user interface."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to sanitize any error messages before adding them to the error array. This ensures that any potentially harmful content is neutralized and cannot be executed in the browser, thereby preventing XSS attacks."
+        },
+        {
+            "cve_id": "CVE-2016-8897",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct concatenation of user input into SQL queries without proper sanitization or validation.",
+                "trigger_condition": "An attacker provides malicious input through user-controlled parameters, which is then included in SQL statements, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries by directly appending user input values from parameters into the query string, allowing for arbitrary SQL code execution."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to use prepared statements or parameterized queries for all SQL operations. This approach separates SQL logic from user data, ensuring that user input is treated as data only and not executable code. Additionally, all user inputs should be validated and sanitized to prevent malicious data from being processed."
+        },
+        {
+            "cve_id": "CVE-2016-9026",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper input validation and sanitization of user-provided data before using it in SQL queries.",
+                "trigger_condition": "An attacker manipulates input parameters to inject malicious SQL code, leading to potential SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code directly assigns user input from parameters to variables used in SQL queries without validation or escaping, allowing for the execution of arbitrary SQL commands."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user inputs before using them in SQL queries. This includes converting inputs to the expected data types and escaping special characters to prevent SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2023-2551",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of database error messages can lead to information disclosure and potential remote file inclusion vulnerabilities.",
+                "trigger_condition": "An attacker exploits the error handling mechanism to gain insights into the database structure or connection details, potentially leading to unauthorized access or manipulation.",
+                "specific_code_behavior_causing_vulnerability": "The code uses a variable to store database errors without proper initialization and management, which can lead to undefined behavior and expose sensitive information."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to explicitly declare and manage error handling variables. This ensures that all database errors are captured in a controlled manner, reducing the risk of information disclosure and improving the robustness of the error handling mechanism."
+        },
+        {
+            "cve_id": "CVE-2016-9023",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper input validation and sanitization of user-supplied data before using it in database queries.",
+                "trigger_condition": "An attacker provides malicious input through parameters, which can manipulate the SQL queries executed by the application.",
+                "specific_code_behavior_causing_vulnerability": "The code directly assigns user input to variables used in SQL queries without validating or sanitizing the input, allowing for potential SQL injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user inputs before using them in database queries. This can be achieved by converting inputs to the expected data types and applying appropriate escaping functions to ensure that the input is safe for use in SQL statements."
+        },
+        {
+            "cve_id": "CVE-2016-9025",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper input validation and sanitization of user-provided data before using it in database queries.",
+                "trigger_condition": "An attacker provides malicious input through parameters, which is then directly used in SQL queries without validation or escaping, leading to potential SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code directly assigns user input to variables and uses them in SQL queries without any type casting or escaping, allowing for the possibility of injecting harmful SQL code."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user input before using it in database queries. This includes using appropriate type casting for numeric values and escaping strings to prevent SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2016-9282",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Insufficient input sanitization and escaping before using user input in SQL queries.",
+                "trigger_condition": "An attacker submits a specially crafted input through a search parameter, which is then directly used in a database query without proper escaping.",
+                "specific_code_behavior_causing_vulnerability": "The code uses htmlspecialchars to sanitize the input for HTML output but fails to escape the input for SQL usage, allowing for potential SQL injection attacks."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to apply a dedicated escaping function for SQL queries to the user input after any necessary HTML sanitization. This ensures that the input is safe to use in SQL statements and prevents SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2023-3673",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Direct use of user input in SQL query construction without proper validation or sanitization.",
+                "trigger_condition": "An attacker manipulates user input parameters that are directly incorporated into the SQL query, leading to potential SQL injection.",
+                "specific_code_behavior_causing_vulnerability": "The code constructs SQL queries using user-supplied values for sorting and filtering without validating or sanitizing these inputs, allowing for the execution of arbitrary SQL commands."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to use safe methods to quote or escape user input when constructing SQL queries. This ensures that user input is treated as data rather than executable code, preventing SQL injection attacks."
+        },
+        {
+            "cve_id": "CVE-2011-10003",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of user input in SQL query construction without adequate validation or sanitization.",
+                "trigger_condition": "An attacker provides malicious input that is directly included in an SQL query, leading to SQL injection vulnerabilities.",
+                "specific_code_behavior_causing_vulnerability": "The code allows user input to be processed without sufficient checks, particularly when handling numeric values, which can be manipulated to execute arbitrary SQL commands."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is essential to validate and sanitize all user input before including it in SQL queries. Specifically, ensure that numeric values are explicitly checked and cast to integers only if they are valid numbers, preventing any non-numeric input from being processed as valid."
+        },
+        {
+            "cve_id": "CVE-2022-2400",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper handling of external input leading to potential path manipulation and unauthorized file access.",
+                "trigger_condition": "An attacker crafts a malicious URL that influences file resolution, allowing access to sensitive files on the server.",
+                "specific_code_behavior_causing_vulnerability": "The code directly uses an object that exposes internal state and options when resolving URLs, which can be manipulated by external input to access unauthorized paths."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to limit the scope of the object used for URL resolution by passing only the necessary configuration options instead of the entire object. This reduces the attack surface and prevents unauthorized access to sensitive files."
+        },
+        {
+            "cve_id": "CVE-2023-3490",
+            "vulnerability_behavior": {
+                "vulnerability_cause_description": "Improper validation and sanitization of user input parameters used in SQL queries.",
+                "trigger_condition": "An attacker manipulates input parameters such as page number and items per page through GET requests, leading to potential SQL injection attacks.",
+                "specific_code_behavior_causing_vulnerability": "The code directly incorporates user input into SQL queries without sufficient validation, allowing for the execution of arbitrary SQL commands if the input is malicious."
+            },
+            "solution_behavior": "To mitigate the vulnerability, it is necessary to validate and sanitize all user input parameters before using them in SQL queries. This includes ensuring that parameters are numeric and within acceptable ranges, and using appropriate data types in the SQL query construction to prevent SQL injection."
+        }
+    ]
+}
