@@ -1,0 +1,36 @@
+{
+  "language": "php",
+  "joern_import": "php",
+  "function_parser": "php",
+  "sources": [
+    {
+      "name": "php_superglobals",
+      "type": "identifier_regex",
+      "value": ".*\\$_(GET|POST|REQUEST|COOKIE|SERVER).*"
+    }
+  ],
+  "sinks": {
+    "sqli": {
+      "regex": "(mysqli_query|mysql_query)"
+    },
+    "include": {
+      "regex": "(include|include_once|require|require_once)"
+    },
+    "command": {
+      "regex": "(exec|system|passthru|shell_exec)"
+    },
+    "eval": {
+      "regex": "(eval)"
+    },
+    "xss": {
+      "regex": "(echo|print)"
+    }
+  },
+  "sink_priority_weight": {
+    "command": 1.0,
+    "include": 0.9,
+    "eval": 0.9,
+    "sqli": 0.85,
+    "xss": 0.6
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "project": {
+    "name": "phpmyadmin",
+    "language": "php"
+  },
+  "paths": {
+    "local_source_root": "E:/nuclei/260312/phpmyadmin",
+    "container_source_root": "/app/source",
+    "taint_dir": "E:/nuclei/260312",
+    "trace_dir": "E:/nuclei/260312/xdebug",
+    "output_dir": "E:/nuclei/260312/nld_out_v4"
+  },
+  "joern": {
+    "server_url": "http://localhost:9000",
+    "workspace_project": "pma_root"
+  },
+  "trace": {
+    "webroot": "/var/www/html"
+  },
+  "analysis": {
+    "enabled_sink_categories": [
+      "sqli",
+      "include",
+      "command",
+      "eval",
+      "xss"
+    ]
+  }
+}

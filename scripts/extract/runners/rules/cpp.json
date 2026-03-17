@@ -1,0 +1,49 @@
+{
+  "language": "cpp",
+  "joern_import": "cpp",
+  "function_parser": "cpp",
+  "trace_support": null,
+  "dynamic_trace_type": null,
+  "sources": [
+    {
+      "name": "argv",
+      "type": "identifier_regex",
+      "value": ".*\\bargv\\b.*"
+    },
+    {
+      "name": "env_input",
+      "type": "call_regex",
+      "value": "(getenv)"
+    },
+    {
+      "name": "stdin_input",
+      "type": "call_regex",
+      "value": "(scanf|fscanf|sscanf|fgets|gets|getchar|read|recv)"
+    },
+    {
+      "name": "iostream_input",
+      "type": "identifier_regex",
+      "value": ".*\\bcin\\b.*"
+    }
+  ],
+  "sinks": {
+    "command": {
+      "regex": "(system|popen|execl|execlp|execle|execv|execvp|execve)"
+    },
+    "memory": {
+      "regex": "(strcpy|strcat|sprintf|vsprintf|memcpy)"
+    },
+    "format": {
+      "regex": "(printf|fprintf|sprintf|snprintf|syslog)"
+    },
+    "file": {
+      "regex": "(fopen|open|freopen|ifstream|ofstream|fstream)"
+    }
+  },
+  "sink_priority_weight": {
+    "command": 1.0,
+    "memory": 0.95,
+    "format": 0.75,
+    "file": 0.7
+  }
+}
