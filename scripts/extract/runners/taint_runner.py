@@ -1,28 +1,63 @@
 '''
-joern-server에 쿼리를 보내서 source, sink, source-sink flow를 추출하고 카테고리별 json 저장
-port: joern-server가 리스닝하는 포트 (기본값: 9001)
-target_path: 분석할 소스코드 경로(/app/phpmyadmin) <- docker volume로 마운트된 phpmyadmin 소스코드 경로
-project_name: 프로젝트 이름(pma_root) <- joern에서 사용할 프로젝트 이름
+Usage:
+python taint_runner.py --config configs/phpmyadmin.json --rules rules/php.json
+python taint_runner.py --config configs/some_c_project.json --rules rules/c.json
+python taint_runner.py --config configs/some_cpp_project.json --rules rules/cpp.json
 '''
 
-import requests
+import argparse
 import json
-import time
 import re
-from typing import Any, Dict
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import requests
 
 
-class NLDSingleAnalyzer:
-    def __init__(self, port: int = 9001):
-        self.base_url = f"http://localhost:{port}"
+class TaintRunner:
+    def __init__(self, config: Dict[str, Any], rules: Dict[str, Any]):
+        self.config = config
+        self.rules = rules
 
-        self.sink_sets = {
-            "sqli": r"(mysqli_query|mysql_query)",
-            "include": r"(include|include_once|require|require_once)",
-            "command": r"(exec|system|passthru|shell_exec)",
-            "eval": r"(eval)",
-            "xss": r"(echo|print)",
-        }
+        self.base_url = self._normalize_server_url(config["joern"]["server_url"])
+        self.project_name = config["joern"]["workspace_project"]
+        self.target_path = config["paths"]["container_source_root"]
+        self.taint_dir = Path(config["paths"]["taint_dir"])
+
+        self.language = config["project"]["language"]
+        self.joern_import = rules.get("joern_import", self.language)
+
+        all_sinks = rules.get("sinks", {})
+        enabled = config.get("analysis", {}).get("enabled_sink_categories", [])
+
+        if enabled:
+            self.sink_sets = {
+                name: value["regex"]
+                for name, value in all_sinks.items()
+                if name in enabled
+            }
+        else:
+            self.sink_sets = {
+                name: value["regex"]
+                for name, value in all_sinks.items()
+            }
+
+        self.source_rules = rules.get("sources", [])
+
+        if not self.source_rules:
+            raise ValueError("No source rules found in rules JSON.")
+        if not self.sink_sets:
+            raise ValueError("No enabled sink categories found.")
+
+    @staticmethod
+    def _normalize_server_url(url: str) -> str:
+        return url.rstrip("/")
+
+    @staticmethod
+    def load_json(path: Path) -> Dict[str, Any]:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
 
     def submit_query(self, query: str, timeout: int = 60) -> str:
         res = requests.post(
@@ -34,7 +69,7 @@ class NLDSingleAnalyzer:
         data = res.json()
 
         if "uuid" not in data:
-            raise RuntimeError(f"UUID 응답이 아님: {data}")
+            raise RuntimeError(f"UUID not found in response: {data}")
 
         return data["uuid"]
 
@@ -48,7 +83,7 @@ class NLDSingleAnalyzer:
 
         while True:
             if time.time() - start > max_wait:
-                raise TimeoutError(f"쿼리 시간 초과: {uuid}")
+                raise TimeoutError(f"Query timed out: {uuid}")
 
             res = requests.get(f"{self.base_url}/result/{uuid}", timeout=30)
             res.raise_for_status()
@@ -65,15 +100,13 @@ class NLDSingleAnalyzer:
 
     @staticmethod
     def extract_res_string(stdout: str) -> str | None:
-        # 1) triple-quoted String
-        matches = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
-        if matches:
-            return matches[-1]
+        m = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
+        if m:
+            return m[-1]
 
-        # 2) normal quoted String
-        matches = re.findall(r'val res\d+: String = "(.*)"', stdout, re.DOTALL)
-        if matches:
-            raw = matches[-1]
+        m = re.findall(r'val res\d+: String = "(.*)"', stdout, re.DOTALL)
+        if m:
+            raw = m[-1]
             try:
                 return raw.encode("utf-8").decode("unicode_escape")
             except Exception:
@@ -81,48 +114,75 @@ class NLDSingleAnalyzer:
 
         return None
 
-    @staticmethod
-    def normalize_parsed_json(data: Any) -> Any:
-        # [{"a":1},{"b":2}] -> {"a":1,"b":2}
-        if isinstance(data, list):
-            merged = {}
-            all_singleton_dict = True
-            for item in data:
-                if isinstance(item, dict) and len(item) == 1:
-                    merged.update(item)
-                else:
-                    all_singleton_dict = False
-                    break
-            if all_singleton_dict:
-                return merged
-        return data
+    def build_import_query(self) -> str:
+        import_stmt = f'importCode.{self.joern_import}("{self.target_path}", "{self.project_name}")'
 
-    def build_import_query(self, target_path: str, project_name: str) -> str:
         return rf'''
-importCode.php("{target_path}", "{project_name}")
-open("{project_name}")
+{import_stmt}
+open("{self.project_name}")
 run.ossdataflow
 
-ujson.Obj(
-  "project_name" -> "{project_name}",
-  "target_path" -> "{target_path}",
-  "files" -> cpg.file.name.l.size,
-  "methods" -> cpg.method.name.l.size,
-  "calls" -> cpg.call.name.l.size,
-  "identifiers" -> cpg.identifier.name.l.size
-).render(indent = 2)
+val summary =
+  Map(
+    "project_name" -> "{self.project_name}",
+    "language" -> "{self.language}",
+    "target_path" -> "{self.target_path}",
+    "files" -> cpg.file.name.l.size,
+    "methods" -> cpg.method.name.l.size,
+    "calls" -> cpg.call.name.l.size,
+    "identifiers" -> cpg.identifier.name.l.size
+  )
+
+ujson.write(ujson.read(summary.toJson), indent = 2)
 '''
 
-    def build_taint_query(self, project_name: str, sink_name: str, sink_regex: str) -> str:
+    def build_source_query_expr(self) -> str:
+        """
+        Support multiple source rule types:
+        - identifier_regex
+        - call_regex
+
+        Result is converted into a common StoredNode iterator so reachableByFlows can use it.
+        """
+        exprs: List[str] = []
+
+        for rule in self.source_rules:
+            rule_type = rule.get("type")
+            value = rule.get("value")
+
+            if not value:
+                continue
+
+            if rule_type == "identifier_regex":
+                exprs.append(
+                    f'cpg.identifier.code("{value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
+                )
+            elif rule_type == "call_regex":
+                exprs.append(
+                    f'cpg.call.name("{value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
+                )
+            else:
+                raise ValueError(f"Unsupported source rule type: {rule_type}")
+
+        if not exprs:
+            raise ValueError("No valid source expressions were generated.")
+
+        if len(exprs) == 1:
+            return exprs[0]
+
+        return " ++ ".join(f"({expr})" for expr in exprs)
+
+    def build_taint_query(self, sink_name: str, sink_regex: str) -> str:
+        source_expr = self.build_source_query_expr()
+
         return rf'''
 import io.joern.dataflowengineoss.language.*
 
-open("{project_name}")
+open("{self.project_name}")
 run.ossdataflow
 
 val sources =
-  cpg.identifier
-    .code(".*\\$_(GET|POST|REQUEST|COOKIE|SERVER).*")
+  {source_expr}
     .l
 
 val sinks =
@@ -135,8 +195,8 @@ val flows =
   sinks.reachableByFlows(sources)
     .map(flow =>
       flow.elements.map(node =>
-        ujson.Obj(
-          "line" -> node.lineNumber.getOrElse(-1),
+        Map(
+          "line" -> node.lineNumber,
           "code" -> node.code,
           "type" -> node.label,
           "file" -> node.file.name.headOption.getOrElse("")
@@ -144,14 +204,19 @@ val flows =
       )
     ).l
 
-ujson.Obj(
-  "sink_name" -> "{sink_name}",
-  "project_name" -> "{project_name}",
-  "source_count" -> sources.size,
-  "sink_count" -> sinks.size,
-  "flow_count" -> flows.size,
-  "flows" -> flows
-).render(indent = 2)
+val out =
+  Map(
+    "project_name" -> "{self.project_name}",
+    "language" -> "{self.language}",
+    "target_path" -> "{self.target_path}",
+    "sink_name" -> "{sink_name}",
+    "source_count" -> sources.size,
+    "sink_count" -> sinks.size,
+    "flow_count" -> flows.size,
+    "flows" -> flows
+  )
+
+ujson.write(ujson.read(out.toJson), indent = 2)
 '''
 
     def run_json_query(self, query: str) -> Dict[str, Any]:
@@ -162,12 +227,11 @@ ujson.Obj(
         stderr = self.strip_ansi(result.get("stderr", ""))
 
         json_str = self.extract_res_string(stdout)
-        parsed: Any
+        parsed: Any = None
 
         if json_str:
             try:
                 parsed = json.loads(json_str)
-                parsed = self.normalize_parsed_json(parsed)
             except json.JSONDecodeError:
                 parsed = {
                     "raw_json_string": json_str,
@@ -186,54 +250,48 @@ ujson.Obj(
             "stderr": stderr,
         }
 
-    def import_project(self, target_path: str, project_name: str) -> Dict[str, Any]:
-        print(f"[*] 프로젝트 import 시작: {target_path}")
-        query = self.build_import_query(target_path, project_name)
-        result = self.run_json_query(query)
-        print(f"[+] import 완료: {project_name}")
+    def import_project(self) -> Dict[str, Any]:
+        print(f"[*] project import start: {self.target_path}")
+        result = self.run_json_query(self.build_import_query())
+        print(f"[+] import complete: {self.project_name}")
         return result
 
-    def run_sink_analysis(self, project_name: str, sink_name: str, sink_regex: str) -> Dict[str, Any]:
-        print(f"[*] sink 분석 시작: {sink_name}")
-        query = self.build_taint_query(project_name, sink_name, sink_regex)
-        result = self.run_json_query(query)
-
+    def run_sink_analysis(self, sink_name: str, sink_regex: str) -> Dict[str, Any]:
+        print(f"[*] sink analysis start: {sink_name}")
+        result = self.run_json_query(self.build_taint_query(sink_name, sink_regex))
         parsed = result.get("parsed", {})
         flow_count = parsed.get("flow_count") if isinstance(parsed, dict) else None
-        print(f"[+] sink 분석 완료: {sink_name} | flow_count={flow_count}")
-
+        print(f"[+] sink analysis complete: {sink_name} | flow_count={flow_count}")
         return result
 
-    def analyze_all(self, target_path: str, project_name: str = "pma_root") -> Dict[str, Any]:
+    def save_json(self, path: Path, data: Dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def analyze_all(self) -> Dict[str, Any]:
         final_result: Dict[str, Any] = {
             "project": {},
             "categories": {}
         }
 
-        import_result = self.import_project(target_path, project_name)
+        import_result = self.import_project()
         final_result["project"] = import_result
 
         for sink_name, sink_regex in self.sink_sets.items():
-            sink_result = self.run_sink_analysis(project_name, sink_name, sink_regex)
+            sink_result = self.run_sink_analysis(sink_name, sink_regex)
             final_result["categories"][sink_name] = sink_result
 
-            with open(f"taint_{sink_name}.json", "w", encoding="utf-8") as f:
-                json.dump(sink_result, f, indent=2, ensure_ascii=False)
+            sink_path = self.taint_dir / f"taint_{sink_name}.json"
+            self.save_json(sink_path, sink_result)
+
+        all_path = self.taint_dir / "taint_results_all.json"
+        self.save_json(all_path, final_result)
 
         return final_result
 
 
-if __name__ == "__main__":
-    analyzer = NLDSingleAnalyzer(port=9001)
-
-    target_path = "/app/phpmyadmin"
-    project_name = "pma_root"
-
-    all_results = analyzer.analyze_all(target_path, project_name)
-
-    with open("taint_results_all.json", "w", encoding="utf-8") as f:
-        json.dump(all_results, f, indent=2, ensure_ascii=False)
-
+def build_summary(all_results: Dict[str, Any]) -> Dict[str, Any]:
     project_summary = all_results.get("project", {}).get("parsed", {})
     category_summary = {}
 
@@ -252,7 +310,51 @@ if __name__ == "__main__":
                 "flow_count": None,
             }
 
-    print(json.dumps({
+    return {
         "project_summary": project_summary,
         "category_summary": category_summary
-    }, indent=2, ensure_ascii=False))
+    }
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Config-driven multi-language Joern taint runner")
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to project config JSON (default: runners/configs/phpmyadmin.json)",
+    )
+    parser.add_argument(
+        "--rules",
+        default=None,
+        help="Path to language rules JSON (default: inferred from config project.language)",
+    )
+    return parser.parse_args()
+
+
+def resolve_default_paths(args: argparse.Namespace) -> Tuple[Path, Path]:
+    base_dir = Path(__file__).resolve().parent
+    config_path = Path(args.config) if args.config else (base_dir / "configs" / "phpmyadmin.json")
+
+    config = TaintRunner.load_json(config_path)
+    language = config["project"]["language"]
+
+    rules_path = Path(args.rules) if args.rules else (base_dir / "rules" / f"{language}.json")
+    return config_path, rules_path
+
+
+def main() -> None:
+    args = parse_args()
+    config_path, rules_path = resolve_default_paths(args)
+
+    config = TaintRunner.load_json(config_path)
+    rules = TaintRunner.load_json(rules_path)
+
+    runner = TaintRunner(config=config, rules=rules)
+    all_results = runner.analyze_all()
+
+    summary = build_summary(all_results)
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
