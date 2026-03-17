@@ -1,0 +1,42 @@
+{
+  "command": {
+    "static_flow_count": 6,
+    "runtime_reachable_flow_count_union": 0,
+    "source_count": 2392,
+    "sink_count": 25,
+    "top_priority_score": 0.35,
+    "max_matched_trace_count": 0
+  },
+  "eval": {
+    "static_flow_count": 0,
+    "runtime_reachable_flow_count_union": 0,
+    "source_count": 2392,
+    "sink_count": 5,
+    "top_priority_score": null,
+    "max_matched_trace_count": 0
+  },
+  "include": {
+    "static_flow_count": 2,
+    "runtime_reachable_flow_count_union": 0,
+    "source_count": 2392,
+    "sink_count": 124,
+    "top_priority_score": 0.8783,
+    "max_matched_trace_count": 82
+  },
+  "sqli": {
+    "static_flow_count": 0,
+    "runtime_reachable_flow_count_union": 0,
+    "source_count": 2392,
+    "sink_count": 2,
+    "top_priority_score": null,
+    "max_matched_trace_count": 0
+  },
+  "xss": {
+    "static_flow_count": 25,
+    "runtime_reachable_flow_count_union": 0,
+    "source_count": 2392,
+    "sink_count": 183,
+    "top_priority_score": 0.5372,
+    "max_matched_trace_count": 78
+  }
+}

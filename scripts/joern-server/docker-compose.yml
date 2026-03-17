@@ -1,0 +1,10 @@
+services:
+  joern-1:
+    image: local-joern:latest
+    container_name: joern-1
+    ports:
+      - "9001:9000"
+    volumes:
+      - E:/nuclei/260312/phpmyadmin:/app/phpmyadmin
+      - E:/nuclei/260312/joern-workspace:/app/workspace
+    command: ["--server", "--server-host", "0.0.0.0", "--server-port", "9000"]
