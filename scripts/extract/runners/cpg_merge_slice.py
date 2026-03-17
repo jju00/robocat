@@ -1,27 +1,34 @@
+'''
+Usage:
+python cpg_merge_slice.py --config configs/phpmyadmin.json --rules rules/php.json --mode union
+python cpg_merge_slice.py --config configs/phpmyadmin.json --rules rules/php.json --mode both
+python cpg_merge_slice.py --config configs/some_c_project.json --rules rules/c.json --mode static
+'''
 import os
 import re
 import json
 import argparse
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Set
 
 
-SUPERGLOBAL_RE = re.compile(r"\$_(GET|POST|REQUEST|COOKIE|SERVER)\b", re.IGNORECASE)
+def load_json(path: str | Path) -> Any:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-SINK_CALL_PATTERNS = {
-    "sqli": re.compile(r"\b(mysqli_query|mysql_query)\b", re.IGNORECASE),
-    "include": re.compile(r"\b(include|include_once|require|require_once)\b", re.IGNORECASE),
-    "command": re.compile(r"\b(exec|system|passthru|shell_exec)\b", re.IGNORECASE),
-    "eval": re.compile(r"\beval\b", re.IGNORECASE),
-    "xss": re.compile(r"\b(echo|print)\b", re.IGNORECASE),
-}
 
-SINK_PRIORITY_WEIGHT = {
-    "command": 1.0,
-    "include": 0.9,
-    "eval": 0.9,
-    "sqli": 0.85,
-    "xss": 0.6,
-}
+def save_json(path: str | Path, data: Any) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def ensure_dir(path: str | Path) -> None:
+    os.makedirs(path, exist_ok=True)
+
+
+def read_text_lines(path: str | Path) -> List[str]:
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        return f.readlines()
 
 
 def normalize_rel_path(path: str) -> str:
@@ -43,23 +50,46 @@ def normalize_trace_path_to_rel(trace_path: str, trace_webroot: str) -> Optional
     return None
 
 
-def read_text_lines(path: str) -> List[str]:
-    with open(path, "r", encoding="utf-8", errors="ignore") as f:
-        return f.readlines()
+class RuleContext:
+    def __init__(self, config: Dict[str, Any], rules: Dict[str, Any]):
+        self.config = config
+        self.rules = rules
 
+        self.language = config["project"]["language"]
+        self.function_parser = rules.get("function_parser", self.language)
 
-def load_json(path: str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        self.source_rules = rules.get("sources", [])
+        self.sinks = rules.get("sinks", {})
+        self.sink_priority_weight = rules.get("sink_priority_weight", {})
 
+        enabled = config.get("analysis", {}).get("enabled_sink_categories", [])
+        if enabled:
+            self.enabled_sinks = {
+                k: v for k, v in self.sinks.items() if k in enabled
+            }
+        else:
+            self.enabled_sinks = dict(self.sinks)
 
-def save_json(path: str, data: Any) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        self.source_compiled = self._compile_source_patterns()
+        self.sink_compiled = self._compile_sink_patterns()
 
+    def _compile_source_patterns(self) -> List[Tuple[str, re.Pattern]]:
+        compiled: List[Tuple[str, re.Pattern]] = []
+        for rule in self.source_rules:
+            rule_type = rule.get("type")
+            value = rule.get("value")
+            if not value:
+                continue
+            compiled.append((rule_type, re.compile(value, re.IGNORECASE)))
+        return compiled
 
-def ensure_dir(path: str) -> None:
-    os.makedirs(path, exist_ok=True)
+    def _compile_sink_patterns(self) -> Dict[str, re.Pattern]:
+        out: Dict[str, re.Pattern] = {}
+        for sink_name, sink_info in self.enabled_sinks.items():
+            regex = sink_info.get("regex")
+            if regex:
+                out[sink_name] = re.compile(rf"\b(?:{regex})\b", re.IGNORECASE)
+        return out
 
 
 def parse_xdebug_trace(trace_path: str, trace_webroot: str) -> Dict[str, Any]:
@@ -157,6 +187,21 @@ def parse_trace_dir(trace_dir: str, trace_webroot: str) -> Dict[str, Any]:
     }
 
 
+def make_empty_trace_index() -> Dict[str, Any]:
+    return {
+        "trace_name": "__static__",
+        "trace_path": None,
+        "trace_webroot": None,
+        "executed_pairs": set(),
+        "per_file_lines": {},
+        "summary": {
+            "unique_executed_pairs": 0,
+            "unique_files": 0,
+            "trace_count": 0,
+        },
+    }
+
+
 def load_taint_file(taint_path: str) -> Dict[str, Any]:
     data = load_json(taint_path)
     parsed = data.get("parsed", {})
@@ -191,16 +236,29 @@ def annotate_flow_with_execution(flow_nodes: List[Dict[str, Any]], executed_pair
     return out
 
 
-def find_source_node(flow_nodes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def matches_any_source(rule_ctx: RuleContext, code: str, node_type: str) -> bool:
+    upper_type = node_type.upper()
+    for rule_type, pattern in rule_ctx.source_compiled:
+        if rule_type == "identifier_regex":
+            if upper_type in {"IDENTIFIER", "CALL", "UNKNOWN"} and pattern.search(code):
+                return True
+        elif rule_type == "call_regex":
+            if upper_type in {"CALL", "UNKNOWN"} and pattern.search(code):
+                return True
+    return False
+
+
+def find_source_node(rule_ctx: RuleContext, flow_nodes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     for node in flow_nodes:
         code = str(node.get("code", ""))
-        if SUPERGLOBAL_RE.search(code):
+        node_type = str(node.get("type", ""))
+        if matches_any_source(rule_ctx, code, node_type):
             return node
     return None
 
 
-def is_sink_match(sink_name: str, node: Dict[str, Any]) -> bool:
-    pattern = SINK_CALL_PATTERNS.get(sink_name)
+def is_sink_match(rule_ctx: RuleContext, sink_name: str, node: Dict[str, Any]) -> bool:
+    pattern = rule_ctx.sink_compiled.get(sink_name)
     if not pattern:
         return False
 
@@ -215,9 +273,9 @@ def is_sink_match(sink_name: str, node: Dict[str, Any]) -> bool:
     return False
 
 
-def find_sink_node(sink_name: str, flow_nodes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def find_sink_node(rule_ctx: RuleContext, sink_name: str, flow_nodes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     for node in reversed(flow_nodes):
-        if is_sink_match(sink_name, node):
+        if is_sink_match(rule_ctx, sink_name, node):
             return node
 
     for node in reversed(flow_nodes):
@@ -259,7 +317,7 @@ def resolve_local_file(source_root: str, rel_file: str) -> str:
     return os.path.join(source_root, *rel_file.split("/"))
 
 
-def find_class_name(lines: List[str], target_line: int) -> Optional[str]:
+def find_class_name_php(lines: List[str], target_line: int) -> Optional[str]:
     pattern = re.compile(r'^\s*(abstract\s+|final\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)')
     for i in range(min(target_line - 1, len(lines) - 1), -1, -1):
         m = pattern.search(lines[i])
@@ -268,7 +326,7 @@ def find_class_name(lines: List[str], target_line: int) -> Optional[str]:
     return None
 
 
-def find_function_range(lines: List[str], target_line: int) -> Optional[Dict[str, Any]]:
+def find_function_range_php(lines: List[str], target_line: int) -> Optional[Dict[str, Any]]:
     func_pattern = re.compile(
         r'^\s*(public|protected|private)?\s*(static\s+)?function\s+&?\s*([A-Za-z_][A-Za-z0-9_]*)\s*\('
     )
@@ -316,6 +374,78 @@ def find_function_range(lines: List[str], target_line: int) -> Optional[Dict[str
     }
 
 
+def find_class_name_cpp(lines: List[str], target_line: int) -> Optional[str]:
+    pattern = re.compile(r'^\s*(class|struct)\s+([A-Za-z_][A-Za-z0-9_]*)')
+    for i in range(min(target_line - 1, len(lines) - 1), -1, -1):
+        m = pattern.search(lines[i])
+        if m:
+            return m.group(2)
+    return None
+
+
+def find_function_range_c_like(lines: List[str], target_line: int) -> Optional[Dict[str, Any]]:
+    """
+    Heuristic parser for C/C++ function blocks.
+    """
+    func_pattern = re.compile(
+        r'^\s*([A-Za-z_][A-Za-z0-9_<>\s\*&:,~]*?)\s+([A-Za-z_][A-Za-z0-9_:~]*)\s*\([^;]*\)\s*(const\s*)?\{'
+    )
+
+    idx = max(0, min(target_line - 1, len(lines) - 1))
+    start = None
+    func_name = None
+
+    for i in range(idx, -1, -1):
+        line = lines[i]
+        if ";" in line and "{" not in line:
+            continue
+        m = func_pattern.search(line)
+        if m:
+            start = i
+            func_name = m.group(2)
+            break
+
+    if start is None:
+        return None
+
+    brace_balance = 0
+    end = None
+
+    for j in range(start, len(lines)):
+        line = lines[j]
+        brace_balance += line.count("{")
+        brace_balance -= line.count("}")
+
+        if brace_balance <= 0 and j > start:
+            end = j
+            break
+
+    if end is None:
+        end = min(len(lines) - 1, start + 250)
+
+    return {
+        "function_name": func_name,
+        "start_line": start + 1,
+        "end_line": end + 1,
+    }
+
+
+def find_class_name(rule_ctx: RuleContext, lines: List[str], target_line: int) -> Optional[str]:
+    if rule_ctx.function_parser == "php":
+        return find_class_name_php(lines, target_line)
+    if rule_ctx.function_parser in {"cpp"}:
+        return find_class_name_cpp(lines, target_line)
+    return None
+
+
+def find_function_range(rule_ctx: RuleContext, lines: List[str], target_line: int) -> Optional[Dict[str, Any]]:
+    if rule_ctx.function_parser == "php":
+        return find_function_range_php(lines, target_line)
+    if rule_ctx.function_parser in {"c", "cpp"}:
+        return find_function_range_c_like(lines, target_line)
+    return None
+
+
 def make_window_slice(
     lines: List[str],
     focus_lines: List[int],
@@ -339,6 +469,7 @@ def make_window_slice(
 
 
 def build_node_context(
+    rule_ctx: RuleContext,
     source_root: str,
     rel_file: str,
     anchor_line: int,
@@ -359,8 +490,8 @@ def build_node_context(
         }
 
     lines = read_text_lines(local_path)
-    function_range = find_function_range(lines, anchor_line)
-    class_name = find_class_name(lines, anchor_line)
+    function_range = find_function_range(rule_ctx, lines, anchor_line)
+    class_name = find_class_name(rule_ctx, lines, anchor_line)
 
     if function_range:
         func_start = function_range["start_line"]
@@ -380,7 +511,7 @@ def build_node_context(
 
     source_lines = [
         n["line"] for n in flow_nodes_in_file
-        if SUPERGLOBAL_RE.search(str(n.get("code", "")))
+        if matches_any_source(rule_ctx, str(n.get("code", "")), str(n.get("type", "")))
         and isinstance(n.get("line"), int)
         and func_start <= n["line"] <= func_end
     ]
@@ -429,7 +560,7 @@ def group_flow_nodes_by_file(flow_nodes: List[Dict[str, Any]]) -> Dict[str, List
     return grouped
 
 
-def build_all_contexts(source_root: str, grouped_nodes: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+def build_all_contexts(rule_ctx: RuleContext, source_root: str, grouped_nodes: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
     out = []
 
     for rel_file, nodes_in_file in grouped_nodes.items():
@@ -449,7 +580,7 @@ def build_all_contexts(source_root: str, grouped_nodes: Dict[str, List[Dict[str,
             if isinstance(n.get("line"), int) and n["line"] > 0
         })
         anchor_line = line_numbers[0] if line_numbers else 1
-        class_name = find_class_name(lines, anchor_line)
+        class_name = find_class_name(rule_ctx, lines, anchor_line)
 
         focused_slice = make_window_slice(
             lines=lines,
@@ -530,12 +661,13 @@ def compute_trace_matches(
 
 
 def score_flow(
+    rule_ctx: RuleContext,
     sink_name: str,
     runtime: Dict[str, Any],
     matched_trace_count: int,
     total_trace_count: int,
 ) -> float:
-    weight = SINK_PRIORITY_WEIGHT.get(sink_name, 0.5)
+    weight = rule_ctx.sink_priority_weight.get(sink_name, 0.5)
     ratio = float(runtime.get("execution_ratio", 0.0))
     source_bonus = 0.15 if runtime.get("source_executed") else 0.0
     sink_bonus = 0.20 if runtime.get("sink_executed") else 0.0
@@ -611,6 +743,7 @@ def build_llm_case(
 
 
 def build_prompt_ready_context(
+    project_language: str,
     sink_name: str,
     flow_id: int,
     source_node: Optional[Dict[str, Any]],
@@ -623,6 +756,7 @@ def build_prompt_ready_context(
 ) -> str:
     parts = []
     parts.append("[Flow Summary]")
+    parts.append(f"- language: {project_language}")
     parts.append(f"- sink_category: {sink_name}")
     parts.append(f"- flow_id: {flow_id}")
     parts.append(f"- priority_score: {priority_score}")
@@ -677,7 +811,7 @@ def build_prompt_ready_context(
     return "\n".join(parts)
 
 
-def build_detect_prompt_case(llm_case: Dict[str, Any]) -> Dict[str, Any]:
+def build_detect_prompt_case(project_language: str, llm_case: Dict[str, Any]) -> Dict[str, Any]:
     source_ctx = llm_case.get("source_context", {})
     sink_ctx = llm_case.get("sink_context", {})
     source = llm_case.get("source", {})
@@ -690,7 +824,7 @@ def build_detect_prompt_case(llm_case: Dict[str, Any]) -> Dict[str, Any]:
         for mt in matched_traces[:10]
     )
 
-    prompt = f"""You are assisting vulnerability detection for a PHP project.
+    prompt = f"""You are assisting vulnerability detection for a {project_language.upper()} project.
 
 [Task]
 Decide whether this flow is a likely real vulnerability candidate.
@@ -747,6 +881,7 @@ Return:
 
 
 def process_taint_file(
+    rule_ctx: RuleContext,
     taint_path: str,
     source_root: str,
     trace_indexes: List[Dict[str, Any]],
@@ -760,8 +895,8 @@ def process_taint_file(
 
     for flow_id, raw_flow_nodes in enumerate(taint["flows"]):
         annotated_nodes = annotate_flow_with_execution(raw_flow_nodes, union_pairs)
-        source_node = find_source_node(annotated_nodes)
-        sink_node = find_sink_node(taint["sink_name"], annotated_nodes)
+        source_node = find_source_node(rule_ctx, annotated_nodes)
+        sink_node = find_sink_node(rule_ctx, taint["sink_name"], annotated_nodes)
         runtime = compute_flow_runtime_metrics(annotated_nodes, source_node, sink_node)
 
         grouped = group_flow_nodes_by_file(annotated_nodes)
@@ -772,6 +907,7 @@ def process_taint_file(
             src_line = source_node.get("line")
             if src_file in grouped and isinstance(src_line, int) and src_line > 0:
                 source_context = build_node_context(
+                    rule_ctx=rule_ctx,
                     source_root=source_root,
                     rel_file=src_file,
                     anchor_line=src_line,
@@ -787,6 +923,7 @@ def process_taint_file(
             sink_line = sink_node.get("line")
             if sink_file in grouped and isinstance(sink_line, int) and sink_line > 0:
                 sink_context = build_node_context(
+                    rule_ctx=rule_ctx,
                     source_root=source_root,
                     rel_file=sink_file,
                     anchor_line=sink_line,
@@ -796,7 +933,7 @@ def process_taint_file(
                     sink_node=sink_node,
                 )
 
-        all_contexts = build_all_contexts(source_root=source_root, grouped_nodes=grouped)
+        all_contexts = build_all_contexts(rule_ctx=rule_ctx, source_root=source_root, grouped_nodes=grouped)
 
         matched_trace_info = compute_trace_matches(
             flow_nodes=annotated_nodes,
@@ -809,6 +946,7 @@ def process_taint_file(
             runtime_reachable_count += 1
 
         priority_score = score_flow(
+            rule_ctx=rule_ctx,
             sink_name=taint["sink_name"],
             runtime=runtime,
             matched_trace_count=matched_trace_info["matched_trace_count"],
@@ -842,8 +980,9 @@ def process_taint_file(
             "sink_context": sink_context,
             "all_contexts": all_contexts,
             "llm_case": llm_case,
-            "detect_prompt_case": build_detect_prompt_case(llm_case),
+            "detect_prompt_case": build_detect_prompt_case(rule_ctx.language, llm_case),
             "prompt_ready_context": build_prompt_ready_context(
+                project_language=rule_ctx.language,
                 sink_name=taint["sink_name"],
                 flow_id=flow_id,
                 source_node=source_node,
@@ -918,6 +1057,7 @@ def build_detect_prompts(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def run_union_mode(
+    rule_ctx: RuleContext,
     source_root: str,
     trace_indexes: List[Dict[str, Any]],
     union_index: Dict[str, Any],
@@ -941,6 +1081,7 @@ def run_union_mode(
     for taint_path in taint_files:
         print(f"[*] union processing: {taint_path}")
         merged = process_taint_file(
+            rule_ctx=rule_ctx,
             taint_path=taint_path,
             source_root=source_root,
             trace_indexes=trace_indexes,
@@ -964,6 +1105,7 @@ def run_union_mode(
 
 
 def run_separate_mode(
+    rule_ctx: RuleContext,
     source_root: str,
     trace_indexes: List[Dict[str, Any]],
     taint_files: List[str],
@@ -993,6 +1135,7 @@ def run_separate_mode(
         for taint_path in taint_files:
             print(f"[*] separate processing [{trace_name}]: {taint_path}")
             merged = process_taint_file(
+                rule_ctx=rule_ctx,
                 taint_path=taint_path,
                 source_root=source_root,
                 trace_indexes=[trace_idx],
@@ -1017,59 +1160,151 @@ def run_separate_mode(
     save_json(os.path.join(output_dir, "overview_separate_all.json"), separate_overview)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="NLD merge/slice v4 with multi-trace union/separate support.")
-    parser.add_argument("--source-root", required=True, help="로컬 phpMyAdmin 루트 경로")
-    parser.add_argument("--trace-webroot", default="/var/www/html", help="Xdebug trace 안 웹루트 경로")
-    parser.add_argument("--taint", nargs="+", required=True, help="taint json 파일 또는 디렉터리")
-    parser.add_argument("--output-dir", required=True, help="출력 디렉터리")
+def run_static_mode(
+    rule_ctx: RuleContext,
+    source_root: str,
+    taint_files: List[str],
+    output_dir: str,
+) -> None:
+    """
+    Static-only mode for languages or projects without runtime trace input.
+    """
+    ensure_dir(output_dir)
+    empty_trace = make_empty_trace_index()
+    results = []
 
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--trace", help=".xt 파일 하나")
-    group.add_argument("--trace-dir", help=".xt 파일들이 들어있는 디렉터리")
+    trace_meta = {
+        "mode": "static",
+        "trace_count": 0,
+        "trace_names": [],
+        "summary": empty_trace["summary"],
+        "per_file_executed_line_count": {},
+    }
+    save_json(os.path.join(output_dir, "dynamic_trace_index_union.json"), trace_meta)
 
+    for taint_path in taint_files:
+        print(f"[*] static processing: {taint_path}")
+        merged = process_taint_file(
+            rule_ctx=rule_ctx,
+            taint_path=taint_path,
+            source_root=source_root,
+            trace_indexes=[],
+            union_index=empty_trace,
+        )
+        results.append(merged)
+
+        sink_name = merged["sink_name"]
+        save_json(os.path.join(output_dir, f"merged_union_{sink_name}.json"), merged)
+
+    overview = build_overview(results)
+    llm_cases = build_llm_cases(results)
+    detect_prompts = build_detect_prompts(results)
+
+    save_json(os.path.join(output_dir, "overview_union.json"), overview)
+    save_json(os.path.join(output_dir, "merged_union_all.json"), results)
+    save_json(os.path.join(output_dir, "llm_cases_union.json"), llm_cases)
+    save_json(os.path.join(output_dir, "detect_prompts_union.json"), detect_prompts)
+
+    print(json.dumps(overview, indent=2, ensure_ascii=False))
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Config-driven NLD merge/slice with multi-trace support.")
+    parser.add_argument("--config", default=None, help="Path to project config JSON")
+    parser.add_argument("--rules", default=None, help="Path to language rules JSON")
+    parser.add_argument("--source-root", default=None, help="Override local source root path")
+    parser.add_argument("--taint", nargs="+", default=None, help="Taint JSON files or directories")
+    parser.add_argument("--output-dir", default=None, help="Override output directory")
+    parser.add_argument("--trace", default=None, help="Single trace file")
+    parser.add_argument("--trace-dir", default=None, help="Directory containing multiple trace files")
+    parser.add_argument("--trace-webroot", default=None, help="Override trace webroot")
     parser.add_argument(
         "--mode",
-        choices=["union", "separate", "both"],
-        default="union",
-        help="trace-dir 사용 시 union / separate / both",
+        choices=["union", "separate", "both", "static"],
+        default=None,
+        help="Execution mode",
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
-    ensure_dir(args.output_dir)
 
-    taint_files = collect_taint_files(args.taint)
+def resolve_default_paths(args: argparse.Namespace) -> Tuple[Path, Path]:
+    base_dir = Path(__file__).resolve().parent
+    config_path = Path(args.config) if args.config else (base_dir / "configs" / "phpmyadmin.json")
 
-    if args.trace:
-        trace_idx = parse_xdebug_trace(args.trace, args.trace_webroot)
-        run_union_mode(
-            source_root=args.source_root,
-            trace_indexes=[trace_idx],
-            union_index=trace_idx,
+    config = load_json(config_path)
+    language = config["project"]["language"]
+    rules_path = Path(args.rules) if args.rules else (base_dir / "rules" / f"{language}.json")
+    return config_path, rules_path
+
+
+def main():
+    args = parse_args()
+    config_path, rules_path = resolve_default_paths(args)
+
+    config = load_json(config_path)
+    rules = load_json(rules_path)
+    rule_ctx = RuleContext(config=config, rules=rules)
+
+    source_root = args.source_root or config["paths"]["local_source_root"]
+    taint_inputs = args.taint or [config["paths"]["taint_dir"]]
+    output_dir = args.output_dir or config["paths"]["output_dir"]
+    trace_webroot = args.trace_webroot or config.get("trace", {}).get("webroot")
+    analysis_mode = args.mode or config.get("analysis", {}).get("mode", "dynamic")
+
+    ensure_dir(output_dir)
+    taint_files = collect_taint_files(taint_inputs)
+
+    if analysis_mode == "static":
+        run_static_mode(
+            rule_ctx=rule_ctx,
+            source_root=source_root,
             taint_files=taint_files,
-            output_dir=args.output_dir,
+            output_dir=output_dir,
         )
         return
 
-    multi = parse_trace_dir(args.trace_dir, args.trace_webroot)
+    # dynamic path expects trace input
+    if args.trace:
+        if not trace_webroot:
+            raise ValueError("trace_webroot is required for dynamic trace processing.")
+        trace_idx = parse_xdebug_trace(args.trace, trace_webroot)
+        run_union_mode(
+            rule_ctx=rule_ctx,
+            source_root=source_root,
+            trace_indexes=[trace_idx],
+            union_index=trace_idx,
+            taint_files=taint_files,
+            output_dir=output_dir,
+        )
+        return
+
+    trace_dir = args.trace_dir or config["paths"].get("trace_dir")
+    if not trace_dir:
+        raise ValueError("trace_dir is required for dynamic mode unless --trace is provided.")
+    if not trace_webroot:
+        raise ValueError("trace_webroot is required for dynamic trace processing.")
+
+    multi = parse_trace_dir(trace_dir, trace_webroot)
     trace_indexes = multi["trace_indexes"]
     union_index = multi["union_index"]
 
-    if args.mode in {"union", "both"}:
+    if analysis_mode in {"union", "dynamic", "both"}:
         run_union_mode(
-            source_root=args.source_root,
+            rule_ctx=rule_ctx,
+            source_root=source_root,
             trace_indexes=trace_indexes,
             union_index=union_index,
             taint_files=taint_files,
-            output_dir=os.path.join(args.output_dir, "union"),
+            output_dir=os.path.join(output_dir, "union") if analysis_mode in {"both"} else output_dir,
         )
 
-    if args.mode in {"separate", "both"}:
+    if analysis_mode in {"separate", "both"}:
         run_separate_mode(
-            source_root=args.source_root,
+            rule_ctx=rule_ctx,
+            source_root=source_root,
             trace_indexes=trace_indexes,
             taint_files=taint_files,
-            output_dir=os.path.join(args.output_dir, "separate"),
+            output_dir=os.path.join(output_dir, "separate") if analysis_mode in {"both"} else output_dir,
         )
 
 
