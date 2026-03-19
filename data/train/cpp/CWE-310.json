@@ -1,0 +1,126 @@
+[
+{
+  "cve_id": "CVE-2014-3570",
+  "code_before_change": "void bn_mul_comba4(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b)\n\t{\n#ifdef BN_LLONG\n\tBN_ULLONG t;\n#else\n\tBN_ULONG bl,bh;\n#endif\n\tBN_ULONG t1,t2;\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tmul_add_c(a[0],b[0],c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tmul_add_c(a[0],b[1],c2,c3,c1);\n\tmul_add_c(a[1],b[0],c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tmul_add_c(a[2],b[0],c3,c1,c2);\n\tmul_add_c(a[1],b[1],c3,c1,c2);\n\tmul_add_c(a[0],b[2],c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tmul_add_c(a[0],b[3],c1,c2,c3);\n\tmul_add_c(a[1],b[2],c1,c2,c3);\n\tmul_add_c(a[2],b[1],c1,c2,c3);\n\tmul_add_c(a[3],b[0],c1,c2,c3);\n\tr[3]=c1;\n\tc1=0;\n\tmul_add_c(a[3],b[1],c2,c3,c1);\n\tmul_add_c(a[2],b[2],c2,c3,c1);\n\tmul_add_c(a[1],b[3],c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tmul_add_c(a[2],b[3],c3,c1,c2);\n\tmul_add_c(a[3],b[2],c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tmul_add_c(a[3],b[3],c1,c2,c3);\n\tr[6]=c1;\n\tr[7]=c2;\n\t}",
+  "code_after_change": "\tc2=0;\n\tmul_add_c(a[4],b[7],c3,c1,c2);\n\tmul_add_c(a[5],b[6],c3,c1,c2);\n\tmul_add_c(a[6],b[5],c3,c1,c2);\n\tmul_add_c(a[7],b[4],c3,c1,c2);\n\tr[11]=c3;\n\tc3=0;\n\tmul_add_c(a[7],b[5],c1,c2,c3);\n\tmul_add_c(a[6],b[6],c1,c2,c3);\n\tmul_add_c(a[5],b[7],c1,c2,c3);\n\tr[12]=c1;\n\tc1=0;\n\tmul_add_c(a[6],b[7],c2,c3,c1);\n\tmul_add_c(a[7],b[6],c2,c3,c1);\n\tr[13]=c2;\n\tc2=0;\n\tmul_add_c(a[7],b[7],c3,c1,c2);\n\tr[14]=c3;\n\tr[15]=c1;\n\t}\n\nvoid bn_mul_comba4(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b)\n\t{\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tmul_add_c(a[0],b[0],c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tmul_add_c(a[0],b[1],c2,c3,c1);\n\tmul_add_c(a[1],b[0],c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tmul_add_c(a[2],b[0],c3,c1,c2);\n\tmul_add_c(a[1],b[1],c3,c1,c2);\n\tmul_add_c(a[0],b[2],c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tmul_add_c(a[0],b[3],c1,c2,c3);\n\tmul_add_c(a[1],b[2],c1,c2,c3);\n\tmul_add_c(a[2],b[1],c1,c2,c3);\n\tmul_add_c(a[3],b[0],c1,c2,c3);",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "#ifdef BN_LLONG",
+      "\tBN_ULLONG t;",
+      "#else",
+      "\tBN_ULONG bl,bh;",
+      "#endif",
+      "\tBN_ULONG t1,t2;"
+    ]
+  },
+  "cwe": [
+    "CWE-310"
+  ],
+  "cve_description": "The BN_sqr implementation in OpenSSL before 0.9.8zd, 1.0.0 before 1.0.0p, and 1.0.1 before 1.0.1k does not properly calculate the square of a BIGNUM value, which might make it easier for remote attackers to defeat cryptographic protection mechanisms via unspecified vectors, related to crypto/bn/asm/mips.pl, crypto/bn/asm/x86_64-gcc.c, and crypto/bn/bn_asm.c.",
+  "id": 1298
+},
+{
+  "cve_id": "CVE-2014-3570",
+  "code_before_change": "void bn_mul_comba8(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b)\n\t{\n#ifdef BN_LLONG\n\tBN_ULLONG t;\n#else\n\tBN_ULONG bl,bh;\n#endif\n\tBN_ULONG t1,t2;\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tmul_add_c(a[0],b[0],c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tmul_add_c(a[0],b[1],c2,c3,c1);\n\tmul_add_c(a[1],b[0],c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tmul_add_c(a[2],b[0],c3,c1,c2);\n\tmul_add_c(a[1],b[1],c3,c1,c2);\n\tmul_add_c(a[0],b[2],c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tmul_add_c(a[0],b[3],c1,c2,c3);\n\tmul_add_c(a[1],b[2],c1,c2,c3);\n\tmul_add_c(a[2],b[1],c1,c2,c3);\n\tmul_add_c(a[3],b[0],c1,c2,c3);\n\tr[3]=c1;\n\tc1=0;\n\tmul_add_c(a[4],b[0],c2,c3,c1);\n\tmul_add_c(a[3],b[1],c2,c3,c1);\n\tmul_add_c(a[2],b[2],c2,c3,c1);\n\tmul_add_c(a[1],b[3],c2,c3,c1);\n\tmul_add_c(a[0],b[4],c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tmul_add_c(a[0],b[5],c3,c1,c2);\n\tmul_add_c(a[1],b[4],c3,c1,c2);\n\tmul_add_c(a[2],b[3],c3,c1,c2);\n\tmul_add_c(a[3],b[2],c3,c1,c2);\n\tmul_add_c(a[4],b[1],c3,c1,c2);\n\tmul_add_c(a[5],b[0],c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tmul_add_c(a[6],b[0],c1,c2,c3);\n\tmul_add_c(a[5],b[1],c1,c2,c3);\n\tmul_add_c(a[4],b[2],c1,c2,c3);\n\tmul_add_c(a[3],b[3],c1,c2,c3);\n\tmul_add_c(a[2],b[4],c1,c2,c3);\n\tmul_add_c(a[1],b[5],c1,c2,c3);\n\tmul_add_c(a[0],b[6],c1,c2,c3);\n\tr[6]=c1;\n\tc1=0;\n\tmul_add_c(a[0],b[7],c2,c3,c1);\n\tmul_add_c(a[1],b[6],c2,c3,c1);\n\tmul_add_c(a[2],b[5],c2,c3,c1);\n\tmul_add_c(a[3],b[4],c2,c3,c1);\n\tmul_add_c(a[4],b[3],c2,c3,c1);\n\tmul_add_c(a[5],b[2],c2,c3,c1);\n\tmul_add_c(a[6],b[1],c2,c3,c1);\n\tmul_add_c(a[7],b[0],c2,c3,c1);\n\tr[7]=c2;\n\tc2=0;\n\tmul_add_c(a[7],b[1],c3,c1,c2);\n\tmul_add_c(a[6],b[2],c3,c1,c2);\n\tmul_add_c(a[5],b[3],c3,c1,c2);\n\tmul_add_c(a[4],b[4],c3,c1,c2);\n\tmul_add_c(a[3],b[5],c3,c1,c2);\n\tmul_add_c(a[2],b[6],c3,c1,c2);\n\tmul_add_c(a[1],b[7],c3,c1,c2);\n\tr[8]=c3;\n\tc3=0;\n\tmul_add_c(a[2],b[7],c1,c2,c3);\n\tmul_add_c(a[3],b[6],c1,c2,c3);\n\tmul_add_c(a[4],b[5],c1,c2,c3);\n\tmul_add_c(a[5],b[4],c1,c2,c3);\n\tmul_add_c(a[6],b[3],c1,c2,c3);\n\tmul_add_c(a[7],b[2],c1,c2,c3);\n\tr[9]=c1;\n\tc1=0;\n\tmul_add_c(a[7],b[3],c2,c3,c1);\n\tmul_add_c(a[6],b[4],c2,c3,c1);\n\tmul_add_c(a[5],b[5],c2,c3,c1);\n\tmul_add_c(a[4],b[6],c2,c3,c1);\n\tmul_add_c(a[3],b[7],c2,c3,c1);\n\tr[10]=c2;\n\tc2=0;\n\tmul_add_c(a[4],b[7],c3,c1,c2);\n\tmul_add_c(a[5],b[6],c3,c1,c2);\n\tmul_add_c(a[6],b[5],c3,c1,c2);\n\tmul_add_c(a[7],b[4],c3,c1,c2);\n\tr[11]=c3;\n\tc3=0;\n\tmul_add_c(a[7],b[5],c1,c2,c3);\n\tmul_add_c(a[6],b[6],c1,c2,c3);\n\tmul_add_c(a[5],b[7],c1,c2,c3);\n\tr[12]=c1;\n\tc1=0;\n\tmul_add_c(a[6],b[7],c2,c3,c1);\n\tmul_add_c(a[7],b[6],c2,c3,c1);\n\tr[13]=c2;\n\tc2=0;\n\tmul_add_c(a[7],b[7],c3,c1,c2);\n\tr[14]=c3;\n\tr[15]=c1;\n\t}",
+  "code_after_change": "\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) hi++;\t\\\n\tc1 = (c1+hi)&BN_MASK2; if (c1<hi) c2++;\t\\\n\t} while(0)\n\n#define mul_add_c2(a,b,c0,c1,c2)\tdo {\t\\\n\tBN_ULONG tt;\t\t\t\t\\\n\tBN_ULONG lo = LBITS(a), hi = HBITS(a);\t\\\n\tBN_ULONG bl = LBITS(b), bh = HBITS(b);\t\\\n\tmul64(lo,hi,bl,bh);\t\t\t\\\n\ttt = hi;\t\t\t\t\\\n\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) tt++;\t\\\n\tc1 = (c1+tt)&BN_MASK2; if (c1<tt) c2++;\t\\\n\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) hi++;\t\\\n\tc1 = (c1+hi)&BN_MASK2; if (c1<hi) c2++;\t\\\n\t} while(0)\n\n#define sqr_add_c(a,i,c0,c1,c2)\t\tdo {\t\\\n\tBN_ULONG lo, hi;\t\t\t\\\n\tsqr64(lo,hi,(a)[i]);\t\t\t\\\n\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) hi++;\t\\\n\tc1 = (c1+hi)&BN_MASK2; if (c1<hi) c2++;\t\\\n\t} while(0)\n\n#define sqr_add_c2(a,i,j,c0,c1,c2) \\\n\tmul_add_c2((a)[i],(a)[j],c0,c1,c2)\n#endif /* !BN_LLONG */\n\nvoid bn_mul_comba8(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b)\n\t{\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tmul_add_c(a[0],b[0],c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tmul_add_c(a[0],b[1],c2,c3,c1);\n\tmul_add_c(a[1],b[0],c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tmul_add_c(a[2],b[0],c3,c1,c2);\n\tmul_add_c(a[1],b[1],c3,c1,c2);\n\tmul_add_c(a[0],b[2],c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tmul_add_c(a[0],b[3],c1,c2,c3);\n\tmul_add_c(a[1],b[2],c1,c2,c3);\n\tmul_add_c(a[2],b[1],c1,c2,c3);\n\tmul_add_c(a[3],b[0],c1,c2,c3);\n\tr[3]=c1;\n\tc1=0;\n\tmul_add_c(a[4],b[0],c2,c3,c1);\n\tmul_add_c(a[3],b[1],c2,c3,c1);\n\tmul_add_c(a[2],b[2],c2,c3,c1);\n\tmul_add_c(a[1],b[3],c2,c3,c1);\n\tmul_add_c(a[0],b[4],c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tmul_add_c(a[0],b[5],c3,c1,c2);\n\tmul_add_c(a[1],b[4],c3,c1,c2);\n\tmul_add_c(a[2],b[3],c3,c1,c2);\n\tmul_add_c(a[3],b[2],c3,c1,c2);\n\tmul_add_c(a[4],b[1],c3,c1,c2);\n\tmul_add_c(a[5],b[0],c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tmul_add_c(a[6],b[0],c1,c2,c3);\n\tmul_add_c(a[5],b[1],c1,c2,c3);\n\tmul_add_c(a[4],b[2],c1,c2,c3);\n\tmul_add_c(a[3],b[3],c1,c2,c3);\n\tmul_add_c(a[2],b[4],c1,c2,c3);\n\tmul_add_c(a[1],b[5],c1,c2,c3);\n\tmul_add_c(a[0],b[6],c1,c2,c3);\n\tr[6]=c1;\n\tc1=0;\n\tmul_add_c(a[0],b[7],c2,c3,c1);\n\tmul_add_c(a[1],b[6],c2,c3,c1);\n\tmul_add_c(a[2],b[5],c2,c3,c1);\n\tmul_add_c(a[3],b[4],c2,c3,c1);\n\tmul_add_c(a[4],b[3],c2,c3,c1);\n\tmul_add_c(a[5],b[2],c2,c3,c1);\n\tmul_add_c(a[6],b[1],c2,c3,c1);\n\tmul_add_c(a[7],b[0],c2,c3,c1);\n\tr[7]=c2;\n\tc2=0;\n\tmul_add_c(a[7],b[1],c3,c1,c2);\n\tmul_add_c(a[6],b[2],c3,c1,c2);\n\tmul_add_c(a[5],b[3],c3,c1,c2);\n\tmul_add_c(a[4],b[4],c3,c1,c2);\n\tmul_add_c(a[3],b[5],c3,c1,c2);\n\tmul_add_c(a[2],b[6],c3,c1,c2);\n\tmul_add_c(a[1],b[7],c3,c1,c2);\n\tr[8]=c3;\n\tc3=0;\n\tmul_add_c(a[2],b[7],c1,c2,c3);\n\tmul_add_c(a[3],b[6],c1,c2,c3);\n\tmul_add_c(a[4],b[5],c1,c2,c3);\n\tmul_add_c(a[5],b[4],c1,c2,c3);\n\tmul_add_c(a[6],b[3],c1,c2,c3);\n\tmul_add_c(a[7],b[2],c1,c2,c3);\n\tr[9]=c1;\n\tc1=0;\n\tmul_add_c(a[7],b[3],c2,c3,c1);\n\tmul_add_c(a[6],b[4],c2,c3,c1);\n\tmul_add_c(a[5],b[5],c2,c3,c1);\n\tmul_add_c(a[4],b[6],c2,c3,c1);\n\tmul_add_c(a[3],b[7],c2,c3,c1);",
+  "function_modified_lines": {
+    "added": [
+      "\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) hi++;\t\\",
+      "\tc1 = (c1+hi)&BN_MASK2; if (c1<hi) c2++;\t\\",
+      "\t} while(0)",
+      "#define mul_add_c2(a,b,c0,c1,c2)\tdo {\t\\",
+      "\tBN_ULONG tt;\t\t\t\t\\",
+      "\tBN_ULONG lo = LBITS(a), hi = HBITS(a);\t\\",
+      "\tBN_ULONG bl = LBITS(b), bh = HBITS(b);\t\\",
+      "\tmul64(lo,hi,bl,bh);\t\t\t\\",
+      "\ttt = hi;\t\t\t\t\\",
+      "\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) tt++;\t\\",
+      "\tc1 = (c1+tt)&BN_MASK2; if (c1<tt) c2++;\t\\",
+      "\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) hi++;\t\\",
+      "\tc1 = (c1+hi)&BN_MASK2; if (c1<hi) c2++;\t\\",
+      "\t} while(0)",
+      "#define sqr_add_c(a,i,c0,c1,c2)\t\tdo {\t\\",
+      "\tBN_ULONG lo, hi;\t\t\t\\",
+      "\tsqr64(lo,hi,(a)[i]);\t\t\t\\",
+      "\tc0 = (c0+lo)&BN_MASK2; if (c0<lo) hi++;\t\\",
+      "\tc1 = (c1+hi)&BN_MASK2; if (c1<hi) c2++;\t\\",
+      "\t} while(0)"
+    ],
+    "deleted": [
+      "#ifdef BN_LLONG",
+      "\tBN_ULLONG t;",
+      "#else",
+      "\tBN_ULONG bl,bh;",
+      "#endif",
+      "\tBN_ULONG t1,t2;"
+    ]
+  },
+  "cwe": [
+    "CWE-310"
+  ],
+  "cve_description": "The BN_sqr implementation in OpenSSL before 0.9.8zd, 1.0.0 before 1.0.0p, and 1.0.1 before 1.0.1k does not properly calculate the square of a BIGNUM value, which might make it easier for remote attackers to defeat cryptographic protection mechanisms via unspecified vectors, related to crypto/bn/asm/mips.pl, crypto/bn/asm/x86_64-gcc.c, and crypto/bn/bn_asm.c.",
+  "id": 1299
+},
+{
+  "cve_id": "CVE-2014-3570",
+  "code_before_change": "void bn_sqr_comba4(BN_ULONG *r, const BN_ULONG *a)\n\t{\n#ifdef BN_LLONG\n\tBN_ULLONG t,tt;\n#else\n\tBN_ULONG bl,bh;\n#endif\n\tBN_ULONG t1,t2;\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tsqr_add_c(a,0,c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tsqr_add_c2(a,1,0,c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tsqr_add_c(a,1,c3,c1,c2);\n\tsqr_add_c2(a,2,0,c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tsqr_add_c2(a,3,0,c1,c2,c3);\n\tsqr_add_c2(a,2,1,c1,c2,c3);\n\tr[3]=c1;\n\tc1=0;\n\tsqr_add_c(a,2,c2,c3,c1);\n\tsqr_add_c2(a,3,1,c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tsqr_add_c2(a,3,2,c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tsqr_add_c(a,3,c1,c2,c3);\n\tr[6]=c1;\n\tr[7]=c2;\n\t}",
+  "code_after_change": "\tc1=0;\n\tsqr_add_c2(a,7,6,c2,c3,c1);\n\tr[13]=c2;\n\tc2=0;\n\tsqr_add_c(a,7,c3,c1,c2);\n\tr[14]=c3;\n\tr[15]=c1;\n\t}\n\nvoid bn_sqr_comba4(BN_ULONG *r, const BN_ULONG *a)\n\t{\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tsqr_add_c(a,0,c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tsqr_add_c2(a,1,0,c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tsqr_add_c(a,1,c3,c1,c2);\n\tsqr_add_c2(a,2,0,c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tsqr_add_c2(a,3,0,c1,c2,c3);\n\tsqr_add_c2(a,2,1,c1,c2,c3);\n\tr[3]=c1;\n\tc1=0;\n\tsqr_add_c(a,2,c2,c3,c1);\n\tsqr_add_c2(a,3,1,c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tsqr_add_c2(a,3,2,c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tsqr_add_c(a,3,c1,c2,c3);",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "#ifdef BN_LLONG",
+      "\tBN_ULLONG t,tt;",
+      "#else",
+      "\tBN_ULONG bl,bh;",
+      "#endif",
+      "\tBN_ULONG t1,t2;"
+    ]
+  },
+  "cwe": [
+    "CWE-310"
+  ],
+  "cve_description": "The BN_sqr implementation in OpenSSL before 0.9.8zd, 1.0.0 before 1.0.0p, and 1.0.1 before 1.0.1k does not properly calculate the square of a BIGNUM value, which might make it easier for remote attackers to defeat cryptographic protection mechanisms via unspecified vectors, related to crypto/bn/asm/mips.pl, crypto/bn/asm/x86_64-gcc.c, and crypto/bn/bn_asm.c.",
+  "id": 1300
+},
+{
+  "cve_id": "CVE-2014-3570",
+  "code_before_change": "void bn_sqr_comba8(BN_ULONG *r, const BN_ULONG *a)\n\t{\n#ifdef BN_LLONG\n\tBN_ULLONG t,tt;\n#else\n\tBN_ULONG bl,bh;\n#endif\n\tBN_ULONG t1,t2;\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tsqr_add_c(a,0,c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tsqr_add_c2(a,1,0,c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tsqr_add_c(a,1,c3,c1,c2);\n\tsqr_add_c2(a,2,0,c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tsqr_add_c2(a,3,0,c1,c2,c3);\n\tsqr_add_c2(a,2,1,c1,c2,c3);\n\tr[3]=c1;\n\tc1=0;\n\tsqr_add_c(a,2,c2,c3,c1);\n\tsqr_add_c2(a,3,1,c2,c3,c1);\n\tsqr_add_c2(a,4,0,c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tsqr_add_c2(a,5,0,c3,c1,c2);\n\tsqr_add_c2(a,4,1,c3,c1,c2);\n\tsqr_add_c2(a,3,2,c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tsqr_add_c(a,3,c1,c2,c3);\n\tsqr_add_c2(a,4,2,c1,c2,c3);\n\tsqr_add_c2(a,5,1,c1,c2,c3);\n\tsqr_add_c2(a,6,0,c1,c2,c3);\n\tr[6]=c1;\n\tc1=0;\n\tsqr_add_c2(a,7,0,c2,c3,c1);\n\tsqr_add_c2(a,6,1,c2,c3,c1);\n\tsqr_add_c2(a,5,2,c2,c3,c1);\n\tsqr_add_c2(a,4,3,c2,c3,c1);\n\tr[7]=c2;\n\tc2=0;\n\tsqr_add_c(a,4,c3,c1,c2);\n\tsqr_add_c2(a,5,3,c3,c1,c2);\n\tsqr_add_c2(a,6,2,c3,c1,c2);\n\tsqr_add_c2(a,7,1,c3,c1,c2);\n\tr[8]=c3;\n\tc3=0;\n\tsqr_add_c2(a,7,2,c1,c2,c3);\n\tsqr_add_c2(a,6,3,c1,c2,c3);\n\tsqr_add_c2(a,5,4,c1,c2,c3);\n\tr[9]=c1;\n\tc1=0;\n\tsqr_add_c(a,5,c2,c3,c1);\n\tsqr_add_c2(a,6,4,c2,c3,c1);\n\tsqr_add_c2(a,7,3,c2,c3,c1);\n\tr[10]=c2;\n\tc2=0;\n\tsqr_add_c2(a,7,4,c3,c1,c2);\n\tsqr_add_c2(a,6,5,c3,c1,c2);\n\tr[11]=c3;\n\tc3=0;\n\tsqr_add_c(a,6,c1,c2,c3);\n\tsqr_add_c2(a,7,5,c1,c2,c3);\n\tr[12]=c1;\n\tc1=0;\n\tsqr_add_c2(a,7,6,c2,c3,c1);\n\tr[13]=c2;\n\tc2=0;\n\tsqr_add_c(a,7,c3,c1,c2);\n\tr[14]=c3;\n\tr[15]=c1;\n\t}",
+  "code_after_change": "\tc1=0;\n\tmul_add_c(a[3],b[1],c2,c3,c1);\n\tmul_add_c(a[2],b[2],c2,c3,c1);\n\tmul_add_c(a[1],b[3],c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tmul_add_c(a[2],b[3],c3,c1,c2);\n\tmul_add_c(a[3],b[2],c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tmul_add_c(a[3],b[3],c1,c2,c3);\n\tr[6]=c1;\n\tr[7]=c2;\n\t}\n\nvoid bn_sqr_comba8(BN_ULONG *r, const BN_ULONG *a)\n\t{\n\tBN_ULONG c1,c2,c3;\n\n\tc1=0;\n\tc2=0;\n\tc3=0;\n\tsqr_add_c(a,0,c1,c2,c3);\n\tr[0]=c1;\n\tc1=0;\n\tsqr_add_c2(a,1,0,c2,c3,c1);\n\tr[1]=c2;\n\tc2=0;\n\tsqr_add_c(a,1,c3,c1,c2);\n\tsqr_add_c2(a,2,0,c3,c1,c2);\n\tr[2]=c3;\n\tc3=0;\n\tsqr_add_c2(a,3,0,c1,c2,c3);\n\tsqr_add_c2(a,2,1,c1,c2,c3);\n\tr[3]=c1;\n\tc1=0;\n\tsqr_add_c(a,2,c2,c3,c1);\n\tsqr_add_c2(a,3,1,c2,c3,c1);\n\tsqr_add_c2(a,4,0,c2,c3,c1);\n\tr[4]=c2;\n\tc2=0;\n\tsqr_add_c2(a,5,0,c3,c1,c2);\n\tsqr_add_c2(a,4,1,c3,c1,c2);\n\tsqr_add_c2(a,3,2,c3,c1,c2);\n\tr[5]=c3;\n\tc3=0;\n\tsqr_add_c(a,3,c1,c2,c3);\n\tsqr_add_c2(a,4,2,c1,c2,c3);\n\tsqr_add_c2(a,5,1,c1,c2,c3);\n\tsqr_add_c2(a,6,0,c1,c2,c3);\n\tr[6]=c1;\n\tc1=0;\n\tsqr_add_c2(a,7,0,c2,c3,c1);\n\tsqr_add_c2(a,6,1,c2,c3,c1);\n\tsqr_add_c2(a,5,2,c2,c3,c1);\n\tsqr_add_c2(a,4,3,c2,c3,c1);\n\tr[7]=c2;\n\tc2=0;\n\tsqr_add_c(a,4,c3,c1,c2);\n\tsqr_add_c2(a,5,3,c3,c1,c2);\n\tsqr_add_c2(a,6,2,c3,c1,c2);\n\tsqr_add_c2(a,7,1,c3,c1,c2);\n\tr[8]=c3;\n\tc3=0;\n\tsqr_add_c2(a,7,2,c1,c2,c3);\n\tsqr_add_c2(a,6,3,c1,c2,c3);\n\tsqr_add_c2(a,5,4,c1,c2,c3);\n\tr[9]=c1;\n\tc1=0;\n\tsqr_add_c(a,5,c2,c3,c1);\n\tsqr_add_c2(a,6,4,c2,c3,c1);\n\tsqr_add_c2(a,7,3,c2,c3,c1);\n\tr[10]=c2;\n\tc2=0;\n\tsqr_add_c2(a,7,4,c3,c1,c2);\n\tsqr_add_c2(a,6,5,c3,c1,c2);\n\tr[11]=c3;\n\tc3=0;\n\tsqr_add_c(a,6,c1,c2,c3);\n\tsqr_add_c2(a,7,5,c1,c2,c3);",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "#ifdef BN_LLONG",
+      "\tBN_ULLONG t,tt;",
+      "#else",
+      "\tBN_ULONG bl,bh;",
+      "#endif",
+      "\tBN_ULONG t1,t2;"
+    ]
+  },
+  "cwe": [
+    "CWE-310"
+  ],
+  "cve_description": "The BN_sqr implementation in OpenSSL before 0.9.8zd, 1.0.0 before 1.0.0p, and 1.0.1 before 1.0.1k does not properly calculate the square of a BIGNUM value, which might make it easier for remote attackers to defeat cryptographic protection mechanisms via unspecified vectors, related to crypto/bn/asm/mips.pl, crypto/bn/asm/x86_64-gcc.c, and crypto/bn/bn_asm.c.",
+  "id": 1301
+},
+{
+  "cve_id": "CVE-2014-5386",
+  "code_before_change": "Variant HHVM_FUNCTION(mcrypt_create_iv, int size, int source /* = 0 */) {\n  if (size <= 0 || size >= INT_MAX) {\n    raise_warning(\"Can not create an IV with a size of less than 1 or \"\n                    \"greater than %d\", INT_MAX);\n    return false;\n  }\n\n  int n = 0;\n  char *iv = (char*)calloc(size + 1, 1);\n  if (source == RANDOM || source == URANDOM) {\n    int fd = open(source == RANDOM ? \"/dev/random\" : \"/dev/urandom\", O_RDONLY);\n    if (fd < 0) {\n      free(iv);\n      raise_warning(\"Cannot open source device\");\n      return false;\n    }\n    int read_bytes;\n    for (read_bytes = 0; read_bytes < size && n >= 0; read_bytes += n) {\n      n = read(fd, iv + read_bytes, size - read_bytes);\n    }\n    n = read_bytes;\n    close(fd);\n    if (n < size) {\n      free(iv);\n      raise_warning(\"Could not gather sufficient random data\");\n      return false;\n    }\n  } else {\n    n = size;\n    while (size) {\n      iv[--size] = (char)(255.0 * rand() / RAND_MAX);\n    }\n  }\n  return String(iv, n, AttachString);\n}",
+  "code_after_change": "Variant HHVM_FUNCTION(mcrypt_create_iv, int size, int source /* = 0 */) {\n  if (size <= 0 || size >= INT_MAX) {\n    raise_warning(\"Can not create an IV with a size of less than 1 or \"\n                    \"greater than %d\", INT_MAX);\n    return false;\n  }\n\n  int n = 0;\n  char *iv = (char*)calloc(size + 1, 1);\n  if (source == RANDOM || source == URANDOM) {\n    int fd = open(source == RANDOM ? \"/dev/random\" : \"/dev/urandom\", O_RDONLY);\n    if (fd < 0) {\n      free(iv);\n      raise_warning(\"Cannot open source device\");\n      return false;\n    }\n    int read_bytes;\n    for (read_bytes = 0; read_bytes < size && n >= 0; read_bytes += n) {\n      n = read(fd, iv + read_bytes, size - read_bytes);\n    }\n    n = read_bytes;\n    close(fd);\n    if (n < size) {\n      free(iv);\n      raise_warning(\"Could not gather sufficient random data\");\n      return false;\n    }\n  } else {\n    n = size;\n    while (size) {\n      // Use userspace rand() function because it handles auto-seeding\n      iv[--size] = (char)f_rand(0, 255);\n    }\n  }\n  return String(iv, n, AttachString);\n}",
+  "function_modified_lines": {
+    "added": [
+      "      // Use userspace rand() function because it handles auto-seeding",
+      "      iv[--size] = (char)f_rand(0, 255);"
+    ],
+    "deleted": [
+      "      iv[--size] = (char)(255.0 * rand() / RAND_MAX);"
+    ]
+  },
+  "cwe": [
+    "CWE-310"
+  ],
+  "cve_description": "The mcrypt_create_iv function in hphp/runtime/ext/mcrypt/ext_mcrypt.cpp in Facebook HipHop Virtual Machine (HHVM) before 3.3.0 does not seed the random number generator, which makes it easier for remote attackers to defeat cryptographic protection mechanisms by leveraging the use of a single initialization vector.",
+  "id": 1302
+}
+]

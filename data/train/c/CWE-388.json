@@ -1,0 +1,145 @@
+[
+{
+  "cve_id": "CVE-2016-9588",
+  "code_before_change": "static inline bool is_exception(u32 intr_info)\n{\n\treturn (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VALID_MASK))\n\t\t== (INTR_TYPE_HARD_EXCEPTION | INTR_INFO_VALID_MASK);\n}",
+  "code_after_change": "static inline bool is_nmi(u32 intr_info)\n{\n\treturn (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VALID_MASK))\n\t\t== (INTR_TYPE_NMI_INTR | INTR_INFO_VALID_MASK);\n}",
+  "function_modified_lines": {
+    "added": [
+      "static inline bool is_nmi(u32 intr_info)",
+      "\t\t== (INTR_TYPE_NMI_INTR | INTR_INFO_VALID_MASK);"
+    ],
+    "deleted": [
+      "static inline bool is_exception(u32 intr_info)",
+      "\t\t== (INTR_TYPE_HARD_EXCEPTION | INTR_INFO_VALID_MASK);"
+    ]
+  },
+  "cwe": [
+    "CWE-388"
+  ],
+  "cve_description": "arch/x86/kvm/vmx.c in the Linux kernel through 4.9 mismanages the #BP and #OF exceptions, which allows guest OS users to cause a denial of service (guest OS crash) by declining to handle an exception thrown by an L2 guest.",
+  "id": 4744
+},
+{
+  "cve_id": "CVE-2016-9588",
+  "code_before_change": "static bool nested_vmx_exit_handled(struct kvm_vcpu *vcpu)\n{\n\tu32 intr_info = vmcs_read32(VM_EXIT_INTR_INFO);\n\tstruct vcpu_vmx *vmx = to_vmx(vcpu);\n\tstruct vmcs12 *vmcs12 = get_vmcs12(vcpu);\n\tu32 exit_reason = vmx->exit_reason;\n\n\ttrace_kvm_nested_vmexit(kvm_rip_read(vcpu), exit_reason,\n\t\t\t\tvmcs_readl(EXIT_QUALIFICATION),\n\t\t\t\tvmx->idt_vectoring_info,\n\t\t\t\tintr_info,\n\t\t\t\tvmcs_read32(VM_EXIT_INTR_ERROR_CODE),\n\t\t\t\tKVM_ISA_VMX);\n\n\tif (vmx->nested.nested_run_pending)\n\t\treturn false;\n\n\tif (unlikely(vmx->fail)) {\n\t\tpr_info_ratelimited(\"%s failed vm entry %x\\n\", __func__,\n\t\t\t\t    vmcs_read32(VM_INSTRUCTION_ERROR));\n\t\treturn true;\n\t}\n\n\tswitch (exit_reason) {\n\tcase EXIT_REASON_EXCEPTION_NMI:\n\t\tif (!is_exception(intr_info))\n\t\t\treturn false;\n\t\telse if (is_page_fault(intr_info))\n\t\t\treturn enable_ept;\n\t\telse if (is_no_device(intr_info) &&\n\t\t\t !(vmcs12->guest_cr0 & X86_CR0_TS))\n\t\t\treturn false;\n\t\telse if (is_debug(intr_info) &&\n\t\t\t vcpu->guest_debug &\n\t\t\t (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP))\n\t\t\treturn false;\n\t\telse if (is_breakpoint(intr_info) &&\n\t\t\t vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)\n\t\t\treturn false;\n\t\treturn vmcs12->exception_bitmap &\n\t\t\t\t(1u << (intr_info & INTR_INFO_VECTOR_MASK));\n\tcase EXIT_REASON_EXTERNAL_INTERRUPT:\n\t\treturn false;\n\tcase EXIT_REASON_TRIPLE_FAULT:\n\t\treturn true;\n\tcase EXIT_REASON_PENDING_INTERRUPT:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_VIRTUAL_INTR_PENDING);\n\tcase EXIT_REASON_NMI_WINDOW:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_VIRTUAL_NMI_PENDING);\n\tcase EXIT_REASON_TASK_SWITCH:\n\t\treturn true;\n\tcase EXIT_REASON_CPUID:\n\t\tif (kvm_register_read(vcpu, VCPU_REGS_RAX) == 0xa)\n\t\t\treturn false;\n\t\treturn true;\n\tcase EXIT_REASON_HLT:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_HLT_EXITING);\n\tcase EXIT_REASON_INVD:\n\t\treturn true;\n\tcase EXIT_REASON_INVLPG:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_INVLPG_EXITING);\n\tcase EXIT_REASON_RDPMC:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_RDPMC_EXITING);\n\tcase EXIT_REASON_RDTSC: case EXIT_REASON_RDTSCP:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_RDTSC_EXITING);\n\tcase EXIT_REASON_VMCALL: case EXIT_REASON_VMCLEAR:\n\tcase EXIT_REASON_VMLAUNCH: case EXIT_REASON_VMPTRLD:\n\tcase EXIT_REASON_VMPTRST: case EXIT_REASON_VMREAD:\n\tcase EXIT_REASON_VMRESUME: case EXIT_REASON_VMWRITE:\n\tcase EXIT_REASON_VMOFF: case EXIT_REASON_VMON:\n\tcase EXIT_REASON_INVEPT: case EXIT_REASON_INVVPID:\n\t\t/*\n\t\t * VMX instructions trap unconditionally. This allows L1 to\n\t\t * emulate them for its L2 guest, i.e., allows 3-level nesting!\n\t\t */\n\t\treturn true;\n\tcase EXIT_REASON_CR_ACCESS:\n\t\treturn nested_vmx_exit_handled_cr(vcpu, vmcs12);\n\tcase EXIT_REASON_DR_ACCESS:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MOV_DR_EXITING);\n\tcase EXIT_REASON_IO_INSTRUCTION:\n\t\treturn nested_vmx_exit_handled_io(vcpu, vmcs12);\n\tcase EXIT_REASON_GDTR_IDTR: case EXIT_REASON_LDTR_TR:\n\t\treturn nested_cpu_has2(vmcs12, SECONDARY_EXEC_DESC);\n\tcase EXIT_REASON_MSR_READ:\n\tcase EXIT_REASON_MSR_WRITE:\n\t\treturn nested_vmx_exit_handled_msr(vcpu, vmcs12, exit_reason);\n\tcase EXIT_REASON_INVALID_STATE:\n\t\treturn true;\n\tcase EXIT_REASON_MWAIT_INSTRUCTION:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MWAIT_EXITING);\n\tcase EXIT_REASON_MONITOR_TRAP_FLAG:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MONITOR_TRAP_FLAG);\n\tcase EXIT_REASON_MONITOR_INSTRUCTION:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MONITOR_EXITING);\n\tcase EXIT_REASON_PAUSE_INSTRUCTION:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_PAUSE_EXITING) ||\n\t\t\tnested_cpu_has2(vmcs12,\n\t\t\t\tSECONDARY_EXEC_PAUSE_LOOP_EXITING);\n\tcase EXIT_REASON_MCE_DURING_VMENTRY:\n\t\treturn false;\n\tcase EXIT_REASON_TPR_BELOW_THRESHOLD:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_TPR_SHADOW);\n\tcase EXIT_REASON_APIC_ACCESS:\n\t\treturn nested_cpu_has2(vmcs12,\n\t\t\tSECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES);\n\tcase EXIT_REASON_APIC_WRITE:\n\tcase EXIT_REASON_EOI_INDUCED:\n\t\t/* apic_write and eoi_induced should exit unconditionally. */\n\t\treturn true;\n\tcase EXIT_REASON_EPT_VIOLATION:\n\t\t/*\n\t\t * L0 always deals with the EPT violation. If nested EPT is\n\t\t * used, and the nested mmu code discovers that the address is\n\t\t * missing in the guest EPT table (EPT12), the EPT violation\n\t\t * will be injected with nested_ept_inject_page_fault()\n\t\t */\n\t\treturn false;\n\tcase EXIT_REASON_EPT_MISCONFIG:\n\t\t/*\n\t\t * L2 never uses directly L1's EPT, but rather L0's own EPT\n\t\t * table (shadow on EPT) or a merged EPT table that L0 built\n\t\t * (EPT on EPT). So any problems with the structure of the\n\t\t * table is L0's fault.\n\t\t */\n\t\treturn false;\n\tcase EXIT_REASON_WBINVD:\n\t\treturn nested_cpu_has2(vmcs12, SECONDARY_EXEC_WBINVD_EXITING);\n\tcase EXIT_REASON_XSETBV:\n\t\treturn true;\n\tcase EXIT_REASON_XSAVES: case EXIT_REASON_XRSTORS:\n\t\t/*\n\t\t * This should never happen, since it is not possible to\n\t\t * set XSS to a non-zero value---neither in L1 nor in L2.\n\t\t * If if it were, XSS would have to be checked against\n\t\t * the XSS exit bitmap in vmcs12.\n\t\t */\n\t\treturn nested_cpu_has2(vmcs12, SECONDARY_EXEC_XSAVES);\n\tcase EXIT_REASON_PREEMPTION_TIMER:\n\t\treturn false;\n\tdefault:\n\t\treturn true;\n\t}\n}",
+  "code_after_change": "static bool nested_vmx_exit_handled(struct kvm_vcpu *vcpu)\n{\n\tu32 intr_info = vmcs_read32(VM_EXIT_INTR_INFO);\n\tstruct vcpu_vmx *vmx = to_vmx(vcpu);\n\tstruct vmcs12 *vmcs12 = get_vmcs12(vcpu);\n\tu32 exit_reason = vmx->exit_reason;\n\n\ttrace_kvm_nested_vmexit(kvm_rip_read(vcpu), exit_reason,\n\t\t\t\tvmcs_readl(EXIT_QUALIFICATION),\n\t\t\t\tvmx->idt_vectoring_info,\n\t\t\t\tintr_info,\n\t\t\t\tvmcs_read32(VM_EXIT_INTR_ERROR_CODE),\n\t\t\t\tKVM_ISA_VMX);\n\n\tif (vmx->nested.nested_run_pending)\n\t\treturn false;\n\n\tif (unlikely(vmx->fail)) {\n\t\tpr_info_ratelimited(\"%s failed vm entry %x\\n\", __func__,\n\t\t\t\t    vmcs_read32(VM_INSTRUCTION_ERROR));\n\t\treturn true;\n\t}\n\n\tswitch (exit_reason) {\n\tcase EXIT_REASON_EXCEPTION_NMI:\n\t\tif (is_nmi(intr_info))\n\t\t\treturn false;\n\t\telse if (is_page_fault(intr_info))\n\t\t\treturn enable_ept;\n\t\telse if (is_no_device(intr_info) &&\n\t\t\t !(vmcs12->guest_cr0 & X86_CR0_TS))\n\t\t\treturn false;\n\t\telse if (is_debug(intr_info) &&\n\t\t\t vcpu->guest_debug &\n\t\t\t (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP))\n\t\t\treturn false;\n\t\telse if (is_breakpoint(intr_info) &&\n\t\t\t vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)\n\t\t\treturn false;\n\t\treturn vmcs12->exception_bitmap &\n\t\t\t\t(1u << (intr_info & INTR_INFO_VECTOR_MASK));\n\tcase EXIT_REASON_EXTERNAL_INTERRUPT:\n\t\treturn false;\n\tcase EXIT_REASON_TRIPLE_FAULT:\n\t\treturn true;\n\tcase EXIT_REASON_PENDING_INTERRUPT:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_VIRTUAL_INTR_PENDING);\n\tcase EXIT_REASON_NMI_WINDOW:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_VIRTUAL_NMI_PENDING);\n\tcase EXIT_REASON_TASK_SWITCH:\n\t\treturn true;\n\tcase EXIT_REASON_CPUID:\n\t\tif (kvm_register_read(vcpu, VCPU_REGS_RAX) == 0xa)\n\t\t\treturn false;\n\t\treturn true;\n\tcase EXIT_REASON_HLT:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_HLT_EXITING);\n\tcase EXIT_REASON_INVD:\n\t\treturn true;\n\tcase EXIT_REASON_INVLPG:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_INVLPG_EXITING);\n\tcase EXIT_REASON_RDPMC:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_RDPMC_EXITING);\n\tcase EXIT_REASON_RDTSC: case EXIT_REASON_RDTSCP:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_RDTSC_EXITING);\n\tcase EXIT_REASON_VMCALL: case EXIT_REASON_VMCLEAR:\n\tcase EXIT_REASON_VMLAUNCH: case EXIT_REASON_VMPTRLD:\n\tcase EXIT_REASON_VMPTRST: case EXIT_REASON_VMREAD:\n\tcase EXIT_REASON_VMRESUME: case EXIT_REASON_VMWRITE:\n\tcase EXIT_REASON_VMOFF: case EXIT_REASON_VMON:\n\tcase EXIT_REASON_INVEPT: case EXIT_REASON_INVVPID:\n\t\t/*\n\t\t * VMX instructions trap unconditionally. This allows L1 to\n\t\t * emulate them for its L2 guest, i.e., allows 3-level nesting!\n\t\t */\n\t\treturn true;\n\tcase EXIT_REASON_CR_ACCESS:\n\t\treturn nested_vmx_exit_handled_cr(vcpu, vmcs12);\n\tcase EXIT_REASON_DR_ACCESS:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MOV_DR_EXITING);\n\tcase EXIT_REASON_IO_INSTRUCTION:\n\t\treturn nested_vmx_exit_handled_io(vcpu, vmcs12);\n\tcase EXIT_REASON_GDTR_IDTR: case EXIT_REASON_LDTR_TR:\n\t\treturn nested_cpu_has2(vmcs12, SECONDARY_EXEC_DESC);\n\tcase EXIT_REASON_MSR_READ:\n\tcase EXIT_REASON_MSR_WRITE:\n\t\treturn nested_vmx_exit_handled_msr(vcpu, vmcs12, exit_reason);\n\tcase EXIT_REASON_INVALID_STATE:\n\t\treturn true;\n\tcase EXIT_REASON_MWAIT_INSTRUCTION:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MWAIT_EXITING);\n\tcase EXIT_REASON_MONITOR_TRAP_FLAG:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MONITOR_TRAP_FLAG);\n\tcase EXIT_REASON_MONITOR_INSTRUCTION:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_MONITOR_EXITING);\n\tcase EXIT_REASON_PAUSE_INSTRUCTION:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_PAUSE_EXITING) ||\n\t\t\tnested_cpu_has2(vmcs12,\n\t\t\t\tSECONDARY_EXEC_PAUSE_LOOP_EXITING);\n\tcase EXIT_REASON_MCE_DURING_VMENTRY:\n\t\treturn false;\n\tcase EXIT_REASON_TPR_BELOW_THRESHOLD:\n\t\treturn nested_cpu_has(vmcs12, CPU_BASED_TPR_SHADOW);\n\tcase EXIT_REASON_APIC_ACCESS:\n\t\treturn nested_cpu_has2(vmcs12,\n\t\t\tSECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES);\n\tcase EXIT_REASON_APIC_WRITE:\n\tcase EXIT_REASON_EOI_INDUCED:\n\t\t/* apic_write and eoi_induced should exit unconditionally. */\n\t\treturn true;\n\tcase EXIT_REASON_EPT_VIOLATION:\n\t\t/*\n\t\t * L0 always deals with the EPT violation. If nested EPT is\n\t\t * used, and the nested mmu code discovers that the address is\n\t\t * missing in the guest EPT table (EPT12), the EPT violation\n\t\t * will be injected with nested_ept_inject_page_fault()\n\t\t */\n\t\treturn false;\n\tcase EXIT_REASON_EPT_MISCONFIG:\n\t\t/*\n\t\t * L2 never uses directly L1's EPT, but rather L0's own EPT\n\t\t * table (shadow on EPT) or a merged EPT table that L0 built\n\t\t * (EPT on EPT). So any problems with the structure of the\n\t\t * table is L0's fault.\n\t\t */\n\t\treturn false;\n\tcase EXIT_REASON_WBINVD:\n\t\treturn nested_cpu_has2(vmcs12, SECONDARY_EXEC_WBINVD_EXITING);\n\tcase EXIT_REASON_XSETBV:\n\t\treturn true;\n\tcase EXIT_REASON_XSAVES: case EXIT_REASON_XRSTORS:\n\t\t/*\n\t\t * This should never happen, since it is not possible to\n\t\t * set XSS to a non-zero value---neither in L1 nor in L2.\n\t\t * If if it were, XSS would have to be checked against\n\t\t * the XSS exit bitmap in vmcs12.\n\t\t */\n\t\treturn nested_cpu_has2(vmcs12, SECONDARY_EXEC_XSAVES);\n\tcase EXIT_REASON_PREEMPTION_TIMER:\n\t\treturn false;\n\tdefault:\n\t\treturn true;\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif (is_nmi(intr_info))"
+    ],
+    "deleted": [
+      "\t\tif (!is_exception(intr_info))"
+    ]
+  },
+  "cwe": [
+    "CWE-388"
+  ],
+  "cve_description": "arch/x86/kvm/vmx.c in the Linux kernel through 4.9 mismanages the #BP and #OF exceptions, which allows guest OS users to cause a denial of service (guest OS crash) by declining to handle an exception thrown by an L2 guest.",
+  "id": 4745
+},
+{
+  "cve_id": "CVE-2016-9588",
+  "code_before_change": "static void vmx_complete_atomic_exit(struct vcpu_vmx *vmx)\n{\n\tu32 exit_intr_info;\n\n\tif (!(vmx->exit_reason == EXIT_REASON_MCE_DURING_VMENTRY\n\t      || vmx->exit_reason == EXIT_REASON_EXCEPTION_NMI))\n\t\treturn;\n\n\tvmx->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);\n\texit_intr_info = vmx->exit_intr_info;\n\n\t/* Handle machine checks before interrupts are enabled */\n\tif (is_machine_check(exit_intr_info))\n\t\tkvm_machine_check();\n\n\t/* We need to handle NMIs before interrupts are enabled */\n\tif ((exit_intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR &&\n\t    (exit_intr_info & INTR_INFO_VALID_MASK)) {\n\t\tkvm_before_handle_nmi(&vmx->vcpu);\n\t\tasm(\"int $2\");\n\t\tkvm_after_handle_nmi(&vmx->vcpu);\n\t}\n}",
+  "code_after_change": "static void vmx_complete_atomic_exit(struct vcpu_vmx *vmx)\n{\n\tu32 exit_intr_info;\n\n\tif (!(vmx->exit_reason == EXIT_REASON_MCE_DURING_VMENTRY\n\t      || vmx->exit_reason == EXIT_REASON_EXCEPTION_NMI))\n\t\treturn;\n\n\tvmx->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);\n\texit_intr_info = vmx->exit_intr_info;\n\n\t/* Handle machine checks before interrupts are enabled */\n\tif (is_machine_check(exit_intr_info))\n\t\tkvm_machine_check();\n\n\t/* We need to handle NMIs before interrupts are enabled */\n\tif (is_nmi(exit_intr_info)) {\n\t\tkvm_before_handle_nmi(&vmx->vcpu);\n\t\tasm(\"int $2\");\n\t\tkvm_after_handle_nmi(&vmx->vcpu);\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tif (is_nmi(exit_intr_info)) {"
+    ],
+    "deleted": [
+      "\tif ((exit_intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR &&",
+      "\t    (exit_intr_info & INTR_INFO_VALID_MASK)) {"
+    ]
+  },
+  "cwe": [
+    "CWE-388"
+  ],
+  "cve_description": "arch/x86/kvm/vmx.c in the Linux kernel through 4.9 mismanages the #BP and #OF exceptions, which allows guest OS users to cause a denial of service (guest OS crash) by declining to handle an exception thrown by an L2 guest.",
+  "id": 4746
+},
+{
+  "cve_id": "CVE-2016-9588",
+  "code_before_change": "static int handle_exception(struct kvm_vcpu *vcpu)\n{\n\tstruct vcpu_vmx *vmx = to_vmx(vcpu);\n\tstruct kvm_run *kvm_run = vcpu->run;\n\tu32 intr_info, ex_no, error_code;\n\tunsigned long cr2, rip, dr6;\n\tu32 vect_info;\n\tenum emulation_result er;\n\n\tvect_info = vmx->idt_vectoring_info;\n\tintr_info = vmx->exit_intr_info;\n\n\tif (is_machine_check(intr_info))\n\t\treturn handle_machine_check(vcpu);\n\n\tif ((intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR)\n\t\treturn 1;  /* already handled by vmx_vcpu_run() */\n\n\tif (is_no_device(intr_info)) {\n\t\tvmx_fpu_activate(vcpu);\n\t\treturn 1;\n\t}\n\n\tif (is_invalid_opcode(intr_info)) {\n\t\tif (is_guest_mode(vcpu)) {\n\t\t\tkvm_queue_exception(vcpu, UD_VECTOR);\n\t\t\treturn 1;\n\t\t}\n\t\ter = emulate_instruction(vcpu, EMULTYPE_TRAP_UD);\n\t\tif (er != EMULATE_DONE)\n\t\t\tkvm_queue_exception(vcpu, UD_VECTOR);\n\t\treturn 1;\n\t}\n\n\terror_code = 0;\n\tif (intr_info & INTR_INFO_DELIVER_CODE_MASK)\n\t\terror_code = vmcs_read32(VM_EXIT_INTR_ERROR_CODE);\n\n\t/*\n\t * The #PF with PFEC.RSVD = 1 indicates the guest is accessing\n\t * MMIO, it is better to report an internal error.\n\t * See the comments in vmx_handle_exit.\n\t */\n\tif ((vect_info & VECTORING_INFO_VALID_MASK) &&\n\t    !(is_page_fault(intr_info) && !(error_code & PFERR_RSVD_MASK))) {\n\t\tvcpu->run->exit_reason = KVM_EXIT_INTERNAL_ERROR;\n\t\tvcpu->run->internal.suberror = KVM_INTERNAL_ERROR_SIMUL_EX;\n\t\tvcpu->run->internal.ndata = 3;\n\t\tvcpu->run->internal.data[0] = vect_info;\n\t\tvcpu->run->internal.data[1] = intr_info;\n\t\tvcpu->run->internal.data[2] = error_code;\n\t\treturn 0;\n\t}\n\n\tif (is_page_fault(intr_info)) {\n\t\t/* EPT won't cause page fault directly */\n\t\tBUG_ON(enable_ept);\n\t\tcr2 = vmcs_readl(EXIT_QUALIFICATION);\n\t\ttrace_kvm_page_fault(cr2, error_code);\n\n\t\tif (kvm_event_needs_reinjection(vcpu))\n\t\t\tkvm_mmu_unprotect_page_virt(vcpu, cr2);\n\t\treturn kvm_mmu_page_fault(vcpu, cr2, error_code, NULL, 0);\n\t}\n\n\tex_no = intr_info & INTR_INFO_VECTOR_MASK;\n\n\tif (vmx->rmode.vm86_active && rmode_exception(vcpu, ex_no))\n\t\treturn handle_rmode_exception(vcpu, ex_no, error_code);\n\n\tswitch (ex_no) {\n\tcase AC_VECTOR:\n\t\tkvm_queue_exception_e(vcpu, AC_VECTOR, error_code);\n\t\treturn 1;\n\tcase DB_VECTOR:\n\t\tdr6 = vmcs_readl(EXIT_QUALIFICATION);\n\t\tif (!(vcpu->guest_debug &\n\t\t      (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP))) {\n\t\t\tvcpu->arch.dr6 &= ~15;\n\t\t\tvcpu->arch.dr6 |= dr6 | DR6_RTM;\n\t\t\tif (!(dr6 & ~DR6_RESERVED)) /* icebp */\n\t\t\t\tskip_emulated_instruction(vcpu);\n\n\t\t\tkvm_queue_exception(vcpu, DB_VECTOR);\n\t\t\treturn 1;\n\t\t}\n\t\tkvm_run->debug.arch.dr6 = dr6 | DR6_FIXED_1;\n\t\tkvm_run->debug.arch.dr7 = vmcs_readl(GUEST_DR7);\n\t\t/* fall through */\n\tcase BP_VECTOR:\n\t\t/*\n\t\t * Update instruction length as we may reinject #BP from\n\t\t * user space while in guest debugging mode. Reading it for\n\t\t * #DB as well causes no harm, it is not used in that case.\n\t\t */\n\t\tvmx->vcpu.arch.event_exit_inst_len =\n\t\t\tvmcs_read32(VM_EXIT_INSTRUCTION_LEN);\n\t\tkvm_run->exit_reason = KVM_EXIT_DEBUG;\n\t\trip = kvm_rip_read(vcpu);\n\t\tkvm_run->debug.arch.pc = vmcs_readl(GUEST_CS_BASE) + rip;\n\t\tkvm_run->debug.arch.exception = ex_no;\n\t\tbreak;\n\tdefault:\n\t\tkvm_run->exit_reason = KVM_EXIT_EXCEPTION;\n\t\tkvm_run->ex.exception = ex_no;\n\t\tkvm_run->ex.error_code = error_code;\n\t\tbreak;\n\t}\n\treturn 0;\n}",
+  "code_after_change": "static int handle_exception(struct kvm_vcpu *vcpu)\n{\n\tstruct vcpu_vmx *vmx = to_vmx(vcpu);\n\tstruct kvm_run *kvm_run = vcpu->run;\n\tu32 intr_info, ex_no, error_code;\n\tunsigned long cr2, rip, dr6;\n\tu32 vect_info;\n\tenum emulation_result er;\n\n\tvect_info = vmx->idt_vectoring_info;\n\tintr_info = vmx->exit_intr_info;\n\n\tif (is_machine_check(intr_info))\n\t\treturn handle_machine_check(vcpu);\n\n\tif (is_nmi(intr_info))\n\t\treturn 1;  /* already handled by vmx_vcpu_run() */\n\n\tif (is_no_device(intr_info)) {\n\t\tvmx_fpu_activate(vcpu);\n\t\treturn 1;\n\t}\n\n\tif (is_invalid_opcode(intr_info)) {\n\t\tif (is_guest_mode(vcpu)) {\n\t\t\tkvm_queue_exception(vcpu, UD_VECTOR);\n\t\t\treturn 1;\n\t\t}\n\t\ter = emulate_instruction(vcpu, EMULTYPE_TRAP_UD);\n\t\tif (er != EMULATE_DONE)\n\t\t\tkvm_queue_exception(vcpu, UD_VECTOR);\n\t\treturn 1;\n\t}\n\n\terror_code = 0;\n\tif (intr_info & INTR_INFO_DELIVER_CODE_MASK)\n\t\terror_code = vmcs_read32(VM_EXIT_INTR_ERROR_CODE);\n\n\t/*\n\t * The #PF with PFEC.RSVD = 1 indicates the guest is accessing\n\t * MMIO, it is better to report an internal error.\n\t * See the comments in vmx_handle_exit.\n\t */\n\tif ((vect_info & VECTORING_INFO_VALID_MASK) &&\n\t    !(is_page_fault(intr_info) && !(error_code & PFERR_RSVD_MASK))) {\n\t\tvcpu->run->exit_reason = KVM_EXIT_INTERNAL_ERROR;\n\t\tvcpu->run->internal.suberror = KVM_INTERNAL_ERROR_SIMUL_EX;\n\t\tvcpu->run->internal.ndata = 3;\n\t\tvcpu->run->internal.data[0] = vect_info;\n\t\tvcpu->run->internal.data[1] = intr_info;\n\t\tvcpu->run->internal.data[2] = error_code;\n\t\treturn 0;\n\t}\n\n\tif (is_page_fault(intr_info)) {\n\t\t/* EPT won't cause page fault directly */\n\t\tBUG_ON(enable_ept);\n\t\tcr2 = vmcs_readl(EXIT_QUALIFICATION);\n\t\ttrace_kvm_page_fault(cr2, error_code);\n\n\t\tif (kvm_event_needs_reinjection(vcpu))\n\t\t\tkvm_mmu_unprotect_page_virt(vcpu, cr2);\n\t\treturn kvm_mmu_page_fault(vcpu, cr2, error_code, NULL, 0);\n\t}\n\n\tex_no = intr_info & INTR_INFO_VECTOR_MASK;\n\n\tif (vmx->rmode.vm86_active && rmode_exception(vcpu, ex_no))\n\t\treturn handle_rmode_exception(vcpu, ex_no, error_code);\n\n\tswitch (ex_no) {\n\tcase AC_VECTOR:\n\t\tkvm_queue_exception_e(vcpu, AC_VECTOR, error_code);\n\t\treturn 1;\n\tcase DB_VECTOR:\n\t\tdr6 = vmcs_readl(EXIT_QUALIFICATION);\n\t\tif (!(vcpu->guest_debug &\n\t\t      (KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_HW_BP))) {\n\t\t\tvcpu->arch.dr6 &= ~15;\n\t\t\tvcpu->arch.dr6 |= dr6 | DR6_RTM;\n\t\t\tif (!(dr6 & ~DR6_RESERVED)) /* icebp */\n\t\t\t\tskip_emulated_instruction(vcpu);\n\n\t\t\tkvm_queue_exception(vcpu, DB_VECTOR);\n\t\t\treturn 1;\n\t\t}\n\t\tkvm_run->debug.arch.dr6 = dr6 | DR6_FIXED_1;\n\t\tkvm_run->debug.arch.dr7 = vmcs_readl(GUEST_DR7);\n\t\t/* fall through */\n\tcase BP_VECTOR:\n\t\t/*\n\t\t * Update instruction length as we may reinject #BP from\n\t\t * user space while in guest debugging mode. Reading it for\n\t\t * #DB as well causes no harm, it is not used in that case.\n\t\t */\n\t\tvmx->vcpu.arch.event_exit_inst_len =\n\t\t\tvmcs_read32(VM_EXIT_INSTRUCTION_LEN);\n\t\tkvm_run->exit_reason = KVM_EXIT_DEBUG;\n\t\trip = kvm_rip_read(vcpu);\n\t\tkvm_run->debug.arch.pc = vmcs_readl(GUEST_CS_BASE) + rip;\n\t\tkvm_run->debug.arch.exception = ex_no;\n\t\tbreak;\n\tdefault:\n\t\tkvm_run->exit_reason = KVM_EXIT_EXCEPTION;\n\t\tkvm_run->ex.exception = ex_no;\n\t\tkvm_run->ex.error_code = error_code;\n\t\tbreak;\n\t}\n\treturn 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tif (is_nmi(intr_info))"
+    ],
+    "deleted": [
+      "\tif ((intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR)"
+    ]
+  },
+  "cwe": [
+    "CWE-388"
+  ],
+  "cve_description": "arch/x86/kvm/vmx.c in the Linux kernel through 4.9 mismanages the #BP and #OF exceptions, which allows guest OS users to cause a denial of service (guest OS crash) by declining to handle an exception thrown by an L2 guest.",
+  "id": 4747
+},
+{
+  "cve_id": "CVE-2017-7616",
+  "code_before_change": "COMPAT_SYSCALL_DEFINE3(set_mempolicy, int, mode, compat_ulong_t __user *, nmask,\n\t\t       compat_ulong_t, maxnode)\n{\n\tlong err = 0;\n\tunsigned long __user *nm = NULL;\n\tunsigned long nr_bits, alloc_size;\n\tDECLARE_BITMAP(bm, MAX_NUMNODES);\n\n\tnr_bits = min_t(unsigned long, maxnode-1, MAX_NUMNODES);\n\talloc_size = ALIGN(nr_bits, BITS_PER_LONG) / 8;\n\n\tif (nmask) {\n\t\terr = compat_get_bitmap(bm, nmask, nr_bits);\n\t\tnm = compat_alloc_user_space(alloc_size);\n\t\terr |= copy_to_user(nm, bm, alloc_size);\n\t}\n\n\tif (err)\n\t\treturn -EFAULT;\n\n\treturn sys_set_mempolicy(mode, nm, nr_bits+1);\n}",
+  "code_after_change": "COMPAT_SYSCALL_DEFINE3(set_mempolicy, int, mode, compat_ulong_t __user *, nmask,\n\t\t       compat_ulong_t, maxnode)\n{\n\tunsigned long __user *nm = NULL;\n\tunsigned long nr_bits, alloc_size;\n\tDECLARE_BITMAP(bm, MAX_NUMNODES);\n\n\tnr_bits = min_t(unsigned long, maxnode-1, MAX_NUMNODES);\n\talloc_size = ALIGN(nr_bits, BITS_PER_LONG) / 8;\n\n\tif (nmask) {\n\t\tif (compat_get_bitmap(bm, nmask, nr_bits))\n\t\t\treturn -EFAULT;\n\t\tnm = compat_alloc_user_space(alloc_size);\n\t\tif (copy_to_user(nm, bm, alloc_size))\n\t\t\treturn -EFAULT;\n\t}\n\n\treturn sys_set_mempolicy(mode, nm, nr_bits+1);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif (compat_get_bitmap(bm, nmask, nr_bits))",
+      "\t\t\treturn -EFAULT;",
+      "\t\tif (copy_to_user(nm, bm, alloc_size))",
+      "\t\t\treturn -EFAULT;"
+    ],
+    "deleted": [
+      "\tlong err = 0;",
+      "\t\terr = compat_get_bitmap(bm, nmask, nr_bits);",
+      "\t\terr |= copy_to_user(nm, bm, alloc_size);",
+      "\tif (err)",
+      "\t\treturn -EFAULT;"
+    ]
+  },
+  "cwe": [
+    "CWE-388"
+  ],
+  "cve_description": "Incorrect error handling in the set_mempolicy and mbind compat syscalls in mm/mempolicy.c in the Linux kernel through 4.10.9 allows local users to obtain sensitive information from uninitialized stack data by triggering failure of a certain bitmap operation.",
+  "id": 4748
+},
+{
+  "cve_id": "CVE-2017-7616",
+  "code_before_change": "COMPAT_SYSCALL_DEFINE6(mbind, compat_ulong_t, start, compat_ulong_t, len,\n\t\t       compat_ulong_t, mode, compat_ulong_t __user *, nmask,\n\t\t       compat_ulong_t, maxnode, compat_ulong_t, flags)\n{\n\tlong err = 0;\n\tunsigned long __user *nm = NULL;\n\tunsigned long nr_bits, alloc_size;\n\tnodemask_t bm;\n\n\tnr_bits = min_t(unsigned long, maxnode-1, MAX_NUMNODES);\n\talloc_size = ALIGN(nr_bits, BITS_PER_LONG) / 8;\n\n\tif (nmask) {\n\t\terr = compat_get_bitmap(nodes_addr(bm), nmask, nr_bits);\n\t\tnm = compat_alloc_user_space(alloc_size);\n\t\terr |= copy_to_user(nm, nodes_addr(bm), alloc_size);\n\t}\n\n\tif (err)\n\t\treturn -EFAULT;\n\n\treturn sys_mbind(start, len, mode, nm, nr_bits+1, flags);\n}",
+  "code_after_change": "COMPAT_SYSCALL_DEFINE6(mbind, compat_ulong_t, start, compat_ulong_t, len,\n\t\t       compat_ulong_t, mode, compat_ulong_t __user *, nmask,\n\t\t       compat_ulong_t, maxnode, compat_ulong_t, flags)\n{\n\tunsigned long __user *nm = NULL;\n\tunsigned long nr_bits, alloc_size;\n\tnodemask_t bm;\n\n\tnr_bits = min_t(unsigned long, maxnode-1, MAX_NUMNODES);\n\talloc_size = ALIGN(nr_bits, BITS_PER_LONG) / 8;\n\n\tif (nmask) {\n\t\tif (compat_get_bitmap(nodes_addr(bm), nmask, nr_bits))\n\t\t\treturn -EFAULT;\n\t\tnm = compat_alloc_user_space(alloc_size);\n\t\tif (copy_to_user(nm, nodes_addr(bm), alloc_size))\n\t\t\treturn -EFAULT;\n\t}\n\n\treturn sys_mbind(start, len, mode, nm, nr_bits+1, flags);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif (compat_get_bitmap(nodes_addr(bm), nmask, nr_bits))",
+      "\t\t\treturn -EFAULT;",
+      "\t\tif (copy_to_user(nm, nodes_addr(bm), alloc_size))",
+      "\t\t\treturn -EFAULT;"
+    ],
+    "deleted": [
+      "\tlong err = 0;",
+      "\t\terr = compat_get_bitmap(nodes_addr(bm), nmask, nr_bits);",
+      "\t\terr |= copy_to_user(nm, nodes_addr(bm), alloc_size);",
+      "\tif (err)",
+      "\t\treturn -EFAULT;"
+    ]
+  },
+  "cwe": [
+    "CWE-388"
+  ],
+  "cve_description": "Incorrect error handling in the set_mempolicy and mbind compat syscalls in mm/mempolicy.c in the Linux kernel through 4.10.9 allows local users to obtain sensitive information from uninitialized stack data by triggering failure of a certain bitmap operation.",
+  "id": 4749
+},
+{
+  "cve_id": "CVE-2017-8072",
+  "code_before_change": "static int cp2112_gpio_direction_input(struct gpio_chip *chip, unsigned offset)\n{\n\tstruct cp2112_device *dev = gpiochip_get_data(chip);\n\tstruct hid_device *hdev = dev->hdev;\n\tu8 *buf = dev->in_out_buffer;\n\tint ret;\n\n\tmutex_lock(&dev->lock);\n\n\tret = hid_hw_raw_request(hdev, CP2112_GPIO_CONFIG, buf,\n\t\t\t\t CP2112_GPIO_CONFIG_LENGTH, HID_FEATURE_REPORT,\n\t\t\t\t HID_REQ_GET_REPORT);\n\tif (ret != CP2112_GPIO_CONFIG_LENGTH) {\n\t\thid_err(hdev, \"error requesting GPIO config: %d\\n\", ret);\n\t\tgoto exit;\n\t}\n\n\tbuf[1] &= ~(1 << offset);\n\tbuf[2] = gpio_push_pull;\n\n\tret = hid_hw_raw_request(hdev, CP2112_GPIO_CONFIG, buf,\n\t\t\t\t CP2112_GPIO_CONFIG_LENGTH, HID_FEATURE_REPORT,\n\t\t\t\t HID_REQ_SET_REPORT);\n\tif (ret < 0) {\n\t\thid_err(hdev, \"error setting GPIO config: %d\\n\", ret);\n\t\tgoto exit;\n\t}\n\n\tret = 0;\n\nexit:\n\tmutex_unlock(&dev->lock);\n\treturn ret <= 0 ? ret : -EIO;\n}",
+  "code_after_change": "static int cp2112_gpio_direction_input(struct gpio_chip *chip, unsigned offset)\n{\n\tstruct cp2112_device *dev = gpiochip_get_data(chip);\n\tstruct hid_device *hdev = dev->hdev;\n\tu8 *buf = dev->in_out_buffer;\n\tint ret;\n\n\tmutex_lock(&dev->lock);\n\n\tret = hid_hw_raw_request(hdev, CP2112_GPIO_CONFIG, buf,\n\t\t\t\t CP2112_GPIO_CONFIG_LENGTH, HID_FEATURE_REPORT,\n\t\t\t\t HID_REQ_GET_REPORT);\n\tif (ret != CP2112_GPIO_CONFIG_LENGTH) {\n\t\thid_err(hdev, \"error requesting GPIO config: %d\\n\", ret);\n\t\tgoto exit;\n\t}\n\n\tbuf[1] &= ~(1 << offset);\n\tbuf[2] = gpio_push_pull;\n\n\tret = hid_hw_raw_request(hdev, CP2112_GPIO_CONFIG, buf,\n\t\t\t\t CP2112_GPIO_CONFIG_LENGTH, HID_FEATURE_REPORT,\n\t\t\t\t HID_REQ_SET_REPORT);\n\tif (ret < 0) {\n\t\thid_err(hdev, \"error setting GPIO config: %d\\n\", ret);\n\t\tgoto exit;\n\t}\n\n\tret = 0;\n\nexit:\n\tmutex_unlock(&dev->lock);\n\treturn ret < 0 ? ret : -EIO;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn ret < 0 ? ret : -EIO;"
+    ],
+    "deleted": [
+      "\treturn ret <= 0 ? ret : -EIO;"
+    ]
+  },
+  "cwe": [
+    "CWE-388"
+  ],
+  "cve_description": "The cp2112_gpio_direction_input function in drivers/hid/hid-cp2112.c in the Linux kernel 4.9.x before 4.9.9 does not have the expected EIO error status for a zero-length report, which allows local users to have an unspecified impact via unknown vectors.",
+  "id": 4750
+}
+]

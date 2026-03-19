@@ -1,0 +1,812 @@
+[
+{
+  "cve_id": "CVE-2016-10166",
+  "code_before_change": "static inline LineContribType * _gdContributionsAlloc(unsigned int line_length, unsigned int windows_size)\n{\n\tunsigned int u = 0;\n\tLineContribType *res;\n\tint overflow_error = 0;\n\n\tres = (LineContribType *) gdMalloc(sizeof(LineContribType));\n\tif (!res) {\n\t\treturn NULL;\n\t}\n\tres->WindowSize = windows_size;\n\tres->LineLength = line_length;\n\tif (overflow2(line_length, sizeof(ContributionType))) {\n\t\tgdFree(res);\n\t\treturn NULL;\n\t}\n\tres->ContribRow = (ContributionType *) gdMalloc(line_length * sizeof(ContributionType));\n\tif (res->ContribRow == NULL) {\n\t\tgdFree(res);\n\t\treturn NULL;\n\t}\n\tfor (u = 0 ; u < line_length ; u++) {\n\t\tif (overflow2(windows_size, sizeof(double))) {\n\t\t\toverflow_error = 1;\n\t\t} else {\n\t\t\tres->ContribRow[u].Weights = (double *) gdMalloc(windows_size * sizeof(double));\n\t\t}\n\t\tif (overflow_error == 1 || res->ContribRow[u].Weights == NULL) {\n\t\t\tunsigned int i;\n\t\t\tu--;\n\t\t\tfor (i=0;i<=u;i++) {\n\t\t\t\tgdFree(res->ContribRow[i].Weights);\n\t\t\t}\n\t\t\tgdFree(res->ContribRow);\n\t\t\tgdFree(res);\n\t\t\treturn NULL;\n\t\t}\n\t}\n\treturn res;\n}",
+  "code_after_change": "static inline LineContribType * _gdContributionsAlloc(unsigned int line_length, unsigned int windows_size)\n{\n\tunsigned int u = 0;\n\tLineContribType *res;\n\tsize_t weights_size;\n\n\tif (overflow2(windows_size, sizeof(double))) {\n\t\treturn NULL;\n\t} else {\n\t\tweights_size = windows_size * sizeof(double);\n\t}\n\tres = (LineContribType *) gdMalloc(sizeof(LineContribType));\n\tif (!res) {\n\t\treturn NULL;\n\t}\n\tres->WindowSize = windows_size;\n\tres->LineLength = line_length;\n\tif (overflow2(line_length, sizeof(ContributionType))) {\n\t\tgdFree(res);\n\t\treturn NULL;\n\t}\n\tres->ContribRow = (ContributionType *) gdMalloc(line_length * sizeof(ContributionType));\n\tif (res->ContribRow == NULL) {\n\t\tgdFree(res);\n\t\treturn NULL;\n\t}\n\tfor (u = 0 ; u < line_length ; u++) {\n\t\tres->ContribRow[u].Weights = (double *) gdMalloc(weights_size);\n\t\tif (res->ContribRow[u].Weights == NULL) {\n\t\t\tunsigned int i;\n\n\t\t\tfor (i=0;i<u;i++) {\n\t\t\t\tgdFree(res->ContribRow[i].Weights);\n\t\t\t}\n\t\t\tgdFree(res->ContribRow);\n\t\t\tgdFree(res);\n\t\t\treturn NULL;\n\t\t}\n\t}\n\treturn res;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tsize_t weights_size;",
+      "\tif (overflow2(windows_size, sizeof(double))) {",
+      "\t\treturn NULL;",
+      "\t} else {",
+      "\t\tweights_size = windows_size * sizeof(double);",
+      "\t}",
+      "\t\tres->ContribRow[u].Weights = (double *) gdMalloc(weights_size);",
+      "\t\tif (res->ContribRow[u].Weights == NULL) {",
+      "\t\t\tfor (i=0;i<u;i++) {"
+    ],
+    "deleted": [
+      "\tint overflow_error = 0;",
+      "\t\tif (overflow2(windows_size, sizeof(double))) {",
+      "\t\t\toverflow_error = 1;",
+      "\t\t} else {",
+      "\t\t\tres->ContribRow[u].Weights = (double *) gdMalloc(windows_size * sizeof(double));",
+      "\t\t}",
+      "\t\tif (overflow_error == 1 || res->ContribRow[u].Weights == NULL) {",
+      "\t\t\tu--;",
+      "\t\t\tfor (i=0;i<=u;i++) {"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "Integer underflow in the _gdContributionsAlloc function in gd_interpolation.c in the GD Graphics Library (aka libgd) before 2.2.4 allows remote attackers to have unspecified impact via vectors related to decrementing the u variable.",
+  "id": 3112
+},
+{
+  "cve_id": "CVE-2016-10268",
+  "code_before_change": "DECLAREcpFunc(cpDecodedStrips)\n{\n\ttsize_t stripsize  = TIFFStripSize(in);\n\ttdata_t buf = _TIFFmalloc(stripsize);\n\n\t(void) imagewidth; (void) spp;\n\tif (buf) {\n\t\ttstrip_t s, ns = TIFFNumberOfStrips(in);\n\t\tuint32 row = 0;\n\t\t_TIFFmemset(buf, 0, stripsize);\n\t\tfor (s = 0; s < ns; s++) {\n\t\t\ttsize_t cc = (row + rowsperstrip > imagelength) ?\n\t\t\t    TIFFVStripSize(in, imagelength - row) : stripsize;\n\t\t\tif (TIFFReadEncodedStrip(in, s, buf, cc) < 0\n\t\t\t    && !ignore) {\n\t\t\t\tTIFFError(TIFFFileName(in),\n\t\t\t\t    \"Error, can't read strip %lu\",\n\t\t\t\t    (unsigned long) s);\n\t\t\t\tgoto bad;\n\t\t\t}\n\t\t\tif (TIFFWriteEncodedStrip(out, s, buf, cc) < 0) {\n\t\t\t\tTIFFError(TIFFFileName(out),\n\t\t\t\t    \"Error, can't write strip %lu\",\n\t\t\t\t    (unsigned long) s);\n\t\t\t\tgoto bad;\n\t\t\t}\n\t\t\trow += rowsperstrip;\n\t\t}\n\t\t_TIFFfree(buf);\n\t\treturn 1;\n\t} else {\n\t\tTIFFError(TIFFFileName(in),\n\t\t    \"Error, can't allocate memory buffer of size %lu \"\n\t\t    \"to read strips\", (unsigned long) stripsize);\n\t\treturn 0;\n\t}\n\nbad:\n\t_TIFFfree(buf);\n\treturn 0;\n}",
+  "code_after_change": "DECLAREcpFunc(cpDecodedStrips)\n{\n\ttsize_t stripsize  = TIFFStripSize(in);\n\ttdata_t buf = _TIFFmalloc(stripsize);\n\n\t(void) imagewidth; (void) spp;\n\tif (buf) {\n\t\ttstrip_t s, ns = TIFFNumberOfStrips(in);\n\t\tuint32 row = 0;\n\t\t_TIFFmemset(buf, 0, stripsize);\n\t\tfor (s = 0; s < ns && row < imagelength; s++) {\n\t\t\ttsize_t cc = (row + rowsperstrip > imagelength) ?\n\t\t\t    TIFFVStripSize(in, imagelength - row) : stripsize;\n\t\t\tif (TIFFReadEncodedStrip(in, s, buf, cc) < 0\n\t\t\t    && !ignore) {\n\t\t\t\tTIFFError(TIFFFileName(in),\n\t\t\t\t    \"Error, can't read strip %lu\",\n\t\t\t\t    (unsigned long) s);\n\t\t\t\tgoto bad;\n\t\t\t}\n\t\t\tif (TIFFWriteEncodedStrip(out, s, buf, cc) < 0) {\n\t\t\t\tTIFFError(TIFFFileName(out),\n\t\t\t\t    \"Error, can't write strip %lu\",\n\t\t\t\t    (unsigned long) s);\n\t\t\t\tgoto bad;\n\t\t\t}\n\t\t\trow += rowsperstrip;\n\t\t}\n\t\t_TIFFfree(buf);\n\t\treturn 1;\n\t} else {\n\t\tTIFFError(TIFFFileName(in),\n\t\t    \"Error, can't allocate memory buffer of size %lu \"\n\t\t    \"to read strips\", (unsigned long) stripsize);\n\t\treturn 0;\n\t}\n\nbad:\n\t_TIFFfree(buf);\n\treturn 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tfor (s = 0; s < ns && row < imagelength; s++) {"
+    ],
+    "deleted": [
+      "\t\tfor (s = 0; s < ns; s++) {"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "tools/tiffcp.c in LibTIFF 4.0.7 allows remote attackers to cause a denial of service (integer underflow and heap-based buffer under-read) or possibly have unspecified other impact via a crafted TIFF image, related to \"READ of size 78490\" and libtiff/tif_unix.c:115:23.",
+  "id": 3113
+},
+{
+  "cve_id": "CVE-2017-8924",
+  "code_before_change": "static void edge_bulk_in_callback(struct urb *urb)\n{\n\tstruct edgeport_port *edge_port = urb->context;\n\tstruct device *dev = &edge_port->port->dev;\n\tunsigned char *data = urb->transfer_buffer;\n\tint retval = 0;\n\tint port_number;\n\tint status = urb->status;\n\n\tswitch (status) {\n\tcase 0:\n\t\t/* success */\n\t\tbreak;\n\tcase -ECONNRESET:\n\tcase -ENOENT:\n\tcase -ESHUTDOWN:\n\t\t/* this urb is terminated, clean up */\n\t\tdev_dbg(&urb->dev->dev, \"%s - urb shutting down with status: %d\\n\", __func__, status);\n\t\treturn;\n\tdefault:\n\t\tdev_err(&urb->dev->dev, \"%s - nonzero read bulk status received: %d\\n\", __func__, status);\n\t}\n\n\tif (status == -EPIPE)\n\t\tgoto exit;\n\n\tif (status) {\n\t\tdev_err(&urb->dev->dev, \"%s - stopping read!\\n\", __func__);\n\t\treturn;\n\t}\n\n\tport_number = edge_port->port->port_number;\n\n\tif (edge_port->lsr_event) {\n\t\tedge_port->lsr_event = 0;\n\t\tdev_dbg(dev, \"%s ===== Port %u LSR Status = %02x, Data = %02x ======\\n\",\n\t\t\t__func__, port_number, edge_port->lsr_mask, *data);\n\t\thandle_new_lsr(edge_port, 1, edge_port->lsr_mask, *data);\n\t\t/* Adjust buffer length/pointer */\n\t\t--urb->actual_length;\n\t\t++data;\n\t}\n\n\tif (urb->actual_length) {\n\t\tusb_serial_debug_data(dev, __func__, urb->actual_length, data);\n\t\tif (edge_port->close_pending)\n\t\t\tdev_dbg(dev, \"%s - close pending, dropping data on the floor\\n\",\n\t\t\t\t\t\t\t\t__func__);\n\t\telse\n\t\t\tedge_tty_recv(edge_port->port, data,\n\t\t\t\t\turb->actual_length);\n\t\tedge_port->port->icount.rx += urb->actual_length;\n\t}\n\nexit:\n\t/* continue read unless stopped */\n\tspin_lock(&edge_port->ep_lock);\n\tif (edge_port->ep_read_urb_state == EDGE_READ_URB_RUNNING)\n\t\tretval = usb_submit_urb(urb, GFP_ATOMIC);\n\telse if (edge_port->ep_read_urb_state == EDGE_READ_URB_STOPPING)\n\t\tedge_port->ep_read_urb_state = EDGE_READ_URB_STOPPED;\n\n\tspin_unlock(&edge_port->ep_lock);\n\tif (retval)\n\t\tdev_err(dev, \"%s - usb_submit_urb failed with result %d\\n\", __func__, retval);\n}",
+  "code_after_change": "static void edge_bulk_in_callback(struct urb *urb)\n{\n\tstruct edgeport_port *edge_port = urb->context;\n\tstruct device *dev = &edge_port->port->dev;\n\tunsigned char *data = urb->transfer_buffer;\n\tint retval = 0;\n\tint port_number;\n\tint status = urb->status;\n\n\tswitch (status) {\n\tcase 0:\n\t\t/* success */\n\t\tbreak;\n\tcase -ECONNRESET:\n\tcase -ENOENT:\n\tcase -ESHUTDOWN:\n\t\t/* this urb is terminated, clean up */\n\t\tdev_dbg(&urb->dev->dev, \"%s - urb shutting down with status: %d\\n\", __func__, status);\n\t\treturn;\n\tdefault:\n\t\tdev_err(&urb->dev->dev, \"%s - nonzero read bulk status received: %d\\n\", __func__, status);\n\t}\n\n\tif (status == -EPIPE)\n\t\tgoto exit;\n\n\tif (status) {\n\t\tdev_err(&urb->dev->dev, \"%s - stopping read!\\n\", __func__);\n\t\treturn;\n\t}\n\n\tport_number = edge_port->port->port_number;\n\n\tif (urb->actual_length > 0 && edge_port->lsr_event) {\n\t\tedge_port->lsr_event = 0;\n\t\tdev_dbg(dev, \"%s ===== Port %u LSR Status = %02x, Data = %02x ======\\n\",\n\t\t\t__func__, port_number, edge_port->lsr_mask, *data);\n\t\thandle_new_lsr(edge_port, 1, edge_port->lsr_mask, *data);\n\t\t/* Adjust buffer length/pointer */\n\t\t--urb->actual_length;\n\t\t++data;\n\t}\n\n\tif (urb->actual_length) {\n\t\tusb_serial_debug_data(dev, __func__, urb->actual_length, data);\n\t\tif (edge_port->close_pending)\n\t\t\tdev_dbg(dev, \"%s - close pending, dropping data on the floor\\n\",\n\t\t\t\t\t\t\t\t__func__);\n\t\telse\n\t\t\tedge_tty_recv(edge_port->port, data,\n\t\t\t\t\turb->actual_length);\n\t\tedge_port->port->icount.rx += urb->actual_length;\n\t}\n\nexit:\n\t/* continue read unless stopped */\n\tspin_lock(&edge_port->ep_lock);\n\tif (edge_port->ep_read_urb_state == EDGE_READ_URB_RUNNING)\n\t\tretval = usb_submit_urb(urb, GFP_ATOMIC);\n\telse if (edge_port->ep_read_urb_state == EDGE_READ_URB_STOPPING)\n\t\tedge_port->ep_read_urb_state = EDGE_READ_URB_STOPPED;\n\n\tspin_unlock(&edge_port->ep_lock);\n\tif (retval)\n\t\tdev_err(dev, \"%s - usb_submit_urb failed with result %d\\n\", __func__, retval);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tif (urb->actual_length > 0 && edge_port->lsr_event) {"
+    ],
+    "deleted": [
+      "\tif (edge_port->lsr_event) {"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "The edge_bulk_in_callback function in drivers/usb/serial/io_ti.c in the Linux kernel before 4.10.4 allows local users to obtain sensitive information (in the dmesg ringbuffer and syslog) from uninitialized kernel memory by using a crafted USB device (posing as an io_ti USB serial device) to trigger an integer underflow.",
+  "id": 3114
+},
+{
+  "cve_id": "CVE-2018-14353",
+  "code_before_change": "static void _imap_quote_string (char *dest, size_t dlen, const char *src,\n                                const char *to_quote)\n{\n  char *pt;\n  const char *s;\n\n  pt = dest;\n  s  = src;\n\n  *pt++ = '\"';\n  /* save room for trailing quote-char */\n  dlen -= 2;\n\n  for (; *s && dlen; s++)\n  {\n    if (strchr (to_quote, *s))\n    {\n      dlen -= 2;\n      if (!dlen)\n\tbreak;\n      *pt++ = '\\\\';\n      *pt++ = *s;\n    }\n    else\n    {\n      *pt++ = *s;\n      dlen--;\n    }\n  }\n  *pt++ = '\"';\n  *pt = 0;\n}",
+  "code_after_change": "static void _imap_quote_string (char *dest, size_t dlen, const char *src,\n                                const char *to_quote)\n{\n  char *pt;\n  const char *s;\n\n  if (!(dest && dlen && src && to_quote))\n    return;\n\n  if (dlen < 3)\n  {\n    *dest = 0;\n    return;\n  }\n\n  pt = dest;\n  s  = src;\n\n  /* save room for pre/post quote-char and trailing null */\n  dlen -= 3;\n\n  *pt++ = '\"';\n  for (; *s && dlen; s++)\n  {\n    if (strchr (to_quote, *s))\n    {\n      if (dlen < 2)\n        break;\n      dlen -= 2;\n      *pt++ = '\\\\';\n      *pt++ = *s;\n    }\n    else\n    {\n      *pt++ = *s;\n      dlen--;\n    }\n  }\n  *pt++ = '\"';\n  *pt = 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  if (!(dest && dlen && src && to_quote))",
+      "    return;",
+      "  if (dlen < 3)",
+      "  {",
+      "    *dest = 0;",
+      "    return;",
+      "  }",
+      "  /* save room for pre/post quote-char and trailing null */",
+      "  dlen -= 3;",
+      "  *pt++ = '\"';",
+      "      if (dlen < 2)",
+      "        break;"
+    ],
+    "deleted": [
+      "  *pt++ = '\"';",
+      "  /* save room for trailing quote-char */",
+      "  dlen -= 2;",
+      "      if (!dlen)",
+      "\tbreak;"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "An issue was discovered in Mutt before 1.10.1 and NeoMutt before 2018-07-16. imap_quote_string in imap/util.c has an integer underflow.",
+  "id": 3115
+},
+{
+  "cve_id": "CVE-2018-14353",
+  "code_before_change": "void imap_quote_string(char *dest, size_t dlen, const char *src, bool quote_backtick)\n{\n  const char *quote = \"`\\\"\\\\\";\n  if (!quote_backtick)\n    quote++;\n\n  char *pt = dest;\n  const char *s = src;\n\n  *pt++ = '\"';\n  /* save room for trailing quote-char */\n  dlen -= 2;\n\n  for (; *s && dlen; s++)\n  {\n    if (strchr(quote, *s))\n    {\n      dlen -= 2;\n      if (dlen == 0)\n        break;\n      *pt++ = '\\\\';\n      *pt++ = *s;\n    }\n    else\n    {\n      *pt++ = *s;\n      dlen--;\n    }\n  }\n  *pt++ = '\"';\n  *pt = '\\0';\n}",
+  "code_after_change": "void imap_quote_string(char *dest, size_t dlen, const char *src, bool quote_backtick)\n{\n  const char *quote = \"`\\\"\\\\\";\n  if (!quote_backtick)\n    quote++;\n\n  char *pt = dest;\n  const char *s = src;\n\n  *pt++ = '\"';\n  /* save room for trailing quote-char */\n  dlen -= 2;\n\n  for (; *s && dlen; s++)\n  {\n    if (strchr(quote, *s))\n    {\n      if (dlen < 2)\n        break;\n      dlen -= 2;\n      *pt++ = '\\\\';\n      *pt++ = *s;\n    }\n    else\n    {\n      *pt++ = *s;\n      dlen--;\n    }\n  }\n  *pt++ = '\"';\n  *pt = '\\0';\n}",
+  "function_modified_lines": {
+    "added": [
+      "      if (dlen < 2)",
+      "      dlen -= 2;"
+    ],
+    "deleted": [
+      "      dlen -= 2;",
+      "      if (dlen == 0)"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "An issue was discovered in Mutt before 1.10.1 and NeoMutt before 2018-07-16. imap_quote_string in imap/util.c has an integer underflow.",
+  "id": 3116
+},
+{
+  "cve_id": "CVE-2018-20179",
+  "code_before_change": "ber_parse_header(STREAM s, int tagval, int *length)\n{\n\tint tag, len;\n\n\tif (tagval > 0xff)\n\t{\n\t\tin_uint16_be(s, tag);\n\t}\n\telse\n\t{\n\t\tin_uint8(s, tag);\n\t}\n\n\tif (tag != tagval)\n\t{\n\t\tlogger(Core, Error, \"ber_parse_header(), expected tag %d, got %d\", tagval, tag);\n\t\treturn False;\n\t}\n\n\tin_uint8(s, len);\n\n\tif (len & 0x80)\n\t{\n\t\tlen &= ~0x80;\n\t\t*length = 0;\n\t\twhile (len--)\n\t\t\tnext_be(s, *length);\n\t}\n\telse\n\t\t*length = len;\n\n\treturn s_check(s);\n}",
+  "code_after_change": "ber_parse_header(STREAM s, int tagval, uint32 *length)\n{\n\tint tag, len;\n\n\tif (tagval > 0xff)\n\t{\n\t\tin_uint16_be(s, tag);\n\t}\n\telse\n\t{\n\t\tin_uint8(s, tag);\n\t}\n\n\tif (tag != tagval)\n\t{\n\t\tlogger(Core, Error, \"ber_parse_header(), expected tag %d, got %d\", tagval, tag);\n\t\treturn False;\n\t}\n\n\tin_uint8(s, len);\n\n\tif (len & 0x80)\n\t{\n\t\tlen &= ~0x80;\n\t\t*length = 0;\n\t\twhile (len--)\n\t\t\tnext_be(s, *length);\n\t}\n\telse\n\t\t*length = len;\n\n\treturn s_check(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "ber_parse_header(STREAM s, int tagval, uint32 *length)"
+    ],
+    "deleted": [
+      "ber_parse_header(STREAM s, int tagval, int *length)"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function lspci_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3117
+},
+{
+  "cve_id": "CVE-2018-20179",
+  "code_before_change": "process_plane(uint8 * in, int width, int height, uint8 * out, int size)\n{\n\tUNUSED(size);\n\tint indexw;\n\tint indexh;\n\tint code;\n\tint collen;\n\tint replen;\n\tint color;\n\tint x;\n\tint revcode;\n\tuint8 * last_line;\n\tuint8 * this_line;\n\tuint8 * org_in;\n\tuint8 * org_out;\n\n\torg_in = in;\n\torg_out = out;\n\tlast_line = 0;\n\tindexh = 0;\n\twhile (indexh < height)\n\t{\n\t\tout = (org_out + width * height * 4) - ((indexh + 1) * width * 4);\n\t\tcolor = 0;\n\t\tthis_line = out;\n\t\tindexw = 0;\n\t\tif (last_line == 0)\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (collen > 0)\n\t\t\t\t{\n\t\t\t\t\tcolor = CVAL(in);\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (replen > 0)\n\t\t\t\t{\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (collen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = CVAL(in);\n\t\t\t\t\tif (x & 1)\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tx = x + 1;\n\t\t\t\t\t\tcolor = -x;\n\t\t\t\t\t}\n\t\t\t\t\telse\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tcolor = x;\n\t\t\t\t\t}\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (replen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tindexh++;\n\t\tlast_line = this_line;\n\t}\n\treturn (int) (in - org_in);\n}",
+  "code_after_change": "process_plane(uint8 * in, int width, int height, uint8 * out, int size)\n{\n\tUNUSED(size);\n\tint indexw;\n\tint indexh;\n\tint code;\n\tint collen;\n\tint replen;\n\tint color;\n\tint x;\n\tint revcode;\n\tuint8 * last_line;\n\tuint8 * this_line;\n\tuint8 * org_in;\n\tuint8 * org_out;\n\n\torg_in = in;\n\torg_out = out;\n\tlast_line = 0;\n\tindexh = 0;\n\twhile (indexh < height)\n\t{\n\t\tout = (org_out + width * height * 4) - ((indexh + 1) * width * 4);\n\t\tcolor = 0;\n\t\tthis_line = out;\n\t\tindexw = 0;\n\t\tif (last_line == 0)\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && collen > 0)\n\t\t\t\t{\n\t\t\t\t\tcolor = CVAL(in);\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && replen > 0)\n\t\t\t\t{\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && collen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = CVAL(in);\n\t\t\t\t\tif (x & 1)\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tx = x + 1;\n\t\t\t\t\t\tcolor = -x;\n\t\t\t\t\t}\n\t\t\t\t\telse\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tcolor = x;\n\t\t\t\t\t}\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && replen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tindexh++;\n\t\tlast_line = this_line;\n\t}\n\treturn (int) (in - org_in);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\twhile (indexw < width && collen > 0)",
+      "\t\t\t\twhile (indexw < width && replen > 0)",
+      "\t\t\t\twhile (indexw < width && collen > 0)",
+      "\t\t\t\twhile (indexw < width && replen > 0)"
+    ],
+    "deleted": [
+      "\t\t\t\twhile (collen > 0)",
+      "\t\t\t\twhile (replen > 0)",
+      "\t\t\t\twhile (collen > 0)",
+      "\t\t\t\twhile (replen > 0)"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function lspci_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3118
+},
+{
+  "cve_id": "CVE-2018-20179",
+  "code_before_change": "cssp_read_tsrequest(STREAM token, STREAM pubkey)\n{\n\tSTREAM s;\n\tint length;\n\tint tagval;\n\n\ts = tcp_recv(NULL, 4);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\t// verify ASN.1 header\n\tif (s->p[0] != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t{\n\t\tlogger(Protocol, Error,\n\t\t       \"cssp_read_tsrequest(), expected BER_TAG_SEQUENCE|BER_TAG_CONSTRUCTED, got %x\",\n\t\t       s->p[0]);\n\t\treturn False;\n\t}\n\n\t// peek at first 4 bytes to get full message length\n\tif (s->p[1] < 0x80)\n\t\tlength = s->p[1] - 2;\n\telse if (s->p[1] == 0x81)\n\t\tlength = s->p[2] - 1;\n\telse if (s->p[1] == 0x82)\n\t\tlength = (s->p[2] << 8) | s->p[3];\n\telse\n\t\treturn False;\n\n\t// receive the remainings of message\n\ts = tcp_recv(s, length);\n\n\t// parse the response and into nego token\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\treturn False;\n\n\t// version [0]\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\treturn False;\n\tin_uint8s(s, length);\n\n\t// negoToken [1]\n\tif (token)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 1))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\ttoken->end = token->p = token->data;\n\t\tout_uint8p(token, s->p, length);\n\t\ts_mark_end(token);\n\t}\n\n\t// pubKey [3]\n\tif (pubkey)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 3))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tpubkey->data = pubkey->p = s->p;\n\t\tpubkey->end = pubkey->data + length;\n\t\tpubkey->size = length;\n\t}\n\n\n\treturn True;\n}",
+  "code_after_change": "cssp_read_tsrequest(STREAM token, STREAM pubkey)\n{\n\tSTREAM s;\n\tint length;\n\tint tagval;\n\tstruct stream packet;\n\n\ts = tcp_recv(NULL, 4);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\t// verify ASN.1 header\n\tif (s->p[0] != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t{\n\t\tlogger(Protocol, Error,\n\t\t       \"cssp_read_tsrequest(), expected BER_TAG_SEQUENCE|BER_TAG_CONSTRUCTED, got %x\",\n\t\t       s->p[0]);\n\t\treturn False;\n\t}\n\n\t// peek at first 4 bytes to get full message length\n\tif (s->p[1] < 0x80)\n\t\tlength = s->p[1] - 2;\n\telse if (s->p[1] == 0x81)\n\t\tlength = s->p[2] - 1;\n\telse if (s->p[1] == 0x82)\n\t\tlength = (s->p[2] << 8) | s->p[3];\n\telse\n\t\treturn False;\n\n\t// receive the remainings of message\n\ts = tcp_recv(s, length);\n\tpacket = *s;\n\n\t// parse the response and into nego token\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\treturn False;\n\n\t// version [0]\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\treturn False;\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\t rdp_protocol_error(\"cssp_read_tsrequest(), consume of version from stream would overrun\",\n\t\t\t\t    &packet);\n\t}\n\tin_uint8s(s, length);\n\n\t// negoToken [1]\n\tif (token)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 1))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tif (!s_check_rem(s, length))\n\t\t{\n\t\t\trdp_protocol_error(\"cssp_read_tsrequest(), consume of token from stream would overrun\",\n\t\t\t\t\t   &packet);\n\t\t}\n\n\t\ts_realloc(token, length);\n\t\ts_reset(token);\n\t\tout_uint8p(token, s->p, length);\n\t\ts_mark_end(token);\n\t}\n\n\t// pubKey [3]\n\tif (pubkey)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 3))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tpubkey->data = pubkey->p = s->p;\n\t\tpubkey->end = pubkey->data + length;\n\t\tpubkey->size = length;\n\t}\n\n\n\treturn True;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tstruct stream packet;",
+      "\tpacket = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\t rdp_protocol_error(\"cssp_read_tsrequest(), consume of version from stream would overrun\",",
+      "\t\t\t\t    &packet);",
+      "\t}",
+      "\t\tif (!s_check_rem(s, length))",
+      "\t\t{",
+      "\t\t\trdp_protocol_error(\"cssp_read_tsrequest(), consume of token from stream would overrun\",",
+      "\t\t\t\t\t   &packet);",
+      "\t\t}",
+      "\t\ts_realloc(token, length);",
+      "\t\ts_reset(token);"
+    ],
+    "deleted": [
+      "\t\ttoken->end = token->p = token->data;"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function lspci_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3119
+},
+{
+  "cve_id": "CVE-2018-20179",
+  "code_before_change": "mcs_parse_domain_params(STREAM s)\n{\n\tint length;\n\n\tber_parse_header(s, MCS_TAG_DOMAIN_PARAMS, &length);\n\tin_uint8s(s, length);\n\n\treturn s_check(s);\n}",
+  "code_after_change": "mcs_parse_domain_params(STREAM s)\n{\n\tuint32 length;\n\tstruct stream packet = *s;\n\n\tber_parse_header(s, MCS_TAG_DOMAIN_PARAMS, &length);\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\trdp_protocol_error(\"mcs_parse_domain_params(), consume domain params from stream would overrun\", &packet);\n\t}\n\n\tin_uint8s(s, length);\n\n\treturn s_check(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tuint32 length;",
+      "\tstruct stream packet = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\trdp_protocol_error(\"mcs_parse_domain_params(), consume domain params from stream would overrun\", &packet);",
+      "\t}"
+    ],
+    "deleted": [
+      "\tint length;"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function lspci_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3120
+},
+{
+  "cve_id": "CVE-2018-20179",
+  "code_before_change": "mcs_recv_connect_response(STREAM mcs_data)\n{\n\tUNUSED(mcs_data);\n\tuint8 result;\n\tint length;\n\tSTREAM s;\n\tRD_BOOL is_fastpath;\n\tuint8 fastpath_hdr;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\ts = iso_recv(&is_fastpath, &fastpath_hdr);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\tber_parse_header(s, MCS_CONNECT_RESPONSE, &length);\n\n\tber_parse_header(s, BER_TAG_RESULT, &length);\n\tin_uint8(s, result);\n\tif (result != 0)\n\t{\n\t\tlogger(Protocol, Error, \"mcs_recv_connect_response(), result=%d\", result);\n\t\treturn False;\n\t}\n\n\tber_parse_header(s, BER_TAG_INTEGER, &length);\n\tin_uint8s(s, length);\t/* connect id */\n\tmcs_parse_domain_params(s);\n\n\tber_parse_header(s, BER_TAG_OCTET_STRING, &length);\n\n\tsec_process_mcs_data(s);\n\t/*\n\t   if (length > mcs_data->size)\n\t   {\n\t   logger(Protocol, Error, \"mcs_recv_connect_response(), expected length=%d, got %d\",length, mcs_data->size);\n\t   length = mcs_data->size;\n\t   }\n\n\t   in_uint8a(s, mcs_data->data, length);\n\t   mcs_data->p = mcs_data->data;\n\t   mcs_data->end = mcs_data->data + length;\n\t */\n\treturn s_check_end(s);\n}",
+  "code_after_change": "mcs_recv_connect_response(STREAM mcs_data)\n{\n\tUNUSED(mcs_data);\n\tuint8 result;\n\tuint32 length;\n\tSTREAM s;\n\tstruct stream packet;\n\tRD_BOOL is_fastpath;\n\tuint8 fastpath_hdr;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\ts = iso_recv(&is_fastpath, &fastpath_hdr);\n\n\tif (s == NULL)\n\t\treturn False;\n\t\n\tpacket = *s;\n\n\tber_parse_header(s, MCS_CONNECT_RESPONSE, &length);\n\n\tber_parse_header(s, BER_TAG_RESULT, &length);\n\tin_uint8(s, result);\n\tif (result != 0)\n\t{\n\t\tlogger(Protocol, Error, \"mcs_recv_connect_response(), result=%d\", result);\n\t\treturn False;\n\t}\n\n\tber_parse_header(s, BER_TAG_INTEGER, &length);\n\tin_uint8s(s, length);\t/* connect id */\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\trdp_protocol_error(\"mcs_recv_connect_response(), consume connect id from stream would overrun\", &packet);\n\t}\n\n\tmcs_parse_domain_params(s);\n\n\tber_parse_header(s, BER_TAG_OCTET_STRING, &length);\n\n\tsec_process_mcs_data(s);\n\t/*\n\t   if (length > mcs_data->size)\n\t   {\n\t   logger(Protocol, Error, \"mcs_recv_connect_response(), expected length=%d, got %d\",length, mcs_data->size);\n\t   length = mcs_data->size;\n\t   }\n\n\t   in_uint8a(s, mcs_data->data, length);\n\t   mcs_data->p = mcs_data->data;\n\t   mcs_data->end = mcs_data->data + length;\n\t */\n\treturn s_check_end(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tuint32 length;",
+      "\tstruct stream packet;",
+      "\tpacket = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\trdp_protocol_error(\"mcs_recv_connect_response(), consume connect id from stream would overrun\", &packet);",
+      "\t}"
+    ],
+    "deleted": [
+      "\tint length;"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function lspci_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3121
+},
+{
+  "cve_id": "CVE-2018-20179",
+  "code_before_change": "process_bitmap_updates(STREAM s)\n{\n\tuint16 num_updates;\n\tuint16 left, top, right, bottom, width, height;\n\tuint16 cx, cy, bpp, Bpp, compress, bufsize, size;\n\tuint8 *data, *bmpdata;\n\tint i;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\n\tin_uint16_le(s, num_updates);\n\n\tfor (i = 0; i < num_updates; i++)\n\t{\n\t\tin_uint16_le(s, left);\n\t\tin_uint16_le(s, top);\n\t\tin_uint16_le(s, right);\n\t\tin_uint16_le(s, bottom);\n\t\tin_uint16_le(s, width);\n\t\tin_uint16_le(s, height);\n\t\tin_uint16_le(s, bpp);\n\t\tBpp = (bpp + 7) / 8;\n\t\tin_uint16_le(s, compress);\n\t\tin_uint16_le(s, bufsize);\n\n\t\tcx = right - left + 1;\n\t\tcy = bottom - top + 1;\n\n\t\tlogger(Graphics, Debug,\n\t\t       \"process_bitmap_updates(), [%d,%d,%d,%d], [%d,%d], bpp=%d, compression=%d\",\n\t\t       left, top, right, bottom, width, height, Bpp, compress);\n\n\t\tif (!compress)\n\t\t{\n\t\t\tint y;\n\t\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);\n\t\t\tfor (y = 0; y < height; y++)\n\t\t\t{\n\t\t\t\tin_uint8a(s, &bmpdata[(height - y - 1) * (width * Bpp)],\n\t\t\t\t\t  width * Bpp);\n\t\t\t}\n\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);\n\t\t\txfree(bmpdata);\n\t\t\tcontinue;\n\t\t}\n\n\n\t\tif (compress & 0x400)\n\t\t{\n\t\t\tsize = bufsize;\n\t\t}\n\t\telse\n\t\t{\n\t\t\tin_uint8s(s, 2);\t/* pad */\n\t\t\tin_uint16_le(s, size);\n\t\t\tin_uint8s(s, 4);\t/* line_size, final_size */\n\t\t}\n\t\tin_uint8p(s, data, size);\n\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);\n\t\tif (bitmap_decompress(bmpdata, width, height, data, size, Bpp))\n\t\t{\n\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);\n\t\t}\n\t\telse\n\t\t{\n\t\t\tlogger(Graphics, Warning,\n\t\t\t       \"process_bitmap_updates(), failed to decompress bitmap\");\n\t\t}\n\n\t\txfree(bmpdata);\n\t}\n}",
+  "code_after_change": "process_bitmap_updates(STREAM s)\n{\n\tint i;\n\tuint16 num_updates;\n\t\n\tin_uint16_le(s, num_updates);   /* rectangles */\n\n\tfor (i = 0; i < num_updates; i++)\n\t{\n\t\tprocess_bitmap_data(s);\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "process_bitmap_updates(STREAM s)",
+      "{",
+      "\tint i;",
+      "\tuint16 num_updates;",
+      "\tin_uint16_le(s, num_updates);   /* rectangles */",
+      "\tfor (i = 0; i < num_updates; i++)",
+      "\t{",
+      "\t\tprocess_bitmap_data(s);"
+    ],
+    "deleted": [
+      "process_bitmap_updates(STREAM s)",
+      "\tuint16 num_updates;",
+      "\tuint16 cx, cy, bpp, Bpp, compress, bufsize, size;",
+      "\tint i;",
+      "\tin_uint16_le(s, num_updates);",
+      "\tfor (i = 0; i < num_updates; i++)",
+      "\t{",
+      "\t\tin_uint16_le(s, left);",
+      "\t\tin_uint16_le(s, top);",
+      "\t\tin_uint16_le(s, right);",
+      "\t\tin_uint16_le(s, bottom);",
+      "\t\tin_uint16_le(s, width);",
+      "\t\tin_uint16_le(s, height);",
+      "\t\tin_uint16_le(s, bpp);",
+      "\t\tBpp = (bpp + 7) / 8;",
+      "\t\tin_uint16_le(s, compress);",
+      "\t\tin_uint16_le(s, bufsize);",
+      "\t\tcx = right - left + 1;",
+      "\t\tcy = bottom - top + 1;",
+      "\t\tlogger(Graphics, Debug,",
+      "\t\t       \"process_bitmap_updates(), [%d,%d,%d,%d], [%d,%d], bpp=%d, compression=%d\",",
+      "\t\t       left, top, right, bottom, width, height, Bpp, compress);",
+      "\t\tif (!compress)",
+      "\t\t{",
+      "\t\t\tint y;",
+      "\t\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);",
+      "\t\t\tfor (y = 0; y < height; y++)",
+      "\t\t\t{",
+      "\t\t\t\tin_uint8a(s, &bmpdata[(height - y - 1) * (width * Bpp)],",
+      "\t\t\t\t\t  width * Bpp);",
+      "\t\t\t}",
+      "\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);",
+      "\t\t\txfree(bmpdata);",
+      "\t\t\tcontinue;",
+      "\t\t}",
+      "\t\tif (compress & 0x400)",
+      "\t\t{",
+      "\t\t\tsize = bufsize;",
+      "\t\t}",
+      "\t\telse",
+      "\t\t{",
+      "\t\t\tin_uint8s(s, 2);\t/* pad */",
+      "\t\t\tin_uint16_le(s, size);",
+      "\t\t\tin_uint8s(s, 4);\t/* line_size, final_size */",
+      "\t\t}",
+      "\t\tin_uint8p(s, data, size);",
+      "\t\tif (bitmap_decompress(bmpdata, width, height, data, size, Bpp))",
+      "\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);",
+      "\t\telse",
+      "\t\t{",
+      "\t\t\tlogger(Graphics, Warning,",
+      "\t\t\t       \"process_bitmap_updates(), failed to decompress bitmap\");",
+      "\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function lspci_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3122
+},
+{
+  "cve_id": "CVE-2018-20180",
+  "code_before_change": "ber_parse_header(STREAM s, int tagval, int *length)\n{\n\tint tag, len;\n\n\tif (tagval > 0xff)\n\t{\n\t\tin_uint16_be(s, tag);\n\t}\n\telse\n\t{\n\t\tin_uint8(s, tag);\n\t}\n\n\tif (tag != tagval)\n\t{\n\t\tlogger(Core, Error, \"ber_parse_header(), expected tag %d, got %d\", tagval, tag);\n\t\treturn False;\n\t}\n\n\tin_uint8(s, len);\n\n\tif (len & 0x80)\n\t{\n\t\tlen &= ~0x80;\n\t\t*length = 0;\n\t\twhile (len--)\n\t\t\tnext_be(s, *length);\n\t}\n\telse\n\t\t*length = len;\n\n\treturn s_check(s);\n}",
+  "code_after_change": "ber_parse_header(STREAM s, int tagval, uint32 *length)\n{\n\tint tag, len;\n\n\tif (tagval > 0xff)\n\t{\n\t\tin_uint16_be(s, tag);\n\t}\n\telse\n\t{\n\t\tin_uint8(s, tag);\n\t}\n\n\tif (tag != tagval)\n\t{\n\t\tlogger(Core, Error, \"ber_parse_header(), expected tag %d, got %d\", tagval, tag);\n\t\treturn False;\n\t}\n\n\tin_uint8(s, len);\n\n\tif (len & 0x80)\n\t{\n\t\tlen &= ~0x80;\n\t\t*length = 0;\n\t\twhile (len--)\n\t\t\tnext_be(s, *length);\n\t}\n\telse\n\t\t*length = len;\n\n\treturn s_check(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "ber_parse_header(STREAM s, int tagval, uint32 *length)"
+    ],
+    "deleted": [
+      "ber_parse_header(STREAM s, int tagval, int *length)"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function rdpsnddbg_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3123
+},
+{
+  "cve_id": "CVE-2018-20180",
+  "code_before_change": "process_plane(uint8 * in, int width, int height, uint8 * out, int size)\n{\n\tUNUSED(size);\n\tint indexw;\n\tint indexh;\n\tint code;\n\tint collen;\n\tint replen;\n\tint color;\n\tint x;\n\tint revcode;\n\tuint8 * last_line;\n\tuint8 * this_line;\n\tuint8 * org_in;\n\tuint8 * org_out;\n\n\torg_in = in;\n\torg_out = out;\n\tlast_line = 0;\n\tindexh = 0;\n\twhile (indexh < height)\n\t{\n\t\tout = (org_out + width * height * 4) - ((indexh + 1) * width * 4);\n\t\tcolor = 0;\n\t\tthis_line = out;\n\t\tindexw = 0;\n\t\tif (last_line == 0)\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (collen > 0)\n\t\t\t\t{\n\t\t\t\t\tcolor = CVAL(in);\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (replen > 0)\n\t\t\t\t{\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (collen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = CVAL(in);\n\t\t\t\t\tif (x & 1)\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tx = x + 1;\n\t\t\t\t\t\tcolor = -x;\n\t\t\t\t\t}\n\t\t\t\t\telse\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tcolor = x;\n\t\t\t\t\t}\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (replen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tindexh++;\n\t\tlast_line = this_line;\n\t}\n\treturn (int) (in - org_in);\n}",
+  "code_after_change": "process_plane(uint8 * in, int width, int height, uint8 * out, int size)\n{\n\tUNUSED(size);\n\tint indexw;\n\tint indexh;\n\tint code;\n\tint collen;\n\tint replen;\n\tint color;\n\tint x;\n\tint revcode;\n\tuint8 * last_line;\n\tuint8 * this_line;\n\tuint8 * org_in;\n\tuint8 * org_out;\n\n\torg_in = in;\n\torg_out = out;\n\tlast_line = 0;\n\tindexh = 0;\n\twhile (indexh < height)\n\t{\n\t\tout = (org_out + width * height * 4) - ((indexh + 1) * width * 4);\n\t\tcolor = 0;\n\t\tthis_line = out;\n\t\tindexw = 0;\n\t\tif (last_line == 0)\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && collen > 0)\n\t\t\t\t{\n\t\t\t\t\tcolor = CVAL(in);\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && replen > 0)\n\t\t\t\t{\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && collen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = CVAL(in);\n\t\t\t\t\tif (x & 1)\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tx = x + 1;\n\t\t\t\t\t\tcolor = -x;\n\t\t\t\t\t}\n\t\t\t\t\telse\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tcolor = x;\n\t\t\t\t\t}\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && replen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tindexh++;\n\t\tlast_line = this_line;\n\t}\n\treturn (int) (in - org_in);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\twhile (indexw < width && collen > 0)",
+      "\t\t\t\twhile (indexw < width && replen > 0)",
+      "\t\t\t\twhile (indexw < width && collen > 0)",
+      "\t\t\t\twhile (indexw < width && replen > 0)"
+    ],
+    "deleted": [
+      "\t\t\t\twhile (collen > 0)",
+      "\t\t\t\twhile (replen > 0)",
+      "\t\t\t\twhile (collen > 0)",
+      "\t\t\t\twhile (replen > 0)"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function rdpsnddbg_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3124
+},
+{
+  "cve_id": "CVE-2018-20180",
+  "code_before_change": "cssp_read_tsrequest(STREAM token, STREAM pubkey)\n{\n\tSTREAM s;\n\tint length;\n\tint tagval;\n\n\ts = tcp_recv(NULL, 4);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\t// verify ASN.1 header\n\tif (s->p[0] != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t{\n\t\tlogger(Protocol, Error,\n\t\t       \"cssp_read_tsrequest(), expected BER_TAG_SEQUENCE|BER_TAG_CONSTRUCTED, got %x\",\n\t\t       s->p[0]);\n\t\treturn False;\n\t}\n\n\t// peek at first 4 bytes to get full message length\n\tif (s->p[1] < 0x80)\n\t\tlength = s->p[1] - 2;\n\telse if (s->p[1] == 0x81)\n\t\tlength = s->p[2] - 1;\n\telse if (s->p[1] == 0x82)\n\t\tlength = (s->p[2] << 8) | s->p[3];\n\telse\n\t\treturn False;\n\n\t// receive the remainings of message\n\ts = tcp_recv(s, length);\n\n\t// parse the response and into nego token\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\treturn False;\n\n\t// version [0]\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\treturn False;\n\tin_uint8s(s, length);\n\n\t// negoToken [1]\n\tif (token)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 1))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\ttoken->end = token->p = token->data;\n\t\tout_uint8p(token, s->p, length);\n\t\ts_mark_end(token);\n\t}\n\n\t// pubKey [3]\n\tif (pubkey)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 3))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tpubkey->data = pubkey->p = s->p;\n\t\tpubkey->end = pubkey->data + length;\n\t\tpubkey->size = length;\n\t}\n\n\n\treturn True;\n}",
+  "code_after_change": "cssp_read_tsrequest(STREAM token, STREAM pubkey)\n{\n\tSTREAM s;\n\tint length;\n\tint tagval;\n\tstruct stream packet;\n\n\ts = tcp_recv(NULL, 4);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\t// verify ASN.1 header\n\tif (s->p[0] != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t{\n\t\tlogger(Protocol, Error,\n\t\t       \"cssp_read_tsrequest(), expected BER_TAG_SEQUENCE|BER_TAG_CONSTRUCTED, got %x\",\n\t\t       s->p[0]);\n\t\treturn False;\n\t}\n\n\t// peek at first 4 bytes to get full message length\n\tif (s->p[1] < 0x80)\n\t\tlength = s->p[1] - 2;\n\telse if (s->p[1] == 0x81)\n\t\tlength = s->p[2] - 1;\n\telse if (s->p[1] == 0x82)\n\t\tlength = (s->p[2] << 8) | s->p[3];\n\telse\n\t\treturn False;\n\n\t// receive the remainings of message\n\ts = tcp_recv(s, length);\n\tpacket = *s;\n\n\t// parse the response and into nego token\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\treturn False;\n\n\t// version [0]\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\treturn False;\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\t rdp_protocol_error(\"cssp_read_tsrequest(), consume of version from stream would overrun\",\n\t\t\t\t    &packet);\n\t}\n\tin_uint8s(s, length);\n\n\t// negoToken [1]\n\tif (token)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 1))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tif (!s_check_rem(s, length))\n\t\t{\n\t\t\trdp_protocol_error(\"cssp_read_tsrequest(), consume of token from stream would overrun\",\n\t\t\t\t\t   &packet);\n\t\t}\n\n\t\ts_realloc(token, length);\n\t\ts_reset(token);\n\t\tout_uint8p(token, s->p, length);\n\t\ts_mark_end(token);\n\t}\n\n\t// pubKey [3]\n\tif (pubkey)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 3))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tpubkey->data = pubkey->p = s->p;\n\t\tpubkey->end = pubkey->data + length;\n\t\tpubkey->size = length;\n\t}\n\n\n\treturn True;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tstruct stream packet;",
+      "\tpacket = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\t rdp_protocol_error(\"cssp_read_tsrequest(), consume of version from stream would overrun\",",
+      "\t\t\t\t    &packet);",
+      "\t}",
+      "\t\tif (!s_check_rem(s, length))",
+      "\t\t{",
+      "\t\t\trdp_protocol_error(\"cssp_read_tsrequest(), consume of token from stream would overrun\",",
+      "\t\t\t\t\t   &packet);",
+      "\t\t}",
+      "\t\ts_realloc(token, length);",
+      "\t\ts_reset(token);"
+    ],
+    "deleted": [
+      "\t\ttoken->end = token->p = token->data;"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function rdpsnddbg_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3125
+},
+{
+  "cve_id": "CVE-2018-20180",
+  "code_before_change": "mcs_parse_domain_params(STREAM s)\n{\n\tint length;\n\n\tber_parse_header(s, MCS_TAG_DOMAIN_PARAMS, &length);\n\tin_uint8s(s, length);\n\n\treturn s_check(s);\n}",
+  "code_after_change": "mcs_parse_domain_params(STREAM s)\n{\n\tuint32 length;\n\tstruct stream packet = *s;\n\n\tber_parse_header(s, MCS_TAG_DOMAIN_PARAMS, &length);\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\trdp_protocol_error(\"mcs_parse_domain_params(), consume domain params from stream would overrun\", &packet);\n\t}\n\n\tin_uint8s(s, length);\n\n\treturn s_check(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tuint32 length;",
+      "\tstruct stream packet = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\trdp_protocol_error(\"mcs_parse_domain_params(), consume domain params from stream would overrun\", &packet);",
+      "\t}"
+    ],
+    "deleted": [
+      "\tint length;"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function rdpsnddbg_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3126
+},
+{
+  "cve_id": "CVE-2018-20180",
+  "code_before_change": "mcs_recv_connect_response(STREAM mcs_data)\n{\n\tUNUSED(mcs_data);\n\tuint8 result;\n\tint length;\n\tSTREAM s;\n\tRD_BOOL is_fastpath;\n\tuint8 fastpath_hdr;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\ts = iso_recv(&is_fastpath, &fastpath_hdr);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\tber_parse_header(s, MCS_CONNECT_RESPONSE, &length);\n\n\tber_parse_header(s, BER_TAG_RESULT, &length);\n\tin_uint8(s, result);\n\tif (result != 0)\n\t{\n\t\tlogger(Protocol, Error, \"mcs_recv_connect_response(), result=%d\", result);\n\t\treturn False;\n\t}\n\n\tber_parse_header(s, BER_TAG_INTEGER, &length);\n\tin_uint8s(s, length);\t/* connect id */\n\tmcs_parse_domain_params(s);\n\n\tber_parse_header(s, BER_TAG_OCTET_STRING, &length);\n\n\tsec_process_mcs_data(s);\n\t/*\n\t   if (length > mcs_data->size)\n\t   {\n\t   logger(Protocol, Error, \"mcs_recv_connect_response(), expected length=%d, got %d\",length, mcs_data->size);\n\t   length = mcs_data->size;\n\t   }\n\n\t   in_uint8a(s, mcs_data->data, length);\n\t   mcs_data->p = mcs_data->data;\n\t   mcs_data->end = mcs_data->data + length;\n\t */\n\treturn s_check_end(s);\n}",
+  "code_after_change": "mcs_recv_connect_response(STREAM mcs_data)\n{\n\tUNUSED(mcs_data);\n\tuint8 result;\n\tuint32 length;\n\tSTREAM s;\n\tstruct stream packet;\n\tRD_BOOL is_fastpath;\n\tuint8 fastpath_hdr;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\ts = iso_recv(&is_fastpath, &fastpath_hdr);\n\n\tif (s == NULL)\n\t\treturn False;\n\t\n\tpacket = *s;\n\n\tber_parse_header(s, MCS_CONNECT_RESPONSE, &length);\n\n\tber_parse_header(s, BER_TAG_RESULT, &length);\n\tin_uint8(s, result);\n\tif (result != 0)\n\t{\n\t\tlogger(Protocol, Error, \"mcs_recv_connect_response(), result=%d\", result);\n\t\treturn False;\n\t}\n\n\tber_parse_header(s, BER_TAG_INTEGER, &length);\n\tin_uint8s(s, length);\t/* connect id */\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\trdp_protocol_error(\"mcs_recv_connect_response(), consume connect id from stream would overrun\", &packet);\n\t}\n\n\tmcs_parse_domain_params(s);\n\n\tber_parse_header(s, BER_TAG_OCTET_STRING, &length);\n\n\tsec_process_mcs_data(s);\n\t/*\n\t   if (length > mcs_data->size)\n\t   {\n\t   logger(Protocol, Error, \"mcs_recv_connect_response(), expected length=%d, got %d\",length, mcs_data->size);\n\t   length = mcs_data->size;\n\t   }\n\n\t   in_uint8a(s, mcs_data->data, length);\n\t   mcs_data->p = mcs_data->data;\n\t   mcs_data->end = mcs_data->data + length;\n\t */\n\treturn s_check_end(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tuint32 length;",
+      "\tstruct stream packet;",
+      "\tpacket = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\trdp_protocol_error(\"mcs_recv_connect_response(), consume connect id from stream would overrun\", &packet);",
+      "\t}"
+    ],
+    "deleted": [
+      "\tint length;"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function rdpsnddbg_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3127
+},
+{
+  "cve_id": "CVE-2018-20180",
+  "code_before_change": "process_bitmap_updates(STREAM s)\n{\n\tuint16 num_updates;\n\tuint16 left, top, right, bottom, width, height;\n\tuint16 cx, cy, bpp, Bpp, compress, bufsize, size;\n\tuint8 *data, *bmpdata;\n\tint i;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\n\tin_uint16_le(s, num_updates);\n\n\tfor (i = 0; i < num_updates; i++)\n\t{\n\t\tin_uint16_le(s, left);\n\t\tin_uint16_le(s, top);\n\t\tin_uint16_le(s, right);\n\t\tin_uint16_le(s, bottom);\n\t\tin_uint16_le(s, width);\n\t\tin_uint16_le(s, height);\n\t\tin_uint16_le(s, bpp);\n\t\tBpp = (bpp + 7) / 8;\n\t\tin_uint16_le(s, compress);\n\t\tin_uint16_le(s, bufsize);\n\n\t\tcx = right - left + 1;\n\t\tcy = bottom - top + 1;\n\n\t\tlogger(Graphics, Debug,\n\t\t       \"process_bitmap_updates(), [%d,%d,%d,%d], [%d,%d], bpp=%d, compression=%d\",\n\t\t       left, top, right, bottom, width, height, Bpp, compress);\n\n\t\tif (!compress)\n\t\t{\n\t\t\tint y;\n\t\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);\n\t\t\tfor (y = 0; y < height; y++)\n\t\t\t{\n\t\t\t\tin_uint8a(s, &bmpdata[(height - y - 1) * (width * Bpp)],\n\t\t\t\t\t  width * Bpp);\n\t\t\t}\n\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);\n\t\t\txfree(bmpdata);\n\t\t\tcontinue;\n\t\t}\n\n\n\t\tif (compress & 0x400)\n\t\t{\n\t\t\tsize = bufsize;\n\t\t}\n\t\telse\n\t\t{\n\t\t\tin_uint8s(s, 2);\t/* pad */\n\t\t\tin_uint16_le(s, size);\n\t\t\tin_uint8s(s, 4);\t/* line_size, final_size */\n\t\t}\n\t\tin_uint8p(s, data, size);\n\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);\n\t\tif (bitmap_decompress(bmpdata, width, height, data, size, Bpp))\n\t\t{\n\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);\n\t\t}\n\t\telse\n\t\t{\n\t\t\tlogger(Graphics, Warning,\n\t\t\t       \"process_bitmap_updates(), failed to decompress bitmap\");\n\t\t}\n\n\t\txfree(bmpdata);\n\t}\n}",
+  "code_after_change": "process_bitmap_updates(STREAM s)\n{\n\tint i;\n\tuint16 num_updates;\n\t\n\tin_uint16_le(s, num_updates);   /* rectangles */\n\n\tfor (i = 0; i < num_updates; i++)\n\t{\n\t\tprocess_bitmap_data(s);\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "process_bitmap_updates(STREAM s)",
+      "{",
+      "\tint i;",
+      "\tuint16 num_updates;",
+      "\tin_uint16_le(s, num_updates);   /* rectangles */",
+      "\tfor (i = 0; i < num_updates; i++)",
+      "\t{",
+      "\t\tprocess_bitmap_data(s);"
+    ],
+    "deleted": [
+      "process_bitmap_updates(STREAM s)",
+      "\tuint16 num_updates;",
+      "\tuint16 cx, cy, bpp, Bpp, compress, bufsize, size;",
+      "\tint i;",
+      "\tin_uint16_le(s, num_updates);",
+      "\tfor (i = 0; i < num_updates; i++)",
+      "\t{",
+      "\t\tin_uint16_le(s, left);",
+      "\t\tin_uint16_le(s, top);",
+      "\t\tin_uint16_le(s, right);",
+      "\t\tin_uint16_le(s, bottom);",
+      "\t\tin_uint16_le(s, width);",
+      "\t\tin_uint16_le(s, height);",
+      "\t\tin_uint16_le(s, bpp);",
+      "\t\tBpp = (bpp + 7) / 8;",
+      "\t\tin_uint16_le(s, compress);",
+      "\t\tin_uint16_le(s, bufsize);",
+      "\t\tcx = right - left + 1;",
+      "\t\tcy = bottom - top + 1;",
+      "\t\tlogger(Graphics, Debug,",
+      "\t\t       \"process_bitmap_updates(), [%d,%d,%d,%d], [%d,%d], bpp=%d, compression=%d\",",
+      "\t\t       left, top, right, bottom, width, height, Bpp, compress);",
+      "\t\tif (!compress)",
+      "\t\t{",
+      "\t\t\tint y;",
+      "\t\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);",
+      "\t\t\tfor (y = 0; y < height; y++)",
+      "\t\t\t{",
+      "\t\t\t\tin_uint8a(s, &bmpdata[(height - y - 1) * (width * Bpp)],",
+      "\t\t\t\t\t  width * Bpp);",
+      "\t\t\t}",
+      "\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);",
+      "\t\t\txfree(bmpdata);",
+      "\t\t\tcontinue;",
+      "\t\t}",
+      "\t\tif (compress & 0x400)",
+      "\t\t{",
+      "\t\t\tsize = bufsize;",
+      "\t\t}",
+      "\t\telse",
+      "\t\t{",
+      "\t\t\tin_uint8s(s, 2);\t/* pad */",
+      "\t\t\tin_uint16_le(s, size);",
+      "\t\t\tin_uint8s(s, 4);\t/* line_size, final_size */",
+      "\t\t}",
+      "\t\tin_uint8p(s, data, size);",
+      "\t\tif (bitmap_decompress(bmpdata, width, height, data, size, Bpp))",
+      "\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);",
+      "\t\telse",
+      "\t\t{",
+      "\t\t\tlogger(Graphics, Warning,",
+      "\t\t\t       \"process_bitmap_updates(), failed to decompress bitmap\");",
+      "\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function rdpsnddbg_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3128
+},
+{
+  "cve_id": "CVE-2018-20181",
+  "code_before_change": "ber_parse_header(STREAM s, int tagval, int *length)\n{\n\tint tag, len;\n\n\tif (tagval > 0xff)\n\t{\n\t\tin_uint16_be(s, tag);\n\t}\n\telse\n\t{\n\t\tin_uint8(s, tag);\n\t}\n\n\tif (tag != tagval)\n\t{\n\t\tlogger(Core, Error, \"ber_parse_header(), expected tag %d, got %d\", tagval, tag);\n\t\treturn False;\n\t}\n\n\tin_uint8(s, len);\n\n\tif (len & 0x80)\n\t{\n\t\tlen &= ~0x80;\n\t\t*length = 0;\n\t\twhile (len--)\n\t\t\tnext_be(s, *length);\n\t}\n\telse\n\t\t*length = len;\n\n\treturn s_check(s);\n}",
+  "code_after_change": "ber_parse_header(STREAM s, int tagval, uint32 *length)\n{\n\tint tag, len;\n\n\tif (tagval > 0xff)\n\t{\n\t\tin_uint16_be(s, tag);\n\t}\n\telse\n\t{\n\t\tin_uint8(s, tag);\n\t}\n\n\tif (tag != tagval)\n\t{\n\t\tlogger(Core, Error, \"ber_parse_header(), expected tag %d, got %d\", tagval, tag);\n\t\treturn False;\n\t}\n\n\tin_uint8(s, len);\n\n\tif (len & 0x80)\n\t{\n\t\tlen &= ~0x80;\n\t\t*length = 0;\n\t\twhile (len--)\n\t\t\tnext_be(s, *length);\n\t}\n\telse\n\t\t*length = len;\n\n\treturn s_check(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "ber_parse_header(STREAM s, int tagval, uint32 *length)"
+    ],
+    "deleted": [
+      "ber_parse_header(STREAM s, int tagval, int *length)"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function seamless_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3129
+},
+{
+  "cve_id": "CVE-2018-20181",
+  "code_before_change": "process_plane(uint8 * in, int width, int height, uint8 * out, int size)\n{\n\tUNUSED(size);\n\tint indexw;\n\tint indexh;\n\tint code;\n\tint collen;\n\tint replen;\n\tint color;\n\tint x;\n\tint revcode;\n\tuint8 * last_line;\n\tuint8 * this_line;\n\tuint8 * org_in;\n\tuint8 * org_out;\n\n\torg_in = in;\n\torg_out = out;\n\tlast_line = 0;\n\tindexh = 0;\n\twhile (indexh < height)\n\t{\n\t\tout = (org_out + width * height * 4) - ((indexh + 1) * width * 4);\n\t\tcolor = 0;\n\t\tthis_line = out;\n\t\tindexw = 0;\n\t\tif (last_line == 0)\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (collen > 0)\n\t\t\t\t{\n\t\t\t\t\tcolor = CVAL(in);\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (replen > 0)\n\t\t\t\t{\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (collen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = CVAL(in);\n\t\t\t\t\tif (x & 1)\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tx = x + 1;\n\t\t\t\t\t\tcolor = -x;\n\t\t\t\t\t}\n\t\t\t\t\telse\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tcolor = x;\n\t\t\t\t\t}\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (replen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tindexh++;\n\t\tlast_line = this_line;\n\t}\n\treturn (int) (in - org_in);\n}",
+  "code_after_change": "process_plane(uint8 * in, int width, int height, uint8 * out, int size)\n{\n\tUNUSED(size);\n\tint indexw;\n\tint indexh;\n\tint code;\n\tint collen;\n\tint replen;\n\tint color;\n\tint x;\n\tint revcode;\n\tuint8 * last_line;\n\tuint8 * this_line;\n\tuint8 * org_in;\n\tuint8 * org_out;\n\n\torg_in = in;\n\torg_out = out;\n\tlast_line = 0;\n\tindexh = 0;\n\twhile (indexh < height)\n\t{\n\t\tout = (org_out + width * height * 4) - ((indexh + 1) * width * 4);\n\t\tcolor = 0;\n\t\tthis_line = out;\n\t\tindexw = 0;\n\t\tif (last_line == 0)\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && collen > 0)\n\t\t\t\t{\n\t\t\t\t\tcolor = CVAL(in);\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && replen > 0)\n\t\t\t\t{\n\t\t\t\t\t*out = color;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\telse\n\t\t{\n\t\t\twhile (indexw < width)\n\t\t\t{\n\t\t\t\tcode = CVAL(in);\n\t\t\t\treplen = code & 0xf;\n\t\t\t\tcollen = (code >> 4) & 0xf;\n\t\t\t\trevcode = (replen << 4) | collen;\n\t\t\t\tif ((revcode <= 47) && (revcode >= 16))\n\t\t\t\t{\n\t\t\t\t\treplen = revcode;\n\t\t\t\t\tcollen = 0;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && collen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = CVAL(in);\n\t\t\t\t\tif (x & 1)\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tx = x + 1;\n\t\t\t\t\t\tcolor = -x;\n\t\t\t\t\t}\n\t\t\t\t\telse\n\t\t\t\t\t{\n\t\t\t\t\t\tx = x >> 1;\n\t\t\t\t\t\tcolor = x;\n\t\t\t\t\t}\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\tcollen--;\n\t\t\t\t}\n\t\t\t\twhile (indexw < width && replen > 0)\n\t\t\t\t{\n\t\t\t\t\tx = last_line[indexw * 4] + color;\n\t\t\t\t\t*out = x;\n\t\t\t\t\tout += 4;\n\t\t\t\t\tindexw++;\n\t\t\t\t\treplen--;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tindexh++;\n\t\tlast_line = this_line;\n\t}\n\treturn (int) (in - org_in);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\t\twhile (indexw < width && collen > 0)",
+      "\t\t\t\twhile (indexw < width && replen > 0)",
+      "\t\t\t\twhile (indexw < width && collen > 0)",
+      "\t\t\t\twhile (indexw < width && replen > 0)"
+    ],
+    "deleted": [
+      "\t\t\t\twhile (collen > 0)",
+      "\t\t\t\twhile (replen > 0)",
+      "\t\t\t\twhile (collen > 0)",
+      "\t\t\t\twhile (replen > 0)"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function seamless_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3130
+},
+{
+  "cve_id": "CVE-2018-20181",
+  "code_before_change": "cssp_read_tsrequest(STREAM token, STREAM pubkey)\n{\n\tSTREAM s;\n\tint length;\n\tint tagval;\n\n\ts = tcp_recv(NULL, 4);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\t// verify ASN.1 header\n\tif (s->p[0] != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t{\n\t\tlogger(Protocol, Error,\n\t\t       \"cssp_read_tsrequest(), expected BER_TAG_SEQUENCE|BER_TAG_CONSTRUCTED, got %x\",\n\t\t       s->p[0]);\n\t\treturn False;\n\t}\n\n\t// peek at first 4 bytes to get full message length\n\tif (s->p[1] < 0x80)\n\t\tlength = s->p[1] - 2;\n\telse if (s->p[1] == 0x81)\n\t\tlength = s->p[2] - 1;\n\telse if (s->p[1] == 0x82)\n\t\tlength = (s->p[2] << 8) | s->p[3];\n\telse\n\t\treturn False;\n\n\t// receive the remainings of message\n\ts = tcp_recv(s, length);\n\n\t// parse the response and into nego token\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\treturn False;\n\n\t// version [0]\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\treturn False;\n\tin_uint8s(s, length);\n\n\t// negoToken [1]\n\tif (token)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 1))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\ttoken->end = token->p = token->data;\n\t\tout_uint8p(token, s->p, length);\n\t\ts_mark_end(token);\n\t}\n\n\t// pubKey [3]\n\tif (pubkey)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 3))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tpubkey->data = pubkey->p = s->p;\n\t\tpubkey->end = pubkey->data + length;\n\t\tpubkey->size = length;\n\t}\n\n\n\treturn True;\n}",
+  "code_after_change": "cssp_read_tsrequest(STREAM token, STREAM pubkey)\n{\n\tSTREAM s;\n\tint length;\n\tint tagval;\n\tstruct stream packet;\n\n\ts = tcp_recv(NULL, 4);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\t// verify ASN.1 header\n\tif (s->p[0] != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t{\n\t\tlogger(Protocol, Error,\n\t\t       \"cssp_read_tsrequest(), expected BER_TAG_SEQUENCE|BER_TAG_CONSTRUCTED, got %x\",\n\t\t       s->p[0]);\n\t\treturn False;\n\t}\n\n\t// peek at first 4 bytes to get full message length\n\tif (s->p[1] < 0x80)\n\t\tlength = s->p[1] - 2;\n\telse if (s->p[1] == 0x81)\n\t\tlength = s->p[2] - 1;\n\telse if (s->p[1] == 0x82)\n\t\tlength = (s->p[2] << 8) | s->p[3];\n\telse\n\t\treturn False;\n\n\t// receive the remainings of message\n\ts = tcp_recv(s, length);\n\tpacket = *s;\n\n\t// parse the response and into nego token\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\treturn False;\n\n\t// version [0]\n\tif (!ber_in_header(s, &tagval, &length) ||\n\t    tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\treturn False;\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\t rdp_protocol_error(\"cssp_read_tsrequest(), consume of version from stream would overrun\",\n\t\t\t\t    &packet);\n\t}\n\tin_uint8s(s, length);\n\n\t// negoToken [1]\n\tif (token)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 1))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_SEQUENCE | BER_TAG_CONSTRUCTED))\n\t\t\treturn False;\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 0))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tif (!s_check_rem(s, length))\n\t\t{\n\t\t\trdp_protocol_error(\"cssp_read_tsrequest(), consume of token from stream would overrun\",\n\t\t\t\t\t   &packet);\n\t\t}\n\n\t\ts_realloc(token, length);\n\t\ts_reset(token);\n\t\tout_uint8p(token, s->p, length);\n\t\ts_mark_end(token);\n\t}\n\n\t// pubKey [3]\n\tif (pubkey)\n\t{\n\t\tif (!ber_in_header(s, &tagval, &length)\n\t\t    || tagval != (BER_TAG_CTXT_SPECIFIC | BER_TAG_CONSTRUCTED | 3))\n\t\t\treturn False;\n\n\t\tif (!ber_in_header(s, &tagval, &length) || tagval != BER_TAG_OCTET_STRING)\n\t\t\treturn False;\n\n\t\tpubkey->data = pubkey->p = s->p;\n\t\tpubkey->end = pubkey->data + length;\n\t\tpubkey->size = length;\n\t}\n\n\n\treturn True;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tstruct stream packet;",
+      "\tpacket = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\t rdp_protocol_error(\"cssp_read_tsrequest(), consume of version from stream would overrun\",",
+      "\t\t\t\t    &packet);",
+      "\t}",
+      "\t\tif (!s_check_rem(s, length))",
+      "\t\t{",
+      "\t\t\trdp_protocol_error(\"cssp_read_tsrequest(), consume of token from stream would overrun\",",
+      "\t\t\t\t\t   &packet);",
+      "\t\t}",
+      "\t\ts_realloc(token, length);",
+      "\t\ts_reset(token);"
+    ],
+    "deleted": [
+      "\t\ttoken->end = token->p = token->data;"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function seamless_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3131
+},
+{
+  "cve_id": "CVE-2018-20181",
+  "code_before_change": "mcs_parse_domain_params(STREAM s)\n{\n\tint length;\n\n\tber_parse_header(s, MCS_TAG_DOMAIN_PARAMS, &length);\n\tin_uint8s(s, length);\n\n\treturn s_check(s);\n}",
+  "code_after_change": "mcs_parse_domain_params(STREAM s)\n{\n\tuint32 length;\n\tstruct stream packet = *s;\n\n\tber_parse_header(s, MCS_TAG_DOMAIN_PARAMS, &length);\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\trdp_protocol_error(\"mcs_parse_domain_params(), consume domain params from stream would overrun\", &packet);\n\t}\n\n\tin_uint8s(s, length);\n\n\treturn s_check(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tuint32 length;",
+      "\tstruct stream packet = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\trdp_protocol_error(\"mcs_parse_domain_params(), consume domain params from stream would overrun\", &packet);",
+      "\t}"
+    ],
+    "deleted": [
+      "\tint length;"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function seamless_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3132
+},
+{
+  "cve_id": "CVE-2018-20181",
+  "code_before_change": "mcs_recv_connect_response(STREAM mcs_data)\n{\n\tUNUSED(mcs_data);\n\tuint8 result;\n\tint length;\n\tSTREAM s;\n\tRD_BOOL is_fastpath;\n\tuint8 fastpath_hdr;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\ts = iso_recv(&is_fastpath, &fastpath_hdr);\n\n\tif (s == NULL)\n\t\treturn False;\n\n\tber_parse_header(s, MCS_CONNECT_RESPONSE, &length);\n\n\tber_parse_header(s, BER_TAG_RESULT, &length);\n\tin_uint8(s, result);\n\tif (result != 0)\n\t{\n\t\tlogger(Protocol, Error, \"mcs_recv_connect_response(), result=%d\", result);\n\t\treturn False;\n\t}\n\n\tber_parse_header(s, BER_TAG_INTEGER, &length);\n\tin_uint8s(s, length);\t/* connect id */\n\tmcs_parse_domain_params(s);\n\n\tber_parse_header(s, BER_TAG_OCTET_STRING, &length);\n\n\tsec_process_mcs_data(s);\n\t/*\n\t   if (length > mcs_data->size)\n\t   {\n\t   logger(Protocol, Error, \"mcs_recv_connect_response(), expected length=%d, got %d\",length, mcs_data->size);\n\t   length = mcs_data->size;\n\t   }\n\n\t   in_uint8a(s, mcs_data->data, length);\n\t   mcs_data->p = mcs_data->data;\n\t   mcs_data->end = mcs_data->data + length;\n\t */\n\treturn s_check_end(s);\n}",
+  "code_after_change": "mcs_recv_connect_response(STREAM mcs_data)\n{\n\tUNUSED(mcs_data);\n\tuint8 result;\n\tuint32 length;\n\tSTREAM s;\n\tstruct stream packet;\n\tRD_BOOL is_fastpath;\n\tuint8 fastpath_hdr;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\ts = iso_recv(&is_fastpath, &fastpath_hdr);\n\n\tif (s == NULL)\n\t\treturn False;\n\t\n\tpacket = *s;\n\n\tber_parse_header(s, MCS_CONNECT_RESPONSE, &length);\n\n\tber_parse_header(s, BER_TAG_RESULT, &length);\n\tin_uint8(s, result);\n\tif (result != 0)\n\t{\n\t\tlogger(Protocol, Error, \"mcs_recv_connect_response(), result=%d\", result);\n\t\treturn False;\n\t}\n\n\tber_parse_header(s, BER_TAG_INTEGER, &length);\n\tin_uint8s(s, length);\t/* connect id */\n\n\tif (!s_check_rem(s, length))\n\t{\n\t\trdp_protocol_error(\"mcs_recv_connect_response(), consume connect id from stream would overrun\", &packet);\n\t}\n\n\tmcs_parse_domain_params(s);\n\n\tber_parse_header(s, BER_TAG_OCTET_STRING, &length);\n\n\tsec_process_mcs_data(s);\n\t/*\n\t   if (length > mcs_data->size)\n\t   {\n\t   logger(Protocol, Error, \"mcs_recv_connect_response(), expected length=%d, got %d\",length, mcs_data->size);\n\t   length = mcs_data->size;\n\t   }\n\n\t   in_uint8a(s, mcs_data->data, length);\n\t   mcs_data->p = mcs_data->data;\n\t   mcs_data->end = mcs_data->data + length;\n\t */\n\treturn s_check_end(s);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tuint32 length;",
+      "\tstruct stream packet;",
+      "\tpacket = *s;",
+      "\tif (!s_check_rem(s, length))",
+      "\t{",
+      "\t\trdp_protocol_error(\"mcs_recv_connect_response(), consume connect id from stream would overrun\", &packet);",
+      "\t}"
+    ],
+    "deleted": [
+      "\tint length;"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function seamless_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3133
+},
+{
+  "cve_id": "CVE-2018-20181",
+  "code_before_change": "process_bitmap_updates(STREAM s)\n{\n\tuint16 num_updates;\n\tuint16 left, top, right, bottom, width, height;\n\tuint16 cx, cy, bpp, Bpp, compress, bufsize, size;\n\tuint8 *data, *bmpdata;\n\tint i;\n\n\tlogger(Protocol, Debug, \"%s()\", __func__);\n\n\tin_uint16_le(s, num_updates);\n\n\tfor (i = 0; i < num_updates; i++)\n\t{\n\t\tin_uint16_le(s, left);\n\t\tin_uint16_le(s, top);\n\t\tin_uint16_le(s, right);\n\t\tin_uint16_le(s, bottom);\n\t\tin_uint16_le(s, width);\n\t\tin_uint16_le(s, height);\n\t\tin_uint16_le(s, bpp);\n\t\tBpp = (bpp + 7) / 8;\n\t\tin_uint16_le(s, compress);\n\t\tin_uint16_le(s, bufsize);\n\n\t\tcx = right - left + 1;\n\t\tcy = bottom - top + 1;\n\n\t\tlogger(Graphics, Debug,\n\t\t       \"process_bitmap_updates(), [%d,%d,%d,%d], [%d,%d], bpp=%d, compression=%d\",\n\t\t       left, top, right, bottom, width, height, Bpp, compress);\n\n\t\tif (!compress)\n\t\t{\n\t\t\tint y;\n\t\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);\n\t\t\tfor (y = 0; y < height; y++)\n\t\t\t{\n\t\t\t\tin_uint8a(s, &bmpdata[(height - y - 1) * (width * Bpp)],\n\t\t\t\t\t  width * Bpp);\n\t\t\t}\n\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);\n\t\t\txfree(bmpdata);\n\t\t\tcontinue;\n\t\t}\n\n\n\t\tif (compress & 0x400)\n\t\t{\n\t\t\tsize = bufsize;\n\t\t}\n\t\telse\n\t\t{\n\t\t\tin_uint8s(s, 2);\t/* pad */\n\t\t\tin_uint16_le(s, size);\n\t\t\tin_uint8s(s, 4);\t/* line_size, final_size */\n\t\t}\n\t\tin_uint8p(s, data, size);\n\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);\n\t\tif (bitmap_decompress(bmpdata, width, height, data, size, Bpp))\n\t\t{\n\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);\n\t\t}\n\t\telse\n\t\t{\n\t\t\tlogger(Graphics, Warning,\n\t\t\t       \"process_bitmap_updates(), failed to decompress bitmap\");\n\t\t}\n\n\t\txfree(bmpdata);\n\t}\n}",
+  "code_after_change": "process_bitmap_updates(STREAM s)\n{\n\tint i;\n\tuint16 num_updates;\n\t\n\tin_uint16_le(s, num_updates);   /* rectangles */\n\n\tfor (i = 0; i < num_updates; i++)\n\t{\n\t\tprocess_bitmap_data(s);\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "process_bitmap_updates(STREAM s)",
+      "{",
+      "\tint i;",
+      "\tuint16 num_updates;",
+      "\tin_uint16_le(s, num_updates);   /* rectangles */",
+      "\tfor (i = 0; i < num_updates; i++)",
+      "\t{",
+      "\t\tprocess_bitmap_data(s);"
+    ],
+    "deleted": [
+      "process_bitmap_updates(STREAM s)",
+      "\tuint16 num_updates;",
+      "\tuint16 cx, cy, bpp, Bpp, compress, bufsize, size;",
+      "\tint i;",
+      "\tin_uint16_le(s, num_updates);",
+      "\tfor (i = 0; i < num_updates; i++)",
+      "\t{",
+      "\t\tin_uint16_le(s, left);",
+      "\t\tin_uint16_le(s, top);",
+      "\t\tin_uint16_le(s, right);",
+      "\t\tin_uint16_le(s, bottom);",
+      "\t\tin_uint16_le(s, width);",
+      "\t\tin_uint16_le(s, height);",
+      "\t\tin_uint16_le(s, bpp);",
+      "\t\tBpp = (bpp + 7) / 8;",
+      "\t\tin_uint16_le(s, compress);",
+      "\t\tin_uint16_le(s, bufsize);",
+      "\t\tcx = right - left + 1;",
+      "\t\tcy = bottom - top + 1;",
+      "\t\tlogger(Graphics, Debug,",
+      "\t\t       \"process_bitmap_updates(), [%d,%d,%d,%d], [%d,%d], bpp=%d, compression=%d\",",
+      "\t\t       left, top, right, bottom, width, height, Bpp, compress);",
+      "\t\tif (!compress)",
+      "\t\t{",
+      "\t\t\tint y;",
+      "\t\t\tbmpdata = (uint8 *) xmalloc(width * height * Bpp);",
+      "\t\t\tfor (y = 0; y < height; y++)",
+      "\t\t\t{",
+      "\t\t\t\tin_uint8a(s, &bmpdata[(height - y - 1) * (width * Bpp)],",
+      "\t\t\t\t\t  width * Bpp);",
+      "\t\t\t}",
+      "\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);",
+      "\t\t\txfree(bmpdata);",
+      "\t\t\tcontinue;",
+      "\t\t}",
+      "\t\tif (compress & 0x400)",
+      "\t\t{",
+      "\t\t\tsize = bufsize;",
+      "\t\t}",
+      "\t\telse",
+      "\t\t{",
+      "\t\t\tin_uint8s(s, 2);\t/* pad */",
+      "\t\t\tin_uint16_le(s, size);",
+      "\t\t\tin_uint8s(s, 4);\t/* line_size, final_size */",
+      "\t\t}",
+      "\t\tin_uint8p(s, data, size);",
+      "\t\tif (bitmap_decompress(bmpdata, width, height, data, size, Bpp))",
+      "\t\t\tui_paint_bitmap(left, top, cx, cy, width, height, bmpdata);",
+      "\t\telse",
+      "\t\t{",
+      "\t\t\tlogger(Graphics, Warning,",
+      "\t\t\t       \"process_bitmap_updates(), failed to decompress bitmap\");",
+      "\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-191"
+  ],
+  "cve_description": "rdesktop versions up to and including v1.8.3 contain an Integer Underflow that leads to a Heap-Based Buffer Overflow in the function seamless_process() and results in memory corruption and probably even a remote code execution.",
+  "id": 3134
+},
+{
+  "cve_id": "CVE-2020-15900",
+  "code_before_change": "search_impl(i_ctx_t *i_ctx_p, bool forward)\n{\n    os_ptr op = osp;\n    os_ptr op1 = op - 1;\n    uint size = r_size(op);\n    uint count;\n    byte *pat;\n    byte *ptr;\n    byte ch;\n    int incr = forward ? 1 : -1;\n\n    check_read_type(*op1, t_string);\n    check_read_type(*op, t_string);\n    if (size > r_size(op1)) {\t/* can't match */\n        make_false(op);\n        return 0;\n    }\n    count = r_size(op1) - size;\n    ptr = op1->value.bytes;\n    if (size == 0)\n        goto found;\n    if (!forward)\n        ptr += count;\n    pat = op->value.bytes;\n    ch = pat[0];\n    do {\n        if (*ptr == ch && (size == 1 || !memcmp(ptr, pat, size)))\n            goto found;\n        ptr += incr;\n    }\n    while (count--);\n    /* No match */\n    make_false(op);\n    return 0;\nfound:\n    op->tas.type_attrs = op1->tas.type_attrs;\n    op->value.bytes = ptr;\n    r_set_size(op, size);\n    push(2);\n    op[-1] = *op1;\n    r_set_size(op - 1, ptr - op[-1].value.bytes);\n    op1->value.bytes = ptr + size;\n    r_set_size(op1, count + (!forward ? (size - 1) : 0));\n    make_true(op);\n    return 0;\n}",
+  "code_after_change": "search_impl(i_ctx_t *i_ctx_p, bool forward)\n{\n    os_ptr op = osp;\n    os_ptr op1 = op - 1;\n    uint size = r_size(op);\n    uint count;\n    byte *pat;\n    byte *ptr;\n    byte ch;\n    int incr = forward ? 1 : -1;\n\n    check_read_type(*op1, t_string);\n    check_read_type(*op, t_string);\n    if (size > r_size(op1)) {\t/* can't match */\n        make_false(op);\n        return 0;\n    }\n    count = r_size(op1) - size;\n    ptr = op1->value.bytes;\n    if (size == 0)\n        goto found;\n    if (!forward)\n        ptr += count;\n    pat = op->value.bytes;\n    ch = pat[0];\n    do {\n        if (*ptr == ch && (size == 1 || !memcmp(ptr, pat, size)))\n            goto found;\n        ptr += incr;\n    }\n    while (count--);\n    /* No match */\n    make_false(op);\n    return 0;\nfound:\n    op->tas.type_attrs = op1->tas.type_attrs;\n    op->value.bytes = ptr;\t\t\t\t/* match */\n    op->tas.rsize = size;\t\t\t\t/* match */\n    push(2);\n    op[-1] = *op1;\t\t\t\t\t/* pre */\n    op[-3].value.bytes = ptr + size;\t\t\t/* post */\n    if (forward) {\n        op[-1].tas.rsize = ptr - op[-1].value.bytes;\t/* pre */\n        op[-3].tas.rsize = count;\t\t\t/* post */\n    } else {\n        op[-1].tas.rsize = count;\t\t\t/* pre */\n        op[-3].tas.rsize -= count + size;\t\t/* post */\n    }\n    make_true(op);\n    return 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    op->value.bytes = ptr;\t\t\t\t/* match */",
+      "    op->tas.rsize = size;\t\t\t\t/* match */",
+      "    op[-1] = *op1;\t\t\t\t\t/* pre */",
+      "    op[-3].value.bytes = ptr + size;\t\t\t/* post */",
+      "    if (forward) {",
+      "        op[-1].tas.rsize = ptr - op[-1].value.bytes;\t/* pre */",
+      "        op[-3].tas.rsize = count;\t\t\t/* post */",
+      "    } else {",
+      "        op[-1].tas.rsize = count;\t\t\t/* pre */",
+      "        op[-3].tas.rsize -= count + size;\t\t/* post */",
+      "    }"
+    ],
+    "deleted": [
+      "    op->value.bytes = ptr;",
+      "    r_set_size(op, size);",
+      "    op[-1] = *op1;",
+      "    r_set_size(op - 1, ptr - op[-1].value.bytes);",
+      "    op1->value.bytes = ptr + size;",
+      "    r_set_size(op1, count + (!forward ? (size - 1) : 0));"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-191"
+  ],
+  "cve_description": "A memory corruption issue was found in Artifex Ghostscript 9.50 and 9.52. Use of a non-standard PostScript operator can allow overriding of file access controls. The 'rsearch' calculation for the 'post' size resulted in a size that was too large, and could underflow to max uint32_t. This was fixed in commit 5d499272b95a6b890a1397e11d20937de000d31b.",
+  "id": 3135
+},
+{
+  "cve_id": "CVE-2020-24370",
+  "code_before_change": "const char *luaG_findlocal (lua_State *L, CallInfo *ci, int n, StkId *pos) {\n  StkId base = ci->func + 1;\n  const char *name = NULL;\n  if (isLua(ci)) {\n    if (n < 0)  /* access to vararg values? */\n      return findvararg(ci, -n, pos);\n    else\n      name = luaF_getlocalname(ci_func(ci)->p, n, currentpc(ci));\n  }\n  if (name == NULL) {  /* no 'standard' name? */\n    StkId limit = (ci == L->ci) ? L->top : ci->next->func;\n    if (limit - base >= n && n > 0) {  /* is 'n' inside 'ci' stack? */\n      /* generic name for any valid slot */\n      name = isLua(ci) ? \"(temporary)\" : \"(C temporary)\";\n    }\n    else\n      return NULL;  /* no name */\n  }\n  if (pos)\n    *pos = base + (n - 1);\n  return name;\n}",
+  "code_after_change": "const char *luaG_findlocal (lua_State *L, CallInfo *ci, int n, StkId *pos) {\n  StkId base = ci->func + 1;\n  const char *name = NULL;\n  if (isLua(ci)) {\n    if (n < 0)  /* access to vararg values? */\n      return findvararg(ci, n, pos);\n    else\n      name = luaF_getlocalname(ci_func(ci)->p, n, currentpc(ci));\n  }\n  if (name == NULL) {  /* no 'standard' name? */\n    StkId limit = (ci == L->ci) ? L->top : ci->next->func;\n    if (limit - base >= n && n > 0) {  /* is 'n' inside 'ci' stack? */\n      /* generic name for any valid slot */\n      name = isLua(ci) ? \"(temporary)\" : \"(C temporary)\";\n    }\n    else\n      return NULL;  /* no name */\n  }\n  if (pos)\n    *pos = base + (n - 1);\n  return name;\n}",
+  "function_modified_lines": {
+    "added": [
+      "      return findvararg(ci, n, pos);"
+    ],
+    "deleted": [
+      "      return findvararg(ci, -n, pos);"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "ldebug.c in Lua 5.4.0 allows a negation overflow and segmentation fault in getlocal and setlocal, as demonstrated by getlocal(3,2^31).",
+  "id": 3136
+},
+{
+  "cve_id": "CVE-2020-24370",
+  "code_before_change": "static const char *findvararg (CallInfo *ci, int n, StkId *pos) {\n  if (clLvalue(s2v(ci->func))->p->is_vararg) {\n    int nextra = ci->u.l.nextraargs;\n    if (n <= nextra) {\n      *pos = ci->func - nextra + (n - 1);\n      return \"(vararg)\";  /* generic name for any vararg */\n    }\n  }\n  return NULL;  /* no such vararg */\n}",
+  "code_after_change": "static const char *findvararg (CallInfo *ci, int n, StkId *pos) {\n  if (clLvalue(s2v(ci->func))->p->is_vararg) {\n    int nextra = ci->u.l.nextraargs;\n    if (n >= -nextra) {  /* 'n' is negative */\n      *pos = ci->func - nextra - (n + 1);\n      return \"(vararg)\";  /* generic name for any vararg */\n    }\n  }\n  return NULL;  /* no such vararg */\n}",
+  "function_modified_lines": {
+    "added": [
+      "    if (n >= -nextra) {  /* 'n' is negative */",
+      "      *pos = ci->func - nextra - (n + 1);"
+    ],
+    "deleted": [
+      "    if (n <= nextra) {",
+      "      *pos = ci->func - nextra + (n - 1);"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "ldebug.c in Lua 5.4.0 allows a negation overflow and segmentation fault in getlocal and setlocal, as demonstrated by getlocal(3,2^31).",
+  "id": 3137
+},
+{
+  "cve_id": "CVE-2023-31137",
+  "code_before_change": "int decomp_get_rddata(js_string *compressed, js_string *out,\n                      unsigned int compressed_offset, int type, int rdlength) {\n\n    char *desc;\n    int subtype, total, len;\n\n    desc = decomp_get_rrdesc(type);\n\n    if(desc == 0) { /* Unknown RR type */\n        if(rdlength == 0) {\n            return JS_SUCCESS;\n            }\n        if(decomp_append_bytes(compressed,out,compressed_offset,\n                               rdlength) != JS_SUCCESS) {\n            return JS_ERROR;\n            }\n        else {\n            return JS_SUCCESS;\n            }\n        }\n    else {\n        subtype = *desc;\n        total = 0;\n        /* Handle the various types of data we can get in the RR RDDATA */\n        while(subtype != 0) {\n            /* Fix-length data fields */\n            if(subtype > 0 && subtype < 64) {\n                if(decomp_append_bytes(compressed,out,\n                   compressed_offset,subtype) != JS_SUCCESS) {\n                       return JS_ERROR;\n                       }\n                total += subtype;\n                compressed_offset += subtype;\n                }\n            /* Dlabels (which may be compressed) */\n            else if(subtype == RRSUB_DLABEL) {\n                len = decomp_append_dlabel(compressed,out,\n                        compressed_offset);\n                if(len == JS_ERROR) {\n                    return JS_ERROR;\n                    }\n                total += len;\n                compressed_offset += len;\n                }\n            /* Text data fields */\n            else if(subtype == RRSUB_TEXT) {\n                /* Data abstraction violation */\n                len = *(compressed->string + compressed_offset);\n                len += 1; /* To account for the one byte which\n                             describes the length */\n                if(len < 0 || len > 256) {\n                    return JS_ERROR;\n                    }\n                if(decomp_append_bytes(compressed,out,\n                                       compressed_offset,len) !=\n                   JS_SUCCESS) {\n                    return JS_ERROR;\n                    }\n                total += len;\n                compressed_offset += len;\n                }\n            /* Variable length data (length determined by rdlength) */\n            else if(subtype == RRSUB_VARIABLE) {\n                len = rdlength - total;\n                if(len == 0) {\n                    break;\n                    }\n                if(decomp_append_bytes(compressed,out,\n                                       compressed_offset,len) != JS_SUCCESS) {\n                    return JS_ERROR;\n                    }\n                total += len;\n                compressed_offset += len;\n                }\n            else { /* Should never happen */\n                return JS_ERROR;\n                }\n            desc++;\n            /* RRSUB_VARIABLE must be the last subtype */\n            if(subtype != RRSUB_VARIABLE)\n                subtype = *desc;\n            else\n                subtype = 0; /* break the loop */\n            }\n        /* Sanity check; make sure that rdlength panned out */\n        if(rdlength != total) {\n            return JS_ERROR;\n            }\n        }\n\n    /* The record's rddata was sucessfully decompressed */\n    return JS_SUCCESS;\n    }",
+  "code_after_change": "int decomp_get_rddata(js_string *compressed, js_string *out,\n                      unsigned int compressed_offset, int type, int rdlength) {\n\n    char *desc;\n    int subtype, total, len;\n\n    desc = decomp_get_rrdesc(type);\n\n    if(desc == 0) { /* Unknown RR type */\n        if(rdlength == 0) {\n            return JS_SUCCESS;\n            }\n        if(decomp_append_bytes(compressed,out,compressed_offset,\n                               rdlength) != JS_SUCCESS) {\n            return JS_ERROR;\n            }\n        else {\n            return JS_SUCCESS;\n            }\n        }\n    else {\n        subtype = *desc;\n        total = 0;\n        /* Handle the various types of data we can get in the RR RDDATA */\n        while(subtype != 0) {\n            /* Fix-length data fields */\n            if(subtype > 0 && subtype < 64) {\n                if(decomp_append_bytes(compressed,out,\n                   compressed_offset,subtype) != JS_SUCCESS) {\n                       return JS_ERROR;\n                       }\n                total += subtype;\n                compressed_offset += subtype;\n                }\n            /* Dlabels (which may be compressed) */\n            else if(subtype == RRSUB_DLABEL) {\n                len = decomp_append_dlabel(compressed,out,\n                        compressed_offset);\n                if(len == JS_ERROR) {\n                    return JS_ERROR;\n                    }\n                total += len;\n                compressed_offset += len;\n                }\n            /* Text data fields */\n            else if(subtype == RRSUB_TEXT) {\n                /* Data abstraction violation */\n                len = *(compressed->string + compressed_offset);\n                len += 1; /* To account for the one byte which\n                             describes the length */\n                if(len < 0 || len > 256) {\n                    return JS_ERROR;\n                    }\n                if(decomp_append_bytes(compressed,out,\n                                       compressed_offset,len) !=\n                   JS_SUCCESS) {\n                    return JS_ERROR;\n                    }\n                total += len;\n                compressed_offset += len;\n                }\n            /* Variable length data (length determined by rdlength) */\n            else if(subtype == RRSUB_VARIABLE) {\n                len = rdlength - total;\n                if(len <= 0) {\n                    break;\n                    }\n                if(decomp_append_bytes(compressed,out,\n                                       compressed_offset,len) != JS_SUCCESS) {\n                    return JS_ERROR;\n                    }\n                total += len;\n                compressed_offset += len;\n                }\n            else { /* Should never happen */\n                return JS_ERROR;\n                }\n            desc++;\n            /* RRSUB_VARIABLE must be the last subtype */\n            if(subtype != RRSUB_VARIABLE)\n                subtype = *desc;\n            else\n                subtype = 0; /* break the loop */\n            }\n        /* Sanity check; make sure that rdlength panned out */\n        if(rdlength != total) {\n            return JS_ERROR;\n            }\n        }\n\n    /* The record's rddata was sucessfully decompressed */\n    return JS_SUCCESS;\n    }",
+  "function_modified_lines": {
+    "added": [
+      "                if(len <= 0) {"
+    ],
+    "deleted": [
+      "                if(len == 0) {"
+    ]
+  },
+  "cwe": [
+    "CWE-191"
+  ],
+  "cve_description": "MaraDNS is open-source software that implements the Domain Name System (DNS). In version 3.5.0024 and prior, a remotely exploitable integer underflow vulnerability in the DNS packet decompression function allows an attacker to cause a Denial of Service by triggering an abnormal program termination.\n\nThe vulnerability exists in the `decomp_get_rddata` function within the `Decompress.c` file. When handling a DNS packet with an Answer RR of qtype 16 (TXT record) and any qclass, if the `rdlength` is smaller than `rdata`, the result of the line `Decompress.c:886` is a negative number `len = rdlength - total;`. This value is then passed to the `decomp_append_bytes` function without proper validation, causing the program to attempt to allocate a massive chunk of memory that is impossible to allocate. Consequently, the program exits with an error code of 64, causing a Denial of Service.\n\nOne proposed fix for this vulnerability is to patch `Decompress.c:887` by breaking `if(len <= 0)`, which has been incorporated in version 3.5.0036 via commit bab062bde40b2ae8a91eecd522e84d8b993bab58.",
+  "id": 3138
+}
+]

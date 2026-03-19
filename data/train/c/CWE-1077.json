@@ -1,0 +1,76 @@
+[
+{
+  "cve_id": "CVE-2023-4720",
+  "code_before_change": "static u32 swf_get_32(SWFReader *read)\n{\n\tu32 val, res;\n\tval = swf_read_int(read, 32);\n\tres = (val&0xFF);\n\tres <<=8;\n\tres |= ((val>>8)&0xFF);\n\tres<<=8;\n\tres |= ((val>>16)&0xFF);\n\tres<<=8;\n\tres|= ((val>>24)&0xFF);\n\treturn res;\n}",
+  "code_after_change": "static u32 swf_get_32(SWFReader *read)\n{\n\treturn gf_bs_read_u32_le(read->bs);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn gf_bs_read_u32_le(read->bs);"
+    ],
+    "deleted": [
+      "\tu32 val, res;",
+      "\tval = swf_read_int(read, 32);",
+      "\tres = (val&0xFF);",
+      "\tres <<=8;",
+      "\tres |= ((val>>8)&0xFF);",
+      "\tres<<=8;",
+      "\tres |= ((val>>16)&0xFF);",
+      "\tres<<=8;",
+      "\tres|= ((val>>24)&0xFF);",
+      "\treturn res;"
+    ]
+  },
+  "cwe": [
+    "CWE-1077"
+  ],
+  "cve_description": "Floating Point Comparison with Incorrect Operator in GitHub repository gpac/gpac prior to 2.3-DEV.",
+  "id": 1
+},
+{
+  "cve_id": "CVE-2023-4720",
+  "code_before_change": "static s16 swf_get_s16(SWFReader *read)\n{\n\ts16 val;\n\tu8 v1;\n\tv1 = swf_read_int(read, 8);\n\tval = swf_read_sint(read, 8);\n\tval = (val<<8)&0xFF00;\n\tval |= (v1&0xFF);\n\treturn val;\n}",
+  "code_after_change": "static s16 swf_get_s16(SWFReader *read)\n{\n\treturn (s16) gf_bs_read_u16_le(read->bs);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn (s16) gf_bs_read_u16_le(read->bs);"
+    ],
+    "deleted": [
+      "\ts16 val;",
+      "\tu8 v1;",
+      "\tv1 = swf_read_int(read, 8);",
+      "\tval = swf_read_sint(read, 8);",
+      "\tval = (val<<8)&0xFF00;",
+      "\tval |= (v1&0xFF);",
+      "\treturn val;"
+    ]
+  },
+  "cwe": [
+    "CWE-1077"
+  ],
+  "cve_description": "Floating Point Comparison with Incorrect Operator in GitHub repository gpac/gpac prior to 2.3-DEV.",
+  "id": 2
+},
+{
+  "cve_id": "CVE-2023-4720",
+  "code_before_change": "static u16 swf_get_16(SWFReader *read)\n{\n\tu16 val, res;\n\tval = swf_read_int(read, 16);\n\tres = (val&0xFF);\n\tres <<=8;\n\tres |= ((val>>8)&0xFF);\n\treturn res;\n}",
+  "code_after_change": "static u16 swf_get_16(SWFReader *read)\n{\n\treturn gf_bs_read_u16_le(read->bs);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn gf_bs_read_u16_le(read->bs);"
+    ],
+    "deleted": [
+      "\tu16 val, res;",
+      "\tval = swf_read_int(read, 16);",
+      "\tres = (val&0xFF);",
+      "\tres <<=8;",
+      "\tres |= ((val>>8)&0xFF);",
+      "\treturn res;"
+    ]
+  },
+  "cwe": [
+    "CWE-1077"
+  ],
+  "cve_description": "Floating Point Comparison with Incorrect Operator in GitHub repository gpac/gpac prior to 2.3-DEV.",
+  "id": 3
+}
+]

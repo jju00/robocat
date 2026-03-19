@@ -1,0 +1,32 @@
+[
+{
+  "cve_id": "CVE-2016-10011",
+  "code_before_change": "sshkey_load_file(int fd, struct sshbuf *blob)\n{\n\tu_char buf[1024];\n\tsize_t len;\n\tstruct stat st;\n\tint r;\n\n\tif (fstat(fd, &st) < 0)\n\t\treturn SSH_ERR_SYSTEM_ERROR;\n\tif ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&\n\t    st.st_size > MAX_KEY_FILE_SIZE)\n\t\treturn SSH_ERR_INVALID_FORMAT;\n\tfor (;;) {\n\t\tif ((len = atomicio(read, fd, buf, sizeof(buf))) == 0) {\n\t\t\tif (errno == EPIPE)\n\t\t\t\tbreak;\n\t\t\tr = SSH_ERR_SYSTEM_ERROR;\n\t\t\tgoto out;\n\t\t}\n\t\tif ((r = sshbuf_put(blob, buf, len)) != 0)\n\t\t\tgoto out;\n\t\tif (sshbuf_len(blob) > MAX_KEY_FILE_SIZE) {\n\t\t\tr = SSH_ERR_INVALID_FORMAT;\n\t\t\tgoto out;\n\t\t}\n\t}\n\tif ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&\n\t    st.st_size != (off_t)sshbuf_len(blob)) {\n\t\tr = SSH_ERR_FILE_CHANGED;\n\t\tgoto out;\n\t}\n\tr = 0;\n\n out:\n\texplicit_bzero(buf, sizeof(buf));\n\tif (r != 0)\n\t\tsshbuf_reset(blob);\n\treturn r;\n}",
+  "code_after_change": "sshkey_load_file(int fd, struct sshbuf *blob)\n{\n\tu_char buf[1024];\n\tsize_t len;\n\tstruct stat st;\n\tint r, dontmax = 0;\n\n\tif (fstat(fd, &st) < 0)\n\t\treturn SSH_ERR_SYSTEM_ERROR;\n\tif ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&\n\t    st.st_size > MAX_KEY_FILE_SIZE)\n\t\treturn SSH_ERR_INVALID_FORMAT;\n\t/*\n\t * Pre-allocate the buffer used for the key contents and clamp its\n\t * maximum size. This ensures that key contents are never leaked via\n\t * implicit realloc() in the sshbuf code.\n\t */\n\tif ((st.st_mode & S_IFREG) == 0 || st.st_size <= 0) {\n\t\tst.st_size = 64*1024; /* 64k should be enough for anyone :) */\n\t\tdontmax = 1;\n\t}\n\tif ((r = sshbuf_allocate(blob, st.st_size)) != 0 ||\n\t    (dontmax && (r = sshbuf_set_max_size(blob, st.st_size)) != 0))\n\t\treturn r;\n\tfor (;;) {\n\t\tif ((len = atomicio(read, fd, buf, sizeof(buf))) == 0) {\n\t\t\tif (errno == EPIPE)\n\t\t\t\tbreak;\n\t\t\tr = SSH_ERR_SYSTEM_ERROR;\n\t\t\tgoto out;\n\t\t}\n\t\tif ((r = sshbuf_put(blob, buf, len)) != 0)\n\t\t\tgoto out;\n\t\tif (sshbuf_len(blob) > MAX_KEY_FILE_SIZE) {\n\t\t\tr = SSH_ERR_INVALID_FORMAT;\n\t\t\tgoto out;\n\t\t}\n\t}\n\tif ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&\n\t    st.st_size != (off_t)sshbuf_len(blob)) {\n\t\tr = SSH_ERR_FILE_CHANGED;\n\t\tgoto out;\n\t}\n\tr = 0;\n\n out:\n\texplicit_bzero(buf, sizeof(buf));\n\tif (r != 0)\n\t\tsshbuf_reset(blob);\n\treturn r;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tint r, dontmax = 0;",
+      "\t/*",
+      "\t * Pre-allocate the buffer used for the key contents and clamp its",
+      "\t * maximum size. This ensures that key contents are never leaked via",
+      "\t * implicit realloc() in the sshbuf code.",
+      "\t */",
+      "\tif ((st.st_mode & S_IFREG) == 0 || st.st_size <= 0) {",
+      "\t\tst.st_size = 64*1024; /* 64k should be enough for anyone :) */",
+      "\t\tdontmax = 1;",
+      "\t}",
+      "\tif ((r = sshbuf_allocate(blob, st.st_size)) != 0 ||",
+      "\t    (dontmax && (r = sshbuf_set_max_size(blob, st.st_size)) != 0))",
+      "\t\treturn r;"
+    ],
+    "deleted": [
+      "\tint r;"
+    ]
+  },
+  "cwe": [
+    "CWE-320"
+  ],
+  "cve_description": "authfile.c in sshd in OpenSSH before 7.4 does not properly consider the effects of realloc on buffer contents, which might allow local users to obtain sensitive private-key information by leveraging access to a privilege-separated child process.",
+  "id": 4443
+}
+]

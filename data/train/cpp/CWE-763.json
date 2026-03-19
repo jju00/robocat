@@ -1,0 +1,101 @@
+[
+{
+  "cve_id": "CVE-2019-11930",
+  "code_before_change": "static bool php_mb_parse_encoding(const Variant& encoding,\n                                  mbfl_encoding ***return_list,\n                                  int *return_size, bool persistent) {\n  bool ret;\n  if (encoding.isArray()) {\n    ret = php_mb_parse_encoding_array(encoding.toArray(),\n                                      return_list, return_size,\n                                      persistent ? 1 : 0);\n  } else {\n    String enc = encoding.toString();\n    ret = php_mb_parse_encoding_list(enc.data(), enc.size(),\n                                     return_list, return_size,\n                                     persistent ? 1 : 0);\n  }\n  if (!ret) {\n    if (return_list && *return_list) {\n      free(*return_list);\n      *return_list = nullptr;\n    }\n    return_size = 0;\n  }\n  return ret;\n}",
+  "code_after_change": "static bool php_mb_parse_encoding(const Variant& encoding,\n                                  mbfl_encoding ***return_list,\n                                  int *return_size, bool persistent) {\n  bool ret;\n  if (encoding.isArray()) {\n    ret = php_mb_parse_encoding_array(encoding.toArray(),\n                                      return_list, return_size,\n                                      persistent ? 1 : 0);\n  } else {\n    String enc = encoding.toString();\n    ret = php_mb_parse_encoding_list(enc.data(), enc.size(),\n                                     return_list, return_size,\n                                     persistent ? 1 : 0);\n  }\n  if (!ret) {\n    if (return_list && *return_list) {\n      req::free(*return_list);\n      *return_list = nullptr;\n    }\n    return_size = 0;\n  }\n  return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "      req::free(*return_list);"
+    ],
+    "deleted": [
+      "      free(*return_list);"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "An invalid free in mb_detect_order can cause the application to crash or potentially result in remote code execution. This issue affects HHVM versions prior to 3.30.12, all versions between 4.0.0 and 4.8.5, all versions between 4.9.0 and 4.23.1, as well as 4.24.0, 4.25.0, 4.26.0, 4.27.0, 4.28.0, and 4.28.1.",
+  "id": 1882
+},
+{
+  "cve_id": "CVE-2021-24028",
+  "code_before_change": "write(Protocol_* iprot, const StructInfo& structInfo, const void* object) {\n  DCHECK(object);\n  size_t written = iprot->writeStructBegin(structInfo.name);\n  if (UNLIKELY(structInfo.unionExt != nullptr)) {\n    const FieldInfo* end = structInfo.fieldInfos + structInfo.numFields;\n    const auto& unionId =\n        activeUnionMemberId(object, structInfo.unionExt->unionTypeOffset);\n    const FieldInfo* found = std::lower_bound(\n        structInfo.fieldInfos,\n        end,\n        unionId,\n        [](const FieldInfo& lhs, FieldID rhs) { return lhs.id < rhs; });\n    if (found < end && found->id == unionId) {\n      const OptionalThriftValue value = getValue(*found->typeInfo, object);\n      if (value.hasValue()) {\n        written += writeField(iprot, *found, value.value());\n      } else if (found->typeInfo->type == protocol::TType::T_STRUCT) {\n        written += iprot->writeFieldBegin(\n            found->name, found->typeInfo->type, found->id);\n        written += iprot->writeStructBegin(found->name);\n        written += iprot->writeStructEnd();\n        written += iprot->writeFieldStop();\n        written += iprot->writeFieldEnd();\n      }\n    }\n  } else {\n    for (std::int16_t index = 0; index < structInfo.numFields; index++) {\n      const auto& fieldInfo = structInfo.fieldInfos[index];\n      if (fieldInfo.isUnqualified || fieldInfo.issetOffset == 0 ||\n          fieldIsSet(object, fieldInfo.issetOffset)) {\n        const OptionalThriftValue value =\n            getValue(*fieldInfo.typeInfo, getMember(fieldInfo, object));\n        if (value.hasValue()) {\n          written += writeField(iprot, fieldInfo, value.value());\n        }\n      }\n    }\n  }\n\n  written += iprot->writeFieldStop();\n  written += iprot->writeStructEnd();\n  return written;\n}",
+  "code_after_change": "write(Protocol_* iprot, const StructInfo& structInfo, const void* object) {\n  DCHECK(object);\n  size_t written = iprot->writeStructBegin(structInfo.name);\n  if (UNLIKELY(structInfo.unionExt != nullptr)) {\n    const FieldInfo* end = structInfo.fieldInfos + structInfo.numFields;\n    const auto& activeId = getActiveId(object, structInfo);\n    const FieldInfo* found = std::lower_bound(\n        structInfo.fieldInfos,\n        end,\n        activeId,\n        [](const FieldInfo& lhs, FieldID rhs) { return lhs.id < rhs; });\n    if (found < end && found->id == activeId) {\n      const OptionalThriftValue value = getValue(*found->typeInfo, object);\n      if (value.hasValue()) {\n        written += writeField(iprot, *found, value.value());\n      } else if (found->typeInfo->type == protocol::TType::T_STRUCT) {\n        written += iprot->writeFieldBegin(\n            found->name, found->typeInfo->type, found->id);\n        written += iprot->writeStructBegin(found->name);\n        written += iprot->writeStructEnd();\n        written += iprot->writeFieldStop();\n        written += iprot->writeFieldEnd();\n      }\n    }\n  } else {\n    for (std::int16_t index = 0; index < structInfo.numFields; index++) {\n      const auto& fieldInfo = structInfo.fieldInfos[index];\n      if (fieldInfo.isUnqualified || fieldInfo.issetOffset == 0 ||\n          fieldIsSet(object, fieldInfo.issetOffset)) {\n        const OptionalThriftValue value =\n            getValue(*fieldInfo.typeInfo, getMember(fieldInfo, object));\n        if (value.hasValue()) {\n          written += writeField(iprot, fieldInfo, value.value());\n        }\n      }\n    }\n  }\n\n  written += iprot->writeFieldStop();\n  written += iprot->writeStructEnd();\n  return written;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    const auto& activeId = getActiveId(object, structInfo);",
+      "        activeId,",
+      "    if (found < end && found->id == activeId) {"
+    ],
+    "deleted": [
+      "    const auto& unionId =",
+      "        activeUnionMemberId(object, structInfo.unionExt->unionTypeOffset);",
+      "        unionId,",
+      "    if (found < end && found->id == unionId) {"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "An invalid free in Thrift's table-based serialization can cause the application to crash or potentially result in code execution or other undesirable effects. This issue affects Facebook Thrift prior to v2021.02.22.00.",
+  "id": 1883
+},
+{
+  "cve_id": "CVE-2021-24028",
+  "code_before_change": "const FieldID& activeUnionMemberId(const void* object, ptrdiff_t offset) {\n  return *reinterpret_cast<const FieldID*>(\n      offset + static_cast<const char*>(object));\n}",
+  "code_after_change": "// Returns a reference to the data member that holds the active field id for a\n// Thrift union object.\nconst int& getActiveId(const void* object, const StructInfo& info) {\n  return *reinterpret_cast<const int*>(",
+  "function_modified_lines": {
+    "added": [
+      "// Returns a reference to the data member that holds the active field id for a",
+      "// Thrift union object.",
+      "const int& getActiveId(const void* object, const StructInfo& info) {",
+      "  return *reinterpret_cast<const int*>("
+    ],
+    "deleted": [
+      "const FieldID& activeUnionMemberId(const void* object, ptrdiff_t offset) {",
+      "  return *reinterpret_cast<const FieldID*>(",
+      "      offset + static_cast<const char*>(object));"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "An invalid free in Thrift's table-based serialization can cause the application to crash or potentially result in code execution or other undesirable effects. This issue affects Facebook Thrift prior to v2021.02.22.00.",
+  "id": 1884
+},
+{
+  "cve_id": "CVE-2021-24028",
+  "code_before_change": "void read(Protocol_* iprot, const StructInfo& structInfo, void* object) {\n  DCHECK(object);\n  ProtocolReaderStructReadState<Protocol_> readState;\n  readState.readStructBegin(iprot);\n\n  if (UNLIKELY(structInfo.unionExt != nullptr)) {\n    readState.fieldId = 0;\n    readState.readFieldBegin(iprot);\n    if (readState.atStop()) {\n      structInfo.unionExt->clear(object);\n      readState.readStructEnd(iprot);\n      return;\n    }\n    const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo);\n    // Found it.\n    if (fieldInfo) {\n      void* unionVal = getMember(*fieldInfo, object);\n      // Default construct and placement new into the member union.\n      structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](\n          unionVal);\n      read(iprot, *fieldInfo->typeInfo, readState, unionVal);\n      const_cast<FieldID&>(activeUnionMemberId(\n          object, structInfo.unionExt->unionTypeOffset)) = fieldInfo->id;\n    } else {\n      skip(iprot, readState);\n    }\n    readState.readFieldEnd(iprot);\n    readState.readFieldBegin(iprot);\n    if (UNLIKELY(!readState.atStop())) {\n      TProtocolException::throwUnionMissingStop();\n    }\n    readState.readStructEnd(iprot);\n    return;\n  }\n\n  // Define out of loop to call advanceToNextField after the loop ends.\n  FieldID prevFieldId = 0;\n\n  // The index of the expected field in the struct layout.\n  std::int16_t index = 0;\n\n  // Every time advanceToNextField reports a field mismatch, either because the\n  // field is missing or if the serialized fields are not sorted (protocols\n  // don't guarantee a specific field order), we search for the field info\n  // matching the read bytes. Then we resume from the one past the found field\n  // to reduce the number of scans we have to do if the fields are sorted which\n  // is a common case. When we increment index past the number of fields we\n  // utilize the same search logic with a field info of type TType::T_STOP.\n  for (;; ++index) {\n    auto* fieldInfo = index < structInfo.numFields\n        ? &structInfo.fieldInfos[index]\n        : &kStopMarker;\n    // Try to match the next field in order against the current bytes.\n    if (UNLIKELY(!readState.advanceToNextField(\n            iprot, prevFieldId, fieldInfo->id, fieldInfo->typeInfo->type))) {\n      // Loop to skip until we find a match for both field id/name and type.\n      for (;;) {\n        readState.afterAdvanceFailure(iprot);\n        if (readState.atStop()) {\n          // Already at stop, return immediately.\n          readState.readStructEnd(iprot);\n          return;\n        }\n        fieldInfo = findFieldInfo(iprot, readState, structInfo);\n        // Found it.\n        if (fieldInfo) {\n          // Set the index to the field next in order to the found field.\n          index = fieldInfo - structInfo.fieldInfos;\n          break;\n        }\n        skip(iprot, readState);\n      }\n    } else if (UNLIKELY(index >= structInfo.numFields)) {\n      // We are at stop and have tried all of the fields, so return.\n      readState.readStructEnd(iprot);\n      return;\n    }\n    // Id and type are what we expect, try read.\n    prevFieldId = fieldInfo->id;\n    read(iprot, *fieldInfo->typeInfo, readState, getMember(*fieldInfo, object));\n    if (fieldInfo->issetOffset > 0) {\n      const_cast<bool&>(fieldIsSet(object, fieldInfo->issetOffset)) = true;\n    }\n  }\n}",
+  "code_after_change": "void read(Protocol_* iprot, const StructInfo& structInfo, void* object) {\n  DCHECK(object);\n  ProtocolReaderStructReadState<Protocol_> readState;\n  readState.readStructBegin(iprot);\n\n  if (UNLIKELY(structInfo.unionExt != nullptr)) {\n    readState.fieldId = 0;\n    readState.readFieldBegin(iprot);\n    if (readState.atStop()) {\n      structInfo.unionExt->clear(object);\n      readState.readStructEnd(iprot);\n      return;\n    }\n    if (const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo)) {\n      auto& activeId = const_cast<int&>(getActiveId(object, structInfo));\n      if (activeId != 0) {\n        structInfo.unionExt->clear(object);\n      }\n      void* value = getMember(*fieldInfo, object);\n      structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](value);\n      read(iprot, *fieldInfo->typeInfo, readState, value);\n      activeId = fieldInfo->id;\n    } else {\n      skip(iprot, readState);\n    }\n    readState.readFieldEnd(iprot);\n    readState.readFieldBegin(iprot);\n    if (UNLIKELY(!readState.atStop())) {\n      TProtocolException::throwUnionMissingStop();\n    }\n    readState.readStructEnd(iprot);\n    return;\n  }\n\n  // Define out of loop to call advanceToNextField after the loop ends.\n  FieldID prevFieldId = 0;\n\n  // The index of the expected field in the struct layout.\n  std::int16_t index = 0;\n\n  // Every time advanceToNextField reports a field mismatch, either because the\n  // field is missing or if the serialized fields are not sorted (protocols\n  // don't guarantee a specific field order), we search for the field info\n  // matching the read bytes. Then we resume from the one past the found field\n  // to reduce the number of scans we have to do if the fields are sorted which\n  // is a common case. When we increment index past the number of fields we\n  // utilize the same search logic with a field info of type TType::T_STOP.\n  for (;; ++index) {\n    auto* fieldInfo = index < structInfo.numFields\n        ? &structInfo.fieldInfos[index]\n        : &kStopMarker;\n    // Try to match the next field in order against the current bytes.\n    if (UNLIKELY(!readState.advanceToNextField(\n            iprot, prevFieldId, fieldInfo->id, fieldInfo->typeInfo->type))) {\n      // Loop to skip until we find a match for both field id/name and type.\n      for (;;) {\n        readState.afterAdvanceFailure(iprot);\n        if (readState.atStop()) {\n          // Already at stop, return immediately.\n          readState.readStructEnd(iprot);\n          return;\n        }\n        fieldInfo = findFieldInfo(iprot, readState, structInfo);\n        // Found it.\n        if (fieldInfo) {\n          // Set the index to the field next in order to the found field.\n          index = fieldInfo - structInfo.fieldInfos;\n          break;\n        }\n        skip(iprot, readState);\n      }\n    } else if (UNLIKELY(index >= structInfo.numFields)) {\n      // We are at stop and have tried all of the fields, so return.\n      readState.readStructEnd(iprot);\n      return;\n    }\n    // Id and type are what we expect, try read.\n    prevFieldId = fieldInfo->id;\n    read(iprot, *fieldInfo->typeInfo, readState, getMember(*fieldInfo, object));\n    if (fieldInfo->issetOffset > 0) {\n      const_cast<bool&>(fieldIsSet(object, fieldInfo->issetOffset)) = true;\n    }\n  }\n}",
+  "function_modified_lines": {
+    "added": [
+      "    if (const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo)) {",
+      "      auto& activeId = const_cast<int&>(getActiveId(object, structInfo));",
+      "      if (activeId != 0) {",
+      "        structInfo.unionExt->clear(object);",
+      "      }",
+      "      void* value = getMember(*fieldInfo, object);",
+      "      structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](value);",
+      "      read(iprot, *fieldInfo->typeInfo, readState, value);",
+      "      activeId = fieldInfo->id;"
+    ],
+    "deleted": [
+      "    const auto* fieldInfo = findFieldInfo(iprot, readState, structInfo);",
+      "    // Found it.",
+      "    if (fieldInfo) {",
+      "      void* unionVal = getMember(*fieldInfo, object);",
+      "      // Default construct and placement new into the member union.",
+      "      structInfo.unionExt->initMember[fieldInfo - structInfo.fieldInfos](",
+      "          unionVal);",
+      "      read(iprot, *fieldInfo->typeInfo, readState, unionVal);",
+      "      const_cast<FieldID&>(activeUnionMemberId(",
+      "          object, structInfo.unionExt->unionTypeOffset)) = fieldInfo->id;"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "An invalid free in Thrift's table-based serialization can cause the application to crash or potentially result in code execution or other undesirable effects. This issue affects Facebook Thrift prior to v2021.02.22.00.",
+  "id": 1885
+}
+]

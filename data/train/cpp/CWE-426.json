@@ -1,0 +1,23 @@
+[
+{
+  "cve_id": "CVE-2016-7838",
+  "code_before_change": "std::wstring CreateUniqueTempDirectory()\n{\n    // We need to put downloaded updates into a directory of their own, because\n    // if we put it in $TMP, some DLLs could be there and interfere with the\n    // installer.\n    //\n    // This code creates a new randomized directory name and tries to create it;\n    // this process is repeated if the directory already exists.\n    wchar_t tmpdir[MAX_PATH+1];\n    if ( GetTempPath(MAX_PATH+1, tmpdir) == 0 )\n        throw Win32Exception(\"Cannot create temporary directory\");\n\n    for ( ;; )\n    {\n        std::wstring dir(tmpdir);\n        dir += L\"Update-\";\n\n        UUID uuid;\n        UuidCreate(&uuid);\n        RPC_WSTR uuidStr;\n        RPC_STATUS status = UuidToString(&uuid, &uuidStr);\n        dir += reinterpret_cast<wchar_t*>(uuidStr);\n        RpcStringFree(&uuidStr);\n\n        if ( CreateDirectory(dir.c_str(), NULL) )\n            return dir;\n        else if ( GetLastError() != ERROR_ALREADY_EXISTS )\n            throw Win32Exception(\"Cannot create temporary directory\");\n    }\n}",
+  "code_after_change": "std::wstring CreateUniqueTempDirectory()\n{\n    // We need to put downloaded updates into a directory of their own, because\n    // if we put it in $TMP, some DLLs could be there and interfere with the\n    // installer.\n    //\n    // This code creates a new randomized directory name and tries to create it;\n    // this process is repeated if the directory already exists.\n    const std::wstring tmpdir = GetUniqueTempDirectoryPrefix();\n\n    for ( ;; )\n    {\n        std::wstring dir(tmpdir);\n        UUID uuid;\n        UuidCreate(&uuid);\n        RPC_WSTR uuidStr;\n        RPC_STATUS status = UuidToString(&uuid, &uuidStr);\n        dir += reinterpret_cast<wchar_t*>(uuidStr);\n        RpcStringFree(&uuidStr);\n\n        if ( CreateDirectory(dir.c_str(), NULL) )\n            return dir;\n        else if ( GetLastError() != ERROR_ALREADY_EXISTS )\n            throw Win32Exception(\"Cannot create temporary directory\");\n    }\n}",
+  "function_modified_lines": {
+    "added": [
+      "    const std::wstring tmpdir = GetUniqueTempDirectoryPrefix();"
+    ],
+    "deleted": [
+      "    wchar_t tmpdir[MAX_PATH+1];",
+      "    if ( GetTempPath(MAX_PATH+1, tmpdir) == 0 )",
+      "        throw Win32Exception(\"Cannot create temporary directory\");",
+      "        dir += L\"Update-\";"
+    ]
+  },
+  "cwe": [
+    "CWE-426"
+  ],
+  "cve_description": "Untrusted search path vulnerability in WinSparkle versions prior to 0.5.3 allows remote attackers to execute arbitrary code via a specially crafted executable file in an unspecified directory.",
+  "id": 1534
+}
+]

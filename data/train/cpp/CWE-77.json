@@ -1,0 +1,192 @@
+[
+{
+  "cve_id": "CVE-2020-26273",
+  "code_before_change": "std::shared_ptr<SQLiteDBInstance> getTestDBC() {\n  auto dbc = SQLiteDBManager::getUnique();\n  char* err = nullptr;\n  std::vector<std::string> queries = {\n      \"CREATE TABLE test_table (username varchar(30) primary key, age int)\",\n      \"INSERT INTO test_table VALUES (\\\"mike\\\", 23)\",\n      \"INSERT INTO test_table VALUES (\\\"matt\\\", 24)\"};\n\n  for (auto q : queries) {\n    sqlite3_exec(dbc->db(), q.c_str(), nullptr, nullptr, &err);\n    if (err != nullptr) {\n      throw std::domain_error(std::string(\"Cannot create testing DBC's db: \") +\n                              err);\n    }\n  }\n\n  return dbc;\n}",
+  "code_after_change": "std::shared_ptr<SQLiteDBInstance> getTestDBC() {\n  auto dbc = SQLiteDBManager::getUnique();\n\n  char* err = nullptr;\n  std::vector<std::string> queries = {\n      \"CREATE TABLE test_table (username varchar(30), age int)\",\n      \"INSERT INTO test_table VALUES (\\\"mike\\\", 23)\",\n      \"INSERT INTO test_table VALUES (\\\"matt\\\", 24)\"};\n\n  for (auto q : queries) {\n    sqlite3_exec(dbc->db(), q.c_str(), nullptr, nullptr, &err);\n    if (err != nullptr) {\n      throw std::domain_error(std::string(\"Cannot create testing DBC's db: \") +\n                              err);\n    }\n  }\n\n  return dbc;\n}",
+  "function_modified_lines": {
+    "added": [
+      "      \"CREATE TABLE test_table (username varchar(30), age int)\","
+    ],
+    "deleted": [
+      "      \"CREATE TABLE test_table (username varchar(30) primary key, age int)\","
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "osquery is a SQL powered operating system instrumentation, monitoring, and analytics framework. In osquery before version 4.6.0, by using sqlite's ATTACH verb, someone with administrative access to osquery can cause reads and writes to arbitrary sqlite databases on disk. This _does_ allow arbitrary files to be created, but they will be sqlite databases. It does not appear to allow existing non-sqlite files to be overwritten. This has been patched in osquery 4.6.0. There are several mitigating factors and possible workarounds. In some deployments, the people with access to these interfaces may be considered administrators. In some deployments, configuration is managed by a central tool. This tool can filter for the `ATTACH` keyword. osquery can be run as non-root user. Because this also limits the desired access levels, this requires deployment specific testing and configuration.",
+  "id": 1886
+},
+{
+  "cve_id": "CVE-2020-26273",
+  "code_before_change": "TEST_F(SQLiteUtilTests, test_column_type_determination) {\n  // Correct identification of text and ints\n  testTypesExpected(\"select path, inode from file where path like '%'\",\n                    TypeMap({{\"path\", TEXT_TYPE}, {\"inode\", INTEGER_TYPE}}));\n  // Correctly treating BLOBs as text\n  testTypesExpected(\"select CAST(seconds AS BLOB) as seconds FROM time\",\n                    TypeMap({{\"seconds\", TEXT_TYPE}}));\n  // Correctly treating ints cast as double as doubles\n  testTypesExpected(\"select CAST(seconds AS DOUBLE) as seconds FROM time\",\n                    TypeMap({{\"seconds\", DOUBLE_TYPE}}));\n  // Correctly treating bools as ints\n  testTypesExpected(\"select CAST(seconds AS BOOLEAN) as seconds FROM time\",\n                    TypeMap({{\"seconds\", INTEGER_TYPE}}));\n  // Correctly recognizing values from columns declared double as double, even\n  // if they happen to have integer value.  And also test multi-statement\n  // queries.\n  testTypesExpected(\n      \"CREATE TABLE test_types_table (username varchar(30) primary key, age \"\n      \"double);INSERT INTO test_types_table VALUES (\\\"mike\\\", 23); SELECT age \"\n      \"from test_types_table\",\n      TypeMap({{\"age\", DOUBLE_TYPE}}));\n}",
+  "code_after_change": "TEST_F(SQLiteUtilTests, test_column_type_determination) {\n  // Correct identification of text and ints\n  testTypesExpected(\"select path, inode from file where path like '%'\",\n                    TypeMap({{\"path\", TEXT_TYPE}, {\"inode\", INTEGER_TYPE}}));\n  // Correctly treating BLOBs as text\n  testTypesExpected(\"select CAST(seconds AS BLOB) as seconds FROM time\",\n                    TypeMap({{\"seconds\", TEXT_TYPE}}));\n  // Correctly treating ints cast as double as doubles\n  testTypesExpected(\"select CAST(seconds AS DOUBLE) as seconds FROM time\",\n                    TypeMap({{\"seconds\", DOUBLE_TYPE}}));\n  // Correctly treating bools as ints\n  testTypesExpected(\"select CAST(seconds AS BOOLEAN) as seconds FROM time\",\n                    TypeMap({{\"seconds\", INTEGER_TYPE}}));\n  // Correctly recognizing values from columns declared double as double, even\n  // if they happen to have integer value.  And also test multi-statement\n  // queries.\n  testTypesExpected(\n      \"CREATE TABLE test_types_table (username varchar(30), age \"\n      \"double);INSERT INTO test_types_table VALUES (\\\"mike\\\", 23); SELECT age \"\n      \"from test_types_table\",\n      TypeMap({{\"age\", DOUBLE_TYPE}}));\n}",
+  "function_modified_lines": {
+    "added": [
+      "      \"CREATE TABLE test_types_table (username varchar(30), age \""
+    ],
+    "deleted": [
+      "      \"CREATE TABLE test_types_table (username varchar(30) primary key, age \""
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "osquery is a SQL powered operating system instrumentation, monitoring, and analytics framework. In osquery before version 4.6.0, by using sqlite's ATTACH verb, someone with administrative access to osquery can cause reads and writes to arbitrary sqlite databases on disk. This _does_ allow arbitrary files to be created, but they will be sqlite databases. It does not appear to allow existing non-sqlite files to be overwritten. This has been patched in osquery 4.6.0. There are several mitigating factors and possible workarounds. In some deployments, the people with access to these interfaces may be considered administrators. In some deployments, configuration is managed by a central tool. This tool can filter for the `ATTACH` keyword. osquery can be run as non-root user. Because this also limits the desired access levels, this requires deployment specific testing and configuration.",
+  "id": 1887
+},
+{
+  "cve_id": "CVE-2020-26273",
+  "code_before_change": "TEST_F(SQLiteUtilTests, test_column_type_determination) {\n  // Correct identification of text and ints\n  testTypesExpected(\"select path, inode from file where path like '%'\",\n                    TypeMap({{\"path\", TEXT_TYPE}, {\"inode\", INTEGER_TYPE}}));\n  // Correctly treating BLOBs as text\n  testTypesExpected(\"select CAST(seconds AS BLOB) as seconds FROM time\",\n                    TypeMap({{\"seconds\", TEXT_TYPE}}));\n  // Correctly treating ints cast as double as doubles\n  testTypesExpected(\"select CAST(seconds AS DOUBLE) as seconds FROM time\",\n                    TypeMap({{\"seconds\", DOUBLE_TYPE}}));\n  // Correctly treating bools as ints\n  testTypesExpected(\"select CAST(seconds AS BOOLEAN) as seconds FROM time\",\n                    TypeMap({{\"seconds\", INTEGER_TYPE}}));\n  // Correctly recognizing values from columns declared double as double, even\n  // if they happen to have integer value.  And also test multi-statement\n  // queries.\n  testTypesExpected(\n      \"CREATE TABLE test_types_table (username varchar(30) primary key, age \"\n      \"double);INSERT INTO test_types_table VALUES (\\\"mike\\\", 23); SELECT age \"\n      \"from test_types_table\",\n      TypeMap({{\"age\", DOUBLE_TYPE}}));\n}",
+  "code_after_change": "TEST_F(SQLiteUtilTests, test_sqlite_authorizer) {\n  auto rc = sqliteAuthorizer(\n      nullptr, SQLITE_ATTACH, nullptr, nullptr, nullptr, nullptr);\n  EXPECT_EQ(SQLITE_DENY, rc);\n\n  rc = sqliteAuthorizer(nullptr, 534, nullptr, nullptr, nullptr, nullptr);\n  EXPECT_EQ(SQLITE_DENY, rc);\n\n  rc = sqliteAuthorizer(\n      nullptr, SQLITE_SELECT, nullptr, nullptr, nullptr, nullptr);\n  EXPECT_EQ(SQLITE_OK, rc);\n}",
+  "function_modified_lines": {
+    "added": [
+      "TEST_F(SQLiteUtilTests, test_sqlite_authorizer) {",
+      "  auto rc = sqliteAuthorizer(",
+      "      nullptr, SQLITE_ATTACH, nullptr, nullptr, nullptr, nullptr);",
+      "  EXPECT_EQ(SQLITE_DENY, rc);",
+      "  rc = sqliteAuthorizer(nullptr, 534, nullptr, nullptr, nullptr, nullptr);",
+      "  EXPECT_EQ(SQLITE_DENY, rc);",
+      "  rc = sqliteAuthorizer(",
+      "      nullptr, SQLITE_SELECT, nullptr, nullptr, nullptr, nullptr);",
+      "  EXPECT_EQ(SQLITE_OK, rc);",
+      "}"
+    ],
+    "deleted": [
+      "      \"CREATE TABLE test_types_table (username varchar(30) primary key, age \""
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "osquery is a SQL powered operating system instrumentation, monitoring, and analytics framework. In osquery before version 4.6.0, by using sqlite's ATTACH verb, someone with administrative access to osquery can cause reads and writes to arbitrary sqlite databases on disk. This _does_ allow arbitrary files to be created, but they will be sqlite databases. It does not appear to allow existing non-sqlite files to be overwritten. This has been patched in osquery 4.6.0. There are several mitigating factors and possible workarounds. In some deployments, the people with access to these interfaces may be considered administrators. In some deployments, configuration is managed by a central tool. This tool can filter for the `ATTACH` keyword. osquery can be run as non-root user. Because this also limits the desired access levels, this requires deployment specific testing and configuration.",
+  "id": 1888
+},
+{
+  "cve_id": "CVE-2022-3008",
+  "code_before_change": "static bool ParseSampler(Sampler *sampler, std::string *err, const json &o,\n                         bool store_original_json_for_extras_and_extensions) {\n  ParseStringProperty(&sampler->name, err, o, \"name\", false);\n\n  int minFilter = -1;\n  int magFilter = -1;\n  int wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;\n  int wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;\n  //int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;\n  ParseIntegerProperty(&minFilter, err, o, \"minFilter\", false);\n  ParseIntegerProperty(&magFilter, err, o, \"magFilter\", false);\n  ParseIntegerProperty(&wrapS, err, o, \"wrapS\", false);\n  ParseIntegerProperty(&wrapT, err, o, \"wrapT\", false);\n  //ParseIntegerProperty(&wrapR, err, o, \"wrapR\", false);  // tinygltf extension\n\n  // TODO(syoyo): Check the value is alloed one.\n  // (e.g. we allow 9728(NEAREST), but don't allow 9727)\n\n  sampler->minFilter = minFilter;\n  sampler->magFilter = magFilter;\n  sampler->wrapS = wrapS;\n  sampler->wrapT = wrapT;\n  //sampler->wrapR = wrapR;\n\n  ParseExtensionsProperty(&(sampler->extensions), err, o);\n  ParseExtrasProperty(&(sampler->extras), o);\n\n  if (store_original_json_for_extras_and_extensions) {\n    {\n      json_const_iterator it;\n      if (FindMember(o, \"extensions\", it)) {\n        sampler->extensions_json_string = JsonToString(GetValue(it));\n      }\n    }\n    {\n      json_const_iterator it;\n      if (FindMember(o, \"extras\", it)) {\n        sampler->extras_json_string = JsonToString(GetValue(it));\n      }\n    }\n  }\n\n  return true;\n}",
+  "code_after_change": "static bool ParseSampler(Sampler *sampler, std::string *err, const json &o,\n                         bool store_original_json_for_extras_and_extensions) {\n  ParseStringProperty(&sampler->name, err, o, \"name\", false);\n\n  int minFilter = -1;\n  int magFilter = -1;\n  int wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;\n  int wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;\n  // int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;\n  ParseIntegerProperty(&minFilter, err, o, \"minFilter\", false);\n  ParseIntegerProperty(&magFilter, err, o, \"magFilter\", false);\n  ParseIntegerProperty(&wrapS, err, o, \"wrapS\", false);\n  ParseIntegerProperty(&wrapT, err, o, \"wrapT\", false);\n  // ParseIntegerProperty(&wrapR, err, o, \"wrapR\", false);  // tinygltf\n  // extension\n\n  // TODO(syoyo): Check the value is alloed one.\n  // (e.g. we allow 9728(NEAREST), but don't allow 9727)\n\n  sampler->minFilter = minFilter;\n  sampler->magFilter = magFilter;\n  sampler->wrapS = wrapS;\n  sampler->wrapT = wrapT;\n  // sampler->wrapR = wrapR;\n\n  ParseExtensionsProperty(&(sampler->extensions), err, o);\n  ParseExtrasProperty(&(sampler->extras), o);\n\n  if (store_original_json_for_extras_and_extensions) {\n    {\n      json_const_iterator it;\n      if (FindMember(o, \"extensions\", it)) {\n        sampler->extensions_json_string = JsonToString(GetValue(it));\n      }\n    }\n    {\n      json_const_iterator it;\n      if (FindMember(o, \"extras\", it)) {\n        sampler->extras_json_string = JsonToString(GetValue(it));\n      }\n    }\n  }\n\n  return true;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  // int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;",
+      "  // ParseIntegerProperty(&wrapR, err, o, \"wrapR\", false);  // tinygltf",
+      "  // extension",
+      "  // sampler->wrapR = wrapR;"
+    ],
+    "deleted": [
+      "  //int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;",
+      "  //ParseIntegerProperty(&wrapR, err, o, \"wrapR\", false);  // tinygltf extension",
+      "  //sampler->wrapR = wrapR;"
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "The tinygltf library uses the C library function wordexp() to perform file path expansion on untrusted paths that are provided from the input file. This function allows for command injection by using backticks. An attacker could craft an untrusted path input that would result in a path expansion. We recommend upgrading to 2.6.0 or past commit 52ff00a38447f06a17eab1caa2cf0730a119c751",
+  "id": 1889
+},
+{
+  "cve_id": "CVE-2022-3008",
+  "code_before_change": "bool Sampler::operator==(const Sampler &other) const {\n  return this->extensions == other.extensions && this->extras == other.extras &&\n         this->magFilter == other.magFilter &&\n         this->minFilter == other.minFilter && this->name == other.name &&\n         this->wrapS == other.wrapS &&\n         this->wrapT == other.wrapT;\n\n         //this->wrapR == other.wrapR\n}",
+  "code_after_change": "bool Sampler::operator==(const Sampler &other) const {\n  return this->extensions == other.extensions && this->extras == other.extras &&\n         this->magFilter == other.magFilter &&\n         this->minFilter == other.minFilter && this->name == other.name &&\n         this->wrapS == other.wrapS && this->wrapT == other.wrapT;\n\n  // this->wrapR == other.wrapR\n}",
+  "function_modified_lines": {
+    "added": [
+      "         this->wrapS == other.wrapS && this->wrapT == other.wrapT;",
+      "  // this->wrapR == other.wrapR"
+    ],
+    "deleted": [
+      "         this->wrapS == other.wrapS &&",
+      "         this->wrapT == other.wrapT;",
+      "         //this->wrapR == other.wrapR"
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "The tinygltf library uses the C library function wordexp() to perform file path expansion on untrusted paths that are provided from the input file. This function allows for command injection by using backticks. An attacker could craft an untrusted path input that would result in a path expansion. We recommend upgrading to 2.6.0 or past commit 52ff00a38447f06a17eab1caa2cf0730a119c751",
+  "id": 1890
+},
+{
+  "cve_id": "CVE-2022-3008",
+  "code_before_change": "static std::string GetBaseFilename(const std::string &filepath) {\n  auto idx = filepath.find_last_of(\"/\\\\\");\n  if (idx != std::string::npos)\n    return filepath.substr(idx + 1);\n  return filepath;\n}",
+  "code_after_change": "static std::string GetBaseFilename(const std::string &filepath) {\n  auto idx = filepath.find_last_of(\"/\\\\\");\n  if (idx != std::string::npos) return filepath.substr(idx + 1);\n  return filepath;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  if (idx != std::string::npos) return filepath.substr(idx + 1);"
+    ],
+    "deleted": [
+      "  if (idx != std::string::npos)",
+      "    return filepath.substr(idx + 1);"
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "The tinygltf library uses the C library function wordexp() to perform file path expansion on untrusted paths that are provided from the input file. This function allows for command injection by using backticks. An attacker could craft an untrusted path input that would result in a path expansion. We recommend upgrading to 2.6.0 or past commit 52ff00a38447f06a17eab1caa2cf0730a119c751",
+  "id": 1891
+},
+{
+  "cve_id": "CVE-2022-3008",
+  "code_before_change": "static void SerializeGltfSampler(Sampler &sampler, json &o) {\n  if (sampler.magFilter != -1) {\n    SerializeNumberProperty(\"magFilter\", sampler.magFilter, o);\n  }\n  if (sampler.minFilter != -1) {\n    SerializeNumberProperty(\"minFilter\", sampler.minFilter, o);\n  }\n  //SerializeNumberProperty(\"wrapR\", sampler.wrapR, o);\n  SerializeNumberProperty(\"wrapS\", sampler.wrapS, o);\n  SerializeNumberProperty(\"wrapT\", sampler.wrapT, o);\n\n  if (sampler.extras.Type() != NULL_TYPE) {\n    SerializeValue(\"extras\", sampler.extras, o);\n  }\n}",
+  "code_after_change": "static void SerializeGltfSampler(Sampler &sampler, json &o) {\n  if (sampler.magFilter != -1) {\n    SerializeNumberProperty(\"magFilter\", sampler.magFilter, o);\n  }\n  if (sampler.minFilter != -1) {\n    SerializeNumberProperty(\"minFilter\", sampler.minFilter, o);\n  }\n  // SerializeNumberProperty(\"wrapR\", sampler.wrapR, o);\n  SerializeNumberProperty(\"wrapS\", sampler.wrapS, o);\n  SerializeNumberProperty(\"wrapT\", sampler.wrapT, o);\n\n  if (sampler.extras.Type() != NULL_TYPE) {\n    SerializeValue(\"extras\", sampler.extras, o);\n  }\n}",
+  "function_modified_lines": {
+    "added": [
+      "  // SerializeNumberProperty(\"wrapR\", sampler.wrapR, o);"
+    ],
+    "deleted": [
+      "  //SerializeNumberProperty(\"wrapR\", sampler.wrapR, o);"
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "The tinygltf library uses the C library function wordexp() to perform file path expansion on untrusted paths that are provided from the input file. This function allows for command injection by using backticks. An attacker could craft an untrusted path input that would result in a path expansion. We recommend upgrading to 2.6.0 or past commit 52ff00a38447f06a17eab1caa2cf0730a119c751",
+  "id": 1892
+},
+{
+  "cve_id": "CVE-2022-3008",
+  "code_before_change": "static void WriteBinaryGltfStream(std::ostream &stream,\n                                  const std::string &content,\n                                  const std::vector<unsigned char> &binBuffer) {\n  const std::string header = \"glTF\";\n  const int version = 2;\n\n  const uint32_t content_size = uint32_t(content.size());\n  const uint32_t binBuffer_size = uint32_t(binBuffer.size());\n  // determine number of padding bytes required to ensure 4 byte alignment\n  const uint32_t content_padding_size = content_size % 4 == 0 ? 0 : 4 - content_size % 4;\n  const uint32_t bin_padding_size = binBuffer_size % 4 == 0 ? 0 : 4 - binBuffer_size % 4;\n\n  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info.\n  // Chunk data must be located at 4-byte boundary, which may require padding\n  const uint32_t length =\n      12 + 8 + content_size + content_padding_size +\n      (binBuffer_size ? (8 + binBuffer_size + bin_padding_size) : 0);\n\n  stream.write(header.c_str(), std::streamsize(header.size()));\n  stream.write(reinterpret_cast<const char *>(&version), sizeof(version));\n  stream.write(reinterpret_cast<const char *>(&length), sizeof(length));\n\n  // JSON chunk info, then JSON data\n  const uint32_t model_length = uint32_t(content.size()) + content_padding_size;\n  const uint32_t model_format = 0x4E4F534A;\n  stream.write(reinterpret_cast<const char *>(&model_length),\n               sizeof(model_length));\n  stream.write(reinterpret_cast<const char *>(&model_format),\n               sizeof(model_format));\n  stream.write(content.c_str(), std::streamsize(content.size()));\n\n  // Chunk must be multiplies of 4, so pad with spaces\n  if (content_padding_size > 0) {\n    const std::string padding = std::string(size_t(content_padding_size), ' ');\n    stream.write(padding.c_str(), std::streamsize(padding.size()));\n  }\n  if (binBuffer.size() > 0) {\n    // BIN chunk info, then BIN data\n    const uint32_t bin_length = uint32_t(binBuffer.size()) + bin_padding_size;\n    const uint32_t bin_format = 0x004e4942;\n    stream.write(reinterpret_cast<const char *>(&bin_length),\n                 sizeof(bin_length));\n    stream.write(reinterpret_cast<const char *>(&bin_format),\n                 sizeof(bin_format));\n    stream.write(reinterpret_cast<const char *>(binBuffer.data()),\n                 std::streamsize(binBuffer.size()));\n    // Chunksize must be multiplies of 4, so pad with zeroes\n    if (bin_padding_size > 0) {\n      const std::vector<unsigned char> padding =\n          std::vector<unsigned char>(size_t(bin_padding_size), 0);\n      stream.write(reinterpret_cast<const char *>(padding.data()),\n                   std::streamsize(padding.size()));\n    }\n  }\n}",
+  "code_after_change": "static void WriteBinaryGltfStream(std::ostream &stream,\n                                  const std::string &content,\n                                  const std::vector<unsigned char> &binBuffer) {\n  const std::string header = \"glTF\";\n  const int version = 2;\n\n  const uint32_t content_size = uint32_t(content.size());\n  const uint32_t binBuffer_size = uint32_t(binBuffer.size());\n  // determine number of padding bytes required to ensure 4 byte alignment\n  const uint32_t content_padding_size =\n      content_size % 4 == 0 ? 0 : 4 - content_size % 4;\n  const uint32_t bin_padding_size =\n      binBuffer_size % 4 == 0 ? 0 : 4 - binBuffer_size % 4;\n\n  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info.\n  // Chunk data must be located at 4-byte boundary, which may require padding\n  const uint32_t length =\n      12 + 8 + content_size + content_padding_size +\n      (binBuffer_size ? (8 + binBuffer_size + bin_padding_size) : 0);\n\n  stream.write(header.c_str(), std::streamsize(header.size()));\n  stream.write(reinterpret_cast<const char *>(&version), sizeof(version));\n  stream.write(reinterpret_cast<const char *>(&length), sizeof(length));\n\n  // JSON chunk info, then JSON data\n  const uint32_t model_length = uint32_t(content.size()) + content_padding_size;\n  const uint32_t model_format = 0x4E4F534A;\n  stream.write(reinterpret_cast<const char *>(&model_length),\n               sizeof(model_length));\n  stream.write(reinterpret_cast<const char *>(&model_format),\n               sizeof(model_format));\n  stream.write(content.c_str(), std::streamsize(content.size()));\n\n  // Chunk must be multiplies of 4, so pad with spaces\n  if (content_padding_size > 0) {\n    const std::string padding = std::string(size_t(content_padding_size), ' ');\n    stream.write(padding.c_str(), std::streamsize(padding.size()));\n  }\n  if (binBuffer.size() > 0) {\n    // BIN chunk info, then BIN data\n    const uint32_t bin_length = uint32_t(binBuffer.size()) + bin_padding_size;\n    const uint32_t bin_format = 0x004e4942;\n    stream.write(reinterpret_cast<const char *>(&bin_length),\n                 sizeof(bin_length));\n    stream.write(reinterpret_cast<const char *>(&bin_format),\n                 sizeof(bin_format));\n    stream.write(reinterpret_cast<const char *>(binBuffer.data()),\n                 std::streamsize(binBuffer.size()));\n    // Chunksize must be multiplies of 4, so pad with zeroes\n    if (bin_padding_size > 0) {\n      const std::vector<unsigned char> padding =\n          std::vector<unsigned char>(size_t(bin_padding_size), 0);\n      stream.write(reinterpret_cast<const char *>(padding.data()),\n                   std::streamsize(padding.size()));\n    }\n  }\n}",
+  "function_modified_lines": {
+    "added": [
+      "  const uint32_t content_padding_size =",
+      "      content_size % 4 == 0 ? 0 : 4 - content_size % 4;",
+      "  const uint32_t bin_padding_size =",
+      "      binBuffer_size % 4 == 0 ? 0 : 4 - binBuffer_size % 4;"
+    ],
+    "deleted": [
+      "  const uint32_t content_padding_size = content_size % 4 == 0 ? 0 : 4 - content_size % 4;",
+      "  const uint32_t bin_padding_size = binBuffer_size % 4 == 0 ? 0 : 4 - binBuffer_size % 4;"
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "The tinygltf library uses the C library function wordexp() to perform file path expansion on untrusted paths that are provided from the input file. This function allows for command injection by using backticks. An attacker could craft an untrusted path input that would result in a path expansion. We recommend upgrading to 2.6.0 or past commit 52ff00a38447f06a17eab1caa2cf0730a119c751",
+  "id": 1893
+},
+{
+  "cve_id": "CVE-2022-3008",
+  "code_before_change": "static bool ParseSparseAccessor(Accessor *accessor, std::string *err,\n                                const json &o) {\n  accessor->sparse.isSparse = true;\n\n  int count = 0;\n  if (!ParseIntegerProperty(&count, err, o, \"count\", true, \"SparseAccessor\")) {\n    return false;\n  }\n\n  json_const_iterator indices_iterator;\n  json_const_iterator values_iterator;\n  if (!FindMember(o, \"indices\", indices_iterator)) {\n    (*err) = \"the sparse object of this accessor doesn't have indices\";\n    return false;\n  }\n\n  if (!FindMember(o, \"values\", values_iterator)) {\n    (*err) = \"the sparse object ob ths accessor doesn't have values\";\n    return false;\n  }\n\n  const json &indices_obj = GetValue(indices_iterator);\n  const json &values_obj = GetValue(values_iterator);\n\n  int indices_buffer_view = 0, indices_byte_offset = 0, component_type = 0;\n  if (!ParseIntegerProperty(&indices_buffer_view, err, indices_obj, \"bufferView\",\n                       true, \"SparseAccessor\")) {\n    return false;\n  }\n  ParseIntegerProperty(&indices_byte_offset, err, indices_obj, \"byteOffset\",\n                       false);\n  if (!ParseIntegerProperty(&component_type, err, indices_obj, \"componentType\",\n                       true, \"SparseAccessor\")) {\n    return false;\n  }\n\n  int values_buffer_view = 0, values_byte_offset = 0;\n  if (!ParseIntegerProperty(&values_buffer_view, err, values_obj, \"bufferView\",\n                       true, \"SparseAccessor\")) {\n    return false;\n  }\n  ParseIntegerProperty(&values_byte_offset, err, values_obj, \"byteOffset\",\n                       false);\n\n  accessor->sparse.count = count;\n  accessor->sparse.indices.bufferView = indices_buffer_view;\n  accessor->sparse.indices.byteOffset = indices_byte_offset;\n  accessor->sparse.indices.componentType = component_type;\n  accessor->sparse.values.bufferView = values_buffer_view;\n  accessor->sparse.values.byteOffset = values_byte_offset;\n\n  return true;\n}",
+  "code_after_change": "static bool ParseSparseAccessor(Accessor *accessor, std::string *err,\n                                const json &o) {\n  accessor->sparse.isSparse = true;\n\n  int count = 0;\n  if (!ParseIntegerProperty(&count, err, o, \"count\", true, \"SparseAccessor\")) {\n    return false;\n  }\n\n  json_const_iterator indices_iterator;\n  json_const_iterator values_iterator;\n  if (!FindMember(o, \"indices\", indices_iterator)) {\n    (*err) = \"the sparse object of this accessor doesn't have indices\";\n    return false;\n  }\n\n  if (!FindMember(o, \"values\", values_iterator)) {\n    (*err) = \"the sparse object ob ths accessor doesn't have values\";\n    return false;\n  }\n\n  const json &indices_obj = GetValue(indices_iterator);\n  const json &values_obj = GetValue(values_iterator);\n\n  int indices_buffer_view = 0, indices_byte_offset = 0, component_type = 0;\n  if (!ParseIntegerProperty(&indices_buffer_view, err, indices_obj,\n                            \"bufferView\", true, \"SparseAccessor\")) {\n    return false;\n  }\n  ParseIntegerProperty(&indices_byte_offset, err, indices_obj, \"byteOffset\",\n                       false);\n  if (!ParseIntegerProperty(&component_type, err, indices_obj, \"componentType\",\n                            true, \"SparseAccessor\")) {\n    return false;\n  }\n\n  int values_buffer_view = 0, values_byte_offset = 0;\n  if (!ParseIntegerProperty(&values_buffer_view, err, values_obj, \"bufferView\",\n                            true, \"SparseAccessor\")) {\n    return false;\n  }\n  ParseIntegerProperty(&values_byte_offset, err, values_obj, \"byteOffset\",\n                       false);\n\n  accessor->sparse.count = count;\n  accessor->sparse.indices.bufferView = indices_buffer_view;\n  accessor->sparse.indices.byteOffset = indices_byte_offset;\n  accessor->sparse.indices.componentType = component_type;\n  accessor->sparse.values.bufferView = values_buffer_view;\n  accessor->sparse.values.byteOffset = values_byte_offset;\n\n  return true;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  if (!ParseIntegerProperty(&indices_buffer_view, err, indices_obj,",
+      "                            \"bufferView\", true, \"SparseAccessor\")) {",
+      "                            true, \"SparseAccessor\")) {",
+      "                            true, \"SparseAccessor\")) {"
+    ],
+    "deleted": [
+      "  if (!ParseIntegerProperty(&indices_buffer_view, err, indices_obj, \"bufferView\",",
+      "                       true, \"SparseAccessor\")) {",
+      "                       true, \"SparseAccessor\")) {",
+      "                       true, \"SparseAccessor\")) {"
+    ]
+  },
+  "cwe": [
+    "CWE-77"
+  ],
+  "cve_description": "The tinygltf library uses the C library function wordexp() to perform file path expansion on untrusted paths that are provided from the input file. This function allows for command injection by using backticks. An attacker could craft an untrusted path input that would result in a path expansion. We recommend upgrading to 2.6.0 or past commit 52ff00a38447f06a17eab1caa2cf0730a119c751",
+  "id": 1894
+}
+]

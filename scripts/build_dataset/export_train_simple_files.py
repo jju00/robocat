@@ -14,9 +14,18 @@ from src.dto.rawdiffdto import RawDiffDTO, FunctionModifiedLinesDTO
 
 BAD_CWE = {"NVD-CWE-Other", "NVD-CWE-noinfo", "CWE-Other", "CWE-noinfo"}
 
+# --lang 에 넣는 값(php/c/cpp)과 DB의 programming_language 값을 연결
+LANG_GROUP_ALIASES = {
+    "php": ["PHP"],
+    "c": ["C"],
+    "cpp": ["C++", "CPP", "CXX", "CC"],
+}
+
+
 def table_columns(conn: sqlite3.Connection, table: str) -> List[str]:
     cur = conn.execute(f"PRAGMA table_info({table});")
     return [row[1] for row in cur.fetchall()]
+
 
 def pick_first(cols: List[str], candidates: List[str]) -> Optional[str]:
     s = set(cols)
@@ -24,6 +33,7 @@ def pick_first(cols: List[str], candidates: List[str]) -> Optional[str]:
         if c in s:
             return c
     return None
+
 
 def build_cwe_map(conn: sqlite3.Connection) -> Dict[str, List[str]]:
     cwe_map: Dict[str, List[str]] = {}
@@ -46,9 +56,11 @@ def build_cwe_map(conn: sqlite3.Connection) -> Dict[str, List[str]]:
             cwe_map[cve_id].append(cwe_str)
     return cwe_map
 
+
 def primary_cwe(cwes: List[str]) -> str:
     c = [x for x in (cwes or []) if isinstance(x, str) and x.startswith("CWE-") and x not in BAD_CWE]
     return sorted(set(c))[0] if c else "CWE-Unknown"
+
 
 def normalize_description(desc: Optional[str]) -> str:
     if not desc:
@@ -66,11 +78,13 @@ def normalize_description(desc: Optional[str]) -> str:
     except Exception:
         return s
 
+
 def safe_int(x: object, default: int = 0) -> int:
     try:
         return int(str(x))
     except Exception:
         return default
+
 
 def slice_lines(text: str, start_line: int, end_line: int, expand: int = 0) -> str:
     if text is None:
@@ -84,6 +98,7 @@ def slice_lines(text: str, start_line: int, end_line: int, expand: int = 0) -> s
     e_idx = min(len(lines), e)
     return "\n".join(lines[s_idx:e_idx])
 
+
 def looks_like_code(text: str, min_lines: int = 3, min_chars: int = 20) -> bool:
     if text is None:
         return False
@@ -96,6 +111,7 @@ def looks_like_code(text: str, min_lines: int = 3, min_chars: int = 20) -> bool:
     if len(stripped) < min_chars:
         return False
     return True
+
 
 def parse_diff_parsed(
     diff_parsed_str: Optional[str],
@@ -136,10 +152,9 @@ def parse_diff_parsed(
                 result.append(code)
             return result
 
-        # added는 after 범위로, deleted는 before 범위로 각각 필터링
         a_lo = after_start_line if after_start_line > 0 else start_line
-        a_hi = after_end_line   if after_end_line   > 0 else end_line
-        added   = extract(obj.get("added",   []), a_lo, a_hi)
+        a_hi = after_end_line if after_end_line > 0 else end_line
+        added = extract(obj.get("added", []), a_lo, a_hi)
         deleted = extract(obj.get("deleted", []), start_line, end_line)
         return added, deleted
     except Exception:
@@ -152,19 +167,59 @@ def atomic_write(path: Path, obj) -> None:
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, path)
 
+
+def resolve_lang_group_and_aliases(lang_value: str) -> Tuple[str, List[str]]:
+    """
+    사용자가 --lang 에 php/c/cpp 같은 그룹명을 넣었을 때 DB alias 목록 반환.
+    혹시 기존처럼 --lang PHP, --lang C, --lang "C++" 를 직접 넣어도 동작하게 처리.
+    """
+    if not lang_value:
+        return "", []
+
+    raw = lang_value.strip()
+    lowered = raw.lower()
+
+    # 그룹명으로 들어온 경우
+    if lowered in LANG_GROUP_ALIASES:
+        return lowered, LANG_GROUP_ALIASES[lowered]
+
+    # DB 실제값으로 직접 넣은 경우도 허용
+    upper_raw = raw.upper()
+    for group, aliases in LANG_GROUP_ALIASES.items():
+        if upper_raw in [a.upper() for a in aliases]:
+            return group, aliases
+
+    # 매핑 안 되면 그대로 단일 언어로 처리
+    safe_group = lowered.replace("+", "p")
+    return safe_group, [raw]
+
+
+def build_lang_filter_sql(lang_aliases: List[str]) -> Tuple[str, List[object]]:
+    if not lang_aliases:
+        return "", []
+
+    placeholders = ",".join(["?"] * len(lang_aliases))
+    clause = f" AND UPPER(fc.programming_language) IN ({placeholders})"
+    params = [x.upper() for x in lang_aliases]
+    return clause, params
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", required=True)
     ap.add_argument("--out_dir", default="~/cve_work/export/train_simple")
     ap.add_argument("--limit_rows", type=int, default=0)
-    ap.add_argument("--lang", type=str, default="", help="e.g., PHP, C")
+    ap.add_argument("--lang", type=str, default="", help="e.g., php, c, cpp, PHP, C, C++")
     ap.add_argument("--min_code_lines", type=int, default=3)
     ap.add_argument("--expand_end", type=int, default=0)
     ap.add_argument("--drop_ws_only", action="store_true")
     ap.add_argument("--require_name_in_code", action="store_true")
     args = ap.parse_args()
 
-    out_dir = Path(os.path.expanduser(args.out_dir))
+    lang_group, lang_aliases = resolve_lang_group_and_aliases(args.lang)
+
+    base_out_dir = Path(os.path.expanduser(args.out_dir))
+    out_dir = base_out_dir / lang_group if lang_group else base_out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(str(Path(args.db)))
@@ -179,6 +234,7 @@ def main():
         fc.diff_parsed    AS diff_parsed,
         fc.code_before    AS file_code_before,
         fc.code_after     AS file_code_after,
+        fc.programming_language AS programming_language,
         mc_b.name         AS method_name,
         mc_b.start_line   AS start_line,
         mc_b.end_line     AS end_line,
@@ -201,40 +257,42 @@ def main():
       AND mc_b.end_line IS NOT NULL
       AND (mc_b.before_change = 1 OR mc_b.before_change = 'True')
     """
+
     params: List[object] = []
-    if args.lang:
-        sql += " AND fc.programming_language = ?"
-        params.append(args.lang)
+    if lang_aliases:
+        lang_sql, lang_params = build_lang_filter_sql(lang_aliases)
+        sql += lang_sql
+        params.extend(lang_params)
+
     if args.limit_rows and args.limit_rows > 0:
         sql += " LIMIT ?"
         params.append(args.limit_rows)
 
     cur = conn.execute(sql, params)
 
-    # 메모리에는 카운터/CWE 정보만 보관 (정수 + 짧은 문자열 → 수 MB 이하)
-    cve_counter: Dict[str, int] = {}   # cve_id -> 현재까지 쓴 항목 수
+    cve_counter: Dict[str, int] = {}
     cve_cwes: Dict[str, List[str]] = {}
 
     skipped = 0
     total_written = 0
 
-    for row in tqdm(cur, desc="Exporting", unit="rows"):
+    desc_lang = lang_group if lang_group else "all"
+    for row in tqdm(cur, desc=f"Exporting [{desc_lang}]", unit="rows"):
         cve_id = str(row["cve_id"])
 
         start_line = safe_int(row["start_line"], 0)
-        end_line   = safe_int(row["end_line"],   0)
+        end_line = safe_int(row["end_line"], 0)
         if start_line <= 0 or end_line <= 0 or end_line < start_line:
             skipped += 1
             continue
 
-        # after 파일 라인 번호: mc_a(before_change=False) 값 사용, 없으면 before 값으로 fallback
         after_start = safe_int(row["after_start_line"], 0)
-        after_end   = safe_int(row["after_end_line"],   0)
+        after_end = safe_int(row["after_end_line"], 0)
         if after_start <= 0 or after_end <= 0 or after_end < after_start:
             after_start, after_end = start_line, end_line
 
-        before_code = slice_lines(row["file_code_before"], start_line,  end_line,   expand=args.expand_end)
-        after_code  = slice_lines(row["file_code_after"],  after_start, after_end,  expand=args.expand_end)
+        before_code = slice_lines(row["file_code_before"], start_line, end_line, expand=args.expand_end)
+        after_code = slice_lines(row["file_code_after"], after_start, after_end, expand=args.expand_end)
 
         if not looks_like_code(before_code, min_lines=args.min_code_lines) or not looks_like_code(after_code, min_lines=args.min_code_lines):
             skipped += 1
@@ -262,7 +320,6 @@ def main():
         if cve_id not in cve_cwes:
             cve_cwes[cve_id] = cwes
 
-        # id 순차 부여
         cve_counter[cve_id] = cve_counter.get(cve_id, 0) + 1
 
         dto = RawDiffDTO(
@@ -275,7 +332,7 @@ def main():
             id=cve_counter[cve_id],
         )
 
-        # 처리 즉시 JSONL로 디스크에 append (메모리에 쌓지 않음)
+        # 언어별 / CWE별 / CVE별 저장
         folder = primary_cwe(cwes)
         jsonl_path = out_dir / folder / f"{cve_id}.jsonl"
         jsonl_path.parent.mkdir(parents=True, exist_ok=True)
@@ -286,12 +343,11 @@ def main():
 
     conn.close()
 
-    # JSONL → JSON 변환 (CVE 1개씩 처리 → 메모리 안전)
-    print(f"\nConverting {len(cve_counter)} CVE JSONL files to JSON...")
-    for cve_id, cwes in tqdm(cve_cwes.items(), desc="Converting to JSON", unit="cve"):
+    print(f"\nConverting {len(cve_counter)} CVE JSONL files to JSON [{desc_lang}]...")
+    for cve_id, cwes in tqdm(cve_cwes.items(), desc=f"Converting [{desc_lang}]", unit="cve"):
         folder = primary_cwe(cwes)
         jsonl_path = out_dir / folder / f"{cve_id}.jsonl"
-        json_path  = out_dir / folder / f"{cve_id}.json"
+        json_path = out_dir / folder / f"{cve_id}.json"
 
         items = [
             json.loads(line)
@@ -299,9 +355,16 @@ def main():
             if line.strip()
         ]
         atomic_write(json_path, items)
-        jsonl_path.unlink()  # 임시 파일 정리
+        jsonl_path.unlink()
 
-    print(f"Done. CVE files written: {len(cve_counter)}, Total items: {total_written}, Skipped rows: {skipped}, Out: {out_dir}")
+    print(
+        f"Done [{desc_lang}]. "
+        f"CVE files written: {len(cve_counter)}, "
+        f"Total items: {total_written}, "
+        f"Skipped rows: {skipped}, "
+        f"Out: {out_dir}"
+    )
+
 
 if __name__ == "__main__":
     main()

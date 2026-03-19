@@ -1,0 +1,58 @@
+[
+{
+  "cve_id": "CVE-2017-1000215",
+  "code_before_change": "  void DefaultEnv::Initialize()\n  {\n    sLog           = new Log();\n    SetUpLog();\n\n    sEnv           = new DefaultEnv();\n    sForkHandler   = new ForkHandler();\n    sFileTimer     = new FileTimer();\n    sPlugInManager = new PlugInManager();\n\n    sPlugInManager->ProcessEnvironmentSettings();\n    sForkHandler->RegisterFileTimer( sFileTimer );\n\n    //--------------------------------------------------------------------------\n    // MacOSX library loading is completely moronic. We cannot dlopen a library\n    // from a thread other than a main thread, so we-pre dlopen all the\n    // libraries that we may potentially want.\n    //--------------------------------------------------------------------------\n#ifdef __APPLE__\n    char *errBuff = new char[1024];\n\n    const char *libs[] =\n    {\n      \"libXrdSeckrb5.so\",\n      \"libXrdSecgsi.so\",\n      \"libXrdSecgsiAuthzVO.so\",\n      \"libXrdSecgsiGMAPDN.so\",\n      \"libXrdSecgsiGMAPLDAP.so\",\n      \"libXrdSecpwd.so\",\n      \"libXrdSecsss.so\",\n      \"libXrdSecunix.so\",\n      0\n    };\n\n    for( int i = 0; libs[i]; ++i )\n    {\n      sLog->Debug( UtilityMsg, \"Attempting to pre-load: %s\", libs[i] );\n      bool ok = XrdOucPreload( libs[i], errBuff, 1024 );\n      if( !ok )\n        sLog->Error( UtilityMsg, \"Unable to pre-load %s: %s\", libs[i], errBuff );\n    }\n    delete [] errBuff;\n#endif\n  }",
+  "code_after_change": "  void DefaultEnv::Initialize()\n  {\n    sLog           = new Log();\n    SetUpLog();\n\n    sEnv           = new DefaultEnv();\n    sForkHandler   = new ForkHandler();\n    sFileTimer     = new FileTimer();\n    sPlugInManager = new PlugInManager();\n\n    sPlugInManager->ProcessEnvironmentSettings();\n    sForkHandler->RegisterFileTimer( sFileTimer );\n\n    //--------------------------------------------------------------------------\n    // MacOSX library loading is completely moronic. We cannot dlopen a library\n    // from a thread other than a main thread, so we-pre dlopen all the\n    // libraries that we may potentially want.\n    //--------------------------------------------------------------------------\n#ifdef __APPLE__\n    char *errBuff = new char[1024];\n\n    const char *libs[] =\n    {\n      \"libXrdSeckrb5.so\",\n      \"libXrdSecgsi.so\",\n      \"libXrdSecgsiAuthzVO.so\",\n      \"libXrdSecgsiGMAPDN.so\",\n      \"libXrdSecpwd.so\",\n      \"libXrdSecsss.so\",\n      \"libXrdSecunix.so\",\n      0\n    };\n\n    for( int i = 0; libs[i]; ++i )\n    {\n      sLog->Debug( UtilityMsg, \"Attempting to pre-load: %s\", libs[i] );\n      bool ok = XrdOucPreload( libs[i], errBuff, 1024 );\n      if( !ok )\n        sLog->Error( UtilityMsg, \"Unable to pre-load %s: %s\", libs[i], errBuff );\n    }\n    delete [] errBuff;\n#endif\n  }\n",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "      \"libXrdSecgsiGMAPLDAP.so\","
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "ROOT xrootd version 4.6.0 and below is vulnerable to an unauthenticated shell command injection resulting in remote code execution",
+  "id": 1923
+},
+{
+  "cve_id": "CVE-2017-14500",
+  "code_before_change": "void pb_controller::play_file(const std::string& file) {\n\tstd::string cmdline;\n\tstd::string player = cfg->get_configvalue(\"player\");\n\tif (player == \"\")\n\t\treturn;\n\tcmdline.append(player);\n\tcmdline.append(\" \\\"\");\n\tcmdline.append(utils::replace_all(file,\"\\\"\", \"\\\\\\\"\"));\n\tcmdline.append(\"\\\"\");\n\tstfl::reset();\n\tutils::run_interactively(cmdline, \"pb_controller::play_file\");\n}",
+  "code_after_change": "void pb_controller::play_file(const std::string& file) {\n\tstd::string cmdline;\n\tstd::string player = cfg->get_configvalue(\"player\");\n\tif (player == \"\")\n\t\treturn;\n\tcmdline.append(player);\n\tcmdline.append(\" '\");\n\tcmdline.append(utils::replace_all(file,\"'\", \"%27\"));\n\tcmdline.append(\"'\");\n\tstfl::reset();\n\tutils::run_interactively(cmdline, \"pb_controller::play_file\");\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tcmdline.append(\" '\");",
+      "\tcmdline.append(utils::replace_all(file,\"'\", \"%27\"));",
+      "\tcmdline.append(\"'\");"
+    ],
+    "deleted": [
+      "\tcmdline.append(\" \\\"\");",
+      "\tcmdline.append(utils::replace_all(file,\"\\\"\", \"\\\\\\\"\"));",
+      "\tcmdline.append(\"\\\"\");"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "Improper Neutralization of Special Elements used in an OS Command in the podcast playback function of Podbeuter in Newsbeuter 0.3 through 2.9 allows remote attackers to perform user-assisted code execution by crafting an RSS item with a media enclosure (i.e., a podcast file) that includes shell metacharacters in its filename, related to pb_controller.cpp and queueloader.cpp, a different vulnerability than CVE-2017-12904.",
+  "id": 1924
+},
+{
+  "cve_id": "CVE-2017-14500",
+  "code_before_change": "std::string queueloader::get_filename(const std::string& str) {\n\tstd::string fn = ctrl->get_dlpath();\n\n\tif (fn[fn.length()-1] != NEWSBEUTER_PATH_SEP[0])\n\t\tfn.append(NEWSBEUTER_PATH_SEP);\n\tchar buf[1024];\n\tsnprintf(buf, sizeof(buf), \"%s\", str.c_str());\n\tchar * base = basename(buf);\n\tif (!base || strlen(base) == 0) {\n\t\tchar lbuf[128];\n\t\ttime_t t = time(nullptr);\n\t\tstrftime(lbuf, sizeof(lbuf), \"%Y-%b-%d-%H%M%S.unknown\", localtime(&t));\n\t\tfn.append(lbuf);\n\t} else {\n\t\tfn.append(base);\n\t}\n\treturn fn;\n}",
+  "code_after_change": "std::string queueloader::get_filename(const std::string& str) {\n\tstd::string fn = ctrl->get_dlpath();\n\n\tif (fn[fn.length()-1] != NEWSBEUTER_PATH_SEP[0])\n\t\tfn.append(NEWSBEUTER_PATH_SEP);\n\tchar buf[1024];\n\tsnprintf(buf, sizeof(buf), \"%s\", str.c_str());\n\tchar * base = basename(buf);\n\tif (!base || strlen(base) == 0) {\n\t\tchar lbuf[128];\n\t\ttime_t t = time(nullptr);\n\t\tstrftime(lbuf, sizeof(lbuf), \"%Y-%b-%d-%H%M%S.unknown\", localtime(&t));\n\t\tfn.append(lbuf);\n\t} else {\n\t\tfn.append(utils::replace_all(base, \"'\", \"%27\"));\n\t}\n\treturn fn;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tfn.append(utils::replace_all(base, \"'\", \"%27\"));"
+    ],
+    "deleted": [
+      "\t\tfn.append(base);"
+    ]
+  },
+  "cwe": [
+    "CWE-78"
+  ],
+  "cve_description": "Improper Neutralization of Special Elements used in an OS Command in the podcast playback function of Podbeuter in Newsbeuter 0.3 through 2.9 allows remote attackers to perform user-assisted code execution by crafting an RSS item with a media enclosure (i.e., a podcast file) that includes shell metacharacters in its filename, related to pb_controller.cpp and queueloader.cpp, a different vulnerability than CVE-2017-12904.",
+  "id": 1925
+}
+]

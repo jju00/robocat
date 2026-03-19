@@ -1,0 +1,349 @@
+[
+{
+  "cve_id": "CVE-2012-0037",
+  "code_before_change": "raptor_libxml_getEntity(void* user_data, const xmlChar *name) {\n  raptor_sax2* sax2 = (raptor_sax2*)user_data;\n  return libxml2_getEntity(sax2->xc, name);\n}",
+  "code_after_change": "raptor_libxml_getEntity(void* user_data, const xmlChar *name)\n{\n  raptor_sax2* sax2 = (raptor_sax2*)user_data;\n  xmlParserCtxtPtr xc = sax2->xc;\n  xmlEntityPtr ret = NULL;\n\n  if(!xc)\n    return NULL;\n\n  if(!xc->inSubset) {\n    /* looks for hardcoded set of entity names - lt, gt etc. */\n    ret = xmlGetPredefinedEntity(name);\n    if(ret) {\n      RAPTOR_DEBUG2(\"Entity '%s' found in predefined set\\n\", name);\n      return ret;\n    }\n  }\n\n  /* This section uses xmlGetDocEntity which looks for entities in\n   * memory only, never from a file or URI \n   */\n  if(xc->myDoc && (xc->myDoc->standalone == 1)) {\n    RAPTOR_DEBUG2(\"Entity '%s' document is standalone\\n\", name);\n    /* Document is standalone: no entities are required to interpret doc */\n    if(xc->inSubset == 2) {\n      xc->myDoc->standalone = 0;\n      ret = xmlGetDocEntity(xc->myDoc, name);\n      xc->myDoc->standalone = 1;\n    } else {\n      ret = xmlGetDocEntity(xc->myDoc, name);\n      if(!ret) {\n        xc->myDoc->standalone = 0;\n        ret = xmlGetDocEntity(xc->myDoc, name);\n        xc->myDoc->standalone = 1;\n      }\n    }\n  } else {\n    ret = xmlGetDocEntity(xc->myDoc, name);\n  }\n\n  if(ret && !ret->children &&\n    (ret->etype == XML_EXTERNAL_GENERAL_PARSED_ENTITY)) {\n    /* Entity is an external general parsed entity. It may be in a\n     * catalog file, user file or user URI\n     */\n    int val = 0;\n    xmlNodePtr children;\n    int load_entity = 0;\n\n    load_entity = RAPTOR_OPTIONS_GET_NUMERIC(sax2, RAPTOR_OPTION_LOAD_EXTERNAL_ENTITIES);\n    if(load_entity)\n      load_entity = raptor_sax2_check_load_uri_string(sax2, ret->URI);\n\n    if(!load_entity) {\n      RAPTOR_DEBUG2(\"Not getting entity URI %s by policy\\n\", ret->URI);\n      children = xmlNewText((const xmlChar*)\"\");\n    } else {\n      /* Disable SAX2 handlers so that the SAX2 events do not all get\n       * sent to callbacks during dealing with the entity parsing.\n       */\n      sax2->enabled = 0;\n      val = xmlParseCtxtExternalEntity(xc, ret->URI, ret->ExternalID, &children);\n      sax2->enabled = 1;\n    }\n    \n    if(!val) {\n      xmlAddChildList((xmlNodePtr)ret, children);\n    } else {\n      xc->validate = 0;\n      return NULL;\n    }\n    \n    ret->owner = 1;\n\n    /* Mark this entity as having been checked - never do this again */\n    if(!ret->checked)\n      ret->checked = 1;\n  }\n\n  return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "raptor_libxml_getEntity(void* user_data, const xmlChar *name)",
+      "{",
+      "  xmlParserCtxtPtr xc = sax2->xc;",
+      "  xmlEntityPtr ret = NULL;",
+      "  if(!xc)",
+      "    return NULL;",
+      "  if(!xc->inSubset) {",
+      "    /* looks for hardcoded set of entity names - lt, gt etc. */",
+      "    ret = xmlGetPredefinedEntity(name);",
+      "    if(ret) {",
+      "      RAPTOR_DEBUG2(\"Entity '%s' found in predefined set\\n\", name);",
+      "      return ret;",
+      "    }",
+      "  }",
+      "  /* This section uses xmlGetDocEntity which looks for entities in",
+      "   * memory only, never from a file or URI",
+      "   */",
+      "  if(xc->myDoc && (xc->myDoc->standalone == 1)) {",
+      "    RAPTOR_DEBUG2(\"Entity '%s' document is standalone\\n\", name);",
+      "    /* Document is standalone: no entities are required to interpret doc */",
+      "    if(xc->inSubset == 2) {",
+      "      xc->myDoc->standalone = 0;",
+      "      ret = xmlGetDocEntity(xc->myDoc, name);",
+      "      xc->myDoc->standalone = 1;",
+      "    } else {",
+      "      ret = xmlGetDocEntity(xc->myDoc, name);",
+      "      if(!ret) {",
+      "        xc->myDoc->standalone = 0;",
+      "        ret = xmlGetDocEntity(xc->myDoc, name);",
+      "        xc->myDoc->standalone = 1;",
+      "      }",
+      "    }",
+      "  } else {",
+      "    ret = xmlGetDocEntity(xc->myDoc, name);",
+      "  }",
+      "  if(ret && !ret->children &&",
+      "    (ret->etype == XML_EXTERNAL_GENERAL_PARSED_ENTITY)) {",
+      "    /* Entity is an external general parsed entity. It may be in a",
+      "     * catalog file, user file or user URI",
+      "     */",
+      "    int val = 0;",
+      "    xmlNodePtr children;",
+      "    int load_entity = 0;",
+      "    load_entity = RAPTOR_OPTIONS_GET_NUMERIC(sax2, RAPTOR_OPTION_LOAD_EXTERNAL_ENTITIES);",
+      "    if(load_entity)",
+      "      load_entity = raptor_sax2_check_load_uri_string(sax2, ret->URI);",
+      "    if(!load_entity) {",
+      "      RAPTOR_DEBUG2(\"Not getting entity URI %s by policy\\n\", ret->URI);",
+      "      children = xmlNewText((const xmlChar*)\"\");",
+      "    } else {",
+      "      /* Disable SAX2 handlers so that the SAX2 events do not all get",
+      "       * sent to callbacks during dealing with the entity parsing.",
+      "       */",
+      "      sax2->enabled = 0;",
+      "      val = xmlParseCtxtExternalEntity(xc, ret->URI, ret->ExternalID, &children);",
+      "      sax2->enabled = 1;",
+      "    }",
+      "    if(!val) {",
+      "      xmlAddChildList((xmlNodePtr)ret, children);",
+      "    } else {",
+      "      xc->validate = 0;",
+      "      return NULL;",
+      "    }",
+      "    ret->owner = 1;",
+      "    /* Mark this entity as having been checked - never do this again */",
+      "    if(!ret->checked)",
+      "      ret->checked = 1;",
+      "  }",
+      "  return ret;"
+    ],
+    "deleted": [
+      "raptor_libxml_getEntity(void* user_data, const xmlChar *name) {",
+      "  return libxml2_getEntity(sax2->xc, name);"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Redland Raptor (aka libraptor) before 2.0.7, as used by OpenOffice 3.3 and 3.4 Beta, LibreOffice before 3.4.6 and 3.5.x before 3.5.1, and other products, allows user-assisted remote attackers to read arbitrary files via a crafted XML external entity (XXE) declaration and reference in an RDF document.",
+  "id": 6036
+},
+{
+  "cve_id": "CVE-2012-0037",
+  "code_before_change": "raptor_libxml_resolveEntity(void* user_data, \n                            const xmlChar *publicId, const xmlChar *systemId) {\n  raptor_sax2* sax2 = (raptor_sax2*)user_data;\n  return libxml2_resolveEntity(sax2->xc, publicId, systemId);\n}",
+  "code_after_change": "raptor_libxml_resolveEntity(void* user_data, \n                            const xmlChar *publicId, const xmlChar *systemId)\n{\n  raptor_sax2* sax2 = (raptor_sax2*)user_data;\n  xmlParserCtxtPtr ctxt = sax2->xc;\n  const unsigned char *uri_string = NULL;\n  xmlParserInputPtr entity_input;\n  int load_entity = 0;\n\n  if(ctxt->input)\n    uri_string = RAPTOR_GOOD_CAST(const unsigned char *, ctxt->input->filename);\n\n  if(!uri_string)\n    uri_string = RAPTOR_GOOD_CAST(const unsigned char *, ctxt->directory);\n\n  load_entity = RAPTOR_OPTIONS_GET_NUMERIC(sax2, RAPTOR_OPTION_LOAD_EXTERNAL_ENTITIES);\n  if(load_entity)\n    load_entity = raptor_sax2_check_load_uri_string(sax2, uri_string);\n\n  if(load_entity) {\n    entity_input = xmlLoadExternalEntity(RAPTOR_GOOD_CAST(const char*, uri_string),\n                                         RAPTOR_GOOD_CAST(const char*, publicId),\n                                         ctxt);\n  } else {\n    RAPTOR_DEBUG4(\"Not loading entity URI %s by policy for publicId '%s' systemId '%s'\\n\", uri_string, publicId, systemId);\n  }\n  \n  return entity_input;\n}",
+  "function_modified_lines": {
+    "added": [
+      "                            const xmlChar *publicId, const xmlChar *systemId)",
+      "{",
+      "  xmlParserCtxtPtr ctxt = sax2->xc;",
+      "  const unsigned char *uri_string = NULL;",
+      "  xmlParserInputPtr entity_input;",
+      "  int load_entity = 0;",
+      "  if(ctxt->input)",
+      "    uri_string = RAPTOR_GOOD_CAST(const unsigned char *, ctxt->input->filename);",
+      "  if(!uri_string)",
+      "    uri_string = RAPTOR_GOOD_CAST(const unsigned char *, ctxt->directory);",
+      "  load_entity = RAPTOR_OPTIONS_GET_NUMERIC(sax2, RAPTOR_OPTION_LOAD_EXTERNAL_ENTITIES);",
+      "  if(load_entity)",
+      "    load_entity = raptor_sax2_check_load_uri_string(sax2, uri_string);",
+      "  if(load_entity) {",
+      "    entity_input = xmlLoadExternalEntity(RAPTOR_GOOD_CAST(const char*, uri_string),",
+      "                                         RAPTOR_GOOD_CAST(const char*, publicId),",
+      "                                         ctxt);",
+      "  } else {",
+      "    RAPTOR_DEBUG4(\"Not loading entity URI %s by policy for publicId '%s' systemId '%s'\\n\", uri_string, publicId, systemId);",
+      "  }",
+      "  return entity_input;"
+    ],
+    "deleted": [
+      "                            const xmlChar *publicId, const xmlChar *systemId) {",
+      "  return libxml2_resolveEntity(sax2->xc, publicId, systemId);"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Redland Raptor (aka libraptor) before 2.0.7, as used by OpenOffice 3.3 and 3.4 Beta, LibreOffice before 3.4.6 and 3.5.x before 3.5.1, and other products, allows user-assisted remote attackers to read arbitrary files via a crafted XML external entity (XXE) declaration and reference in an RDF document.",
+  "id": 6037
+},
+{
+  "cve_id": "CVE-2013-1915",
+  "code_before_change": "static const char *cmd_hash_engine(cmd_parms *cmd, void *_dcfg, const char *p1)\n{\n    directory_config *dcfg = (directory_config *)_dcfg;\n    if (dcfg == NULL) return NULL;\n\n    if (strcasecmp(p1, \"on\") == 0)  {\n        dcfg->hash_is_enabled = HASH_ENABLED;\n        dcfg->hash_enforcement = HASH_ENABLED;\n    }\n    else if (strcasecmp(p1, \"off\") == 0)    {\n        dcfg->hash_is_enabled = HASH_DISABLED;\n        dcfg->hash_enforcement = HASH_DISABLED;\n    }\n    else return apr_psprintf(cmd->pool, \"ModSecurity: Invalid value for SecRuleEngine: %s\", p1);\n\n    return NULL;\n}",
+  "code_after_change": "static const char *cmd_hash_engine(cmd_parms *cmd, void *_dcfg, const char *p1)\n{\n    directory_config *dcfg = (directory_config *)_dcfg;\n    if (dcfg == NULL) return NULL;\n\n    if (strcasecmp(p1, \"on\") == 0)  {\n        dcfg->hash_is_enabled = HASH_ENABLED;\n        dcfg->hash_enforcement = HASH_ENABLED;\n    }\n    else if (strcasecmp(p1, \"off\") == 0)    {\n        dcfg->hash_is_enabled = HASH_DISABLED;\n        dcfg->hash_enforcement = HASH_DISABLED;\n    }\n    else return apr_psprintf(cmd->pool, \"ModSecurity: Invalid value for SexHashEngine: %s\", p1);\n\n    return NULL;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    else return apr_psprintf(cmd->pool, \"ModSecurity: Invalid value for SexHashEngine: %s\", p1);"
+    ],
+    "deleted": [
+      "    else return apr_psprintf(cmd->pool, \"ModSecurity: Invalid value for SecRuleEngine: %s\", p1);"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "ModSecurity before 2.7.3 allows remote attackers to read arbitrary files, send HTTP requests to intranet servers, or cause a denial of service (CPU and memory consumption) via an XML external entity declaration in conjunction with an entity reference, aka an XML External Entity (XXE) vulnerability.",
+  "id": 6038
+},
+{
+  "cve_id": "CVE-2015-10082",
+  "code_before_change": "PLIST_API void plist_from_xml(const char *plist_xml, uint32_t length, plist_t * plist)\n{\n    xmlDocPtr plist_doc = xmlParseMemory(plist_xml, length);\n    xmlNodePtr root_node = xmlDocGetRootElement(plist_doc);\n\n    xml_to_node(root_node, plist);\n    xmlFreeDoc(plist_doc);\n}",
+  "code_after_change": "PLIST_API void plist_from_xml(const char *plist_xml, uint32_t length, plist_t * plist)\n{\n    /* CVE-2013-0339: disable external entity loading to prevent XXE vulnerability */\n    xmlSetExternalEntityLoader(plist_xml_external_entity_loader);\n\n    /* read XML from memory and disable network access for security reasons */\n    xmlDocPtr plist_doc = xmlReadMemory(plist_xml, length, \"plist_from_xml:memory\", NULL, XML_PARSE_NONET);\n    if (plist_doc) {\n        xmlNodePtr root_node = xmlDocGetRootElement(plist_doc);\n\n        xml_to_node(root_node, plist);\n        xmlFreeDoc(plist_doc);\n    }\n}",
+  "function_modified_lines": {
+    "added": [
+      "    /* CVE-2013-0339: disable external entity loading to prevent XXE vulnerability */",
+      "    xmlSetExternalEntityLoader(plist_xml_external_entity_loader);",
+      "    /* read XML from memory and disable network access for security reasons */",
+      "    xmlDocPtr plist_doc = xmlReadMemory(plist_xml, length, \"plist_from_xml:memory\", NULL, XML_PARSE_NONET);",
+      "    if (plist_doc) {",
+      "        xmlNodePtr root_node = xmlDocGetRootElement(plist_doc);",
+      "        xml_to_node(root_node, plist);",
+      "        xmlFreeDoc(plist_doc);",
+      "    }"
+    ],
+    "deleted": [
+      "    xmlDocPtr plist_doc = xmlParseMemory(plist_xml, length);",
+      "    xmlNodePtr root_node = xmlDocGetRootElement(plist_doc);",
+      "    xml_to_node(root_node, plist);",
+      "    xmlFreeDoc(plist_doc);"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "A vulnerability classified as problematic has been found in UIKit0 libplist 1.12. This affects the function plist_from_xml of the file src/xplist.c of the component XML Handler. The manipulation leads to xml external entity reference. The patch is named c086cb139af7c82845f6d565e636073ff4b37440. It is recommended to apply a patch to fix this issue. The associated identifier of this vulnerability is VDB-221499.",
+  "id": 6039
+},
+{
+  "cve_id": "CVE-2020-26247",
+  "code_before_change": "static VALUE read_memory(VALUE klass, VALUE content)\n{\n  xmlRelaxNGParserCtxtPtr ctx = xmlRelaxNGNewMemParserCtxt(\n      (const char *)StringValuePtr(content),\n      (int)RSTRING_LEN(content)\n  );\n  xmlRelaxNGPtr schema;\n  VALUE errors = rb_ary_new();\n  VALUE rb_schema;\n\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLRELAXNGSETPARSERSTRUCTUREDERRORS\n  xmlRelaxNGSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n  );\n#endif\n\n  schema = xmlRelaxNGParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlRelaxNGFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n\n  return rb_schema;\n}",
+  "code_after_change": "static VALUE read_memory(int argc, VALUE *argv, VALUE klass)\n{\n  VALUE content;\n  VALUE parse_options;\n  xmlRelaxNGParserCtxtPtr ctx;\n  xmlRelaxNGPtr schema;\n  VALUE errors;\n  VALUE rb_schema;\n  int scanned_args = 0;\n\n  scanned_args = rb_scan_args(argc, argv, \"11\", &content, &parse_options);\n  if (scanned_args == 1) {\n    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));\n  }\n\n  ctx = xmlRelaxNGNewMemParserCtxt((const char *)StringValuePtr(content), (int)RSTRING_LEN(content));\n\n  errors = rb_ary_new();\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLRELAXNGSETPARSERSTRUCTUREDERRORS\n  xmlRelaxNGSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n  );\n#endif\n\n  schema = xmlRelaxNGParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlRelaxNGFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n  rb_iv_set(rb_schema, \"@parse_options\", parse_options);\n\n  return rb_schema;\n}",
+  "function_modified_lines": {
+    "added": [
+      "static VALUE read_memory(int argc, VALUE *argv, VALUE klass)",
+      "  VALUE content;",
+      "  VALUE parse_options;",
+      "  xmlRelaxNGParserCtxtPtr ctx;",
+      "  VALUE errors;",
+      "  int scanned_args = 0;",
+      "  scanned_args = rb_scan_args(argc, argv, \"11\", &content, &parse_options);",
+      "  if (scanned_args == 1) {",
+      "    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));",
+      "  }",
+      "  ctx = xmlRelaxNGNewMemParserCtxt((const char *)StringValuePtr(content), (int)RSTRING_LEN(content));",
+      "  errors = rb_ary_new();",
+      "  rb_iv_set(rb_schema, \"@parse_options\", parse_options);"
+    ],
+    "deleted": [
+      "static VALUE read_memory(VALUE klass, VALUE content)",
+      "  xmlRelaxNGParserCtxtPtr ctx = xmlRelaxNGNewMemParserCtxt(",
+      "      (const char *)StringValuePtr(content),",
+      "      (int)RSTRING_LEN(content)",
+      "  );",
+      "  VALUE errors = rb_ary_new();"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Nokogiri is a Rubygem providing HTML, XML, SAX, and Reader parsers with XPath and CSS selector support. In Nokogiri before version 1.11.0.rc4 there is an XXE vulnerability. XML Schemas parsed by Nokogiri::XML::Schema are trusted by default, allowing external resources to be accessed over the network, potentially enabling XXE or SSRF attacks. This behavior is counter to the security policy followed by Nokogiri maintainers, which is to treat all input as untrusted by default whenever possible. This is fixed in Nokogiri version 1.11.0.rc4.",
+  "id": 6040
+},
+{
+  "cve_id": "CVE-2020-26247",
+  "code_before_change": "static VALUE from_document(VALUE klass, VALUE document)\n{\n  xmlDocPtr doc;\n  xmlRelaxNGParserCtxtPtr ctx;\n  xmlRelaxNGPtr schema;\n  VALUE errors;\n  VALUE rb_schema;\n\n  Data_Get_Struct(document, xmlDoc, doc);\n\n  /* In case someone passes us a node. ugh. */\n  doc = doc->doc;\n\n  ctx = xmlRelaxNGNewDocParserCtxt(doc);\n\n  errors = rb_ary_new();\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLRELAXNGSETPARSERSTRUCTUREDERRORS\n  xmlRelaxNGSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n  );\n#endif\n\n  schema = xmlRelaxNGParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlRelaxNGFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n\n  return rb_schema;\n}",
+  "code_after_change": "static VALUE from_document(int argc, VALUE *argv, VALUE klass)\n{\n  VALUE document;\n  VALUE parse_options;\n  xmlDocPtr doc;\n  xmlRelaxNGParserCtxtPtr ctx;\n  xmlRelaxNGPtr schema;\n  VALUE errors;\n  VALUE rb_schema;\n  int scanned_args = 0;\n\n  scanned_args = rb_scan_args(argc, argv, \"11\", &document, &parse_options);\n\n  Data_Get_Struct(document, xmlDoc, doc);\n  doc = doc->doc; /* In case someone passes us a node. ugh. */\n\n  if (scanned_args == 1) {\n    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));\n  }\n\n  ctx = xmlRelaxNGNewDocParserCtxt(doc);\n\n  errors = rb_ary_new();\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLRELAXNGSETPARSERSTRUCTUREDERRORS\n  xmlRelaxNGSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n  );\n#endif\n\n  schema = xmlRelaxNGParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlRelaxNGFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n  rb_iv_set(rb_schema, \"@parse_options\", parse_options);\n\n  return rb_schema;\n}",
+  "function_modified_lines": {
+    "added": [
+      "static VALUE from_document(int argc, VALUE *argv, VALUE klass)",
+      "  VALUE document;",
+      "  VALUE parse_options;",
+      "  int scanned_args = 0;",
+      "  scanned_args = rb_scan_args(argc, argv, \"11\", &document, &parse_options);",
+      "  doc = doc->doc; /* In case someone passes us a node. ugh. */",
+      "  if (scanned_args == 1) {",
+      "    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));",
+      "  }",
+      "  rb_iv_set(rb_schema, \"@parse_options\", parse_options);"
+    ],
+    "deleted": [
+      "static VALUE from_document(VALUE klass, VALUE document)",
+      "  /* In case someone passes us a node. ugh. */",
+      "  doc = doc->doc;"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Nokogiri is a Rubygem providing HTML, XML, SAX, and Reader parsers with XPath and CSS selector support. In Nokogiri before version 1.11.0.rc4 there is an XXE vulnerability. XML Schemas parsed by Nokogiri::XML::Schema are trusted by default, allowing external resources to be accessed over the network, potentially enabling XXE or SSRF attacks. This behavior is counter to the security policy followed by Nokogiri maintainers, which is to treat all input as untrusted by default whenever possible. This is fixed in Nokogiri version 1.11.0.rc4.",
+  "id": 6041
+},
+{
+  "cve_id": "CVE-2020-26247",
+  "code_before_change": "void init_xml_relax_ng()\n{\n  VALUE nokogiri = rb_define_module(\"Nokogiri\");\n  VALUE xml = rb_define_module_under(nokogiri, \"XML\");\n  VALUE klass = rb_define_class_under(xml, \"RelaxNG\", cNokogiriXmlSchema);\n\n  cNokogiriXmlRelaxNG = klass;\n\n  rb_define_singleton_method(klass, \"read_memory\", read_memory, 1);\n  rb_define_singleton_method(klass, \"from_document\", from_document, 1);\n  rb_define_private_method(klass, \"validate_document\", validate_document, 1);\n}",
+  "code_after_change": "void init_xml_relax_ng()\n{\n  VALUE nokogiri = rb_define_module(\"Nokogiri\");\n  VALUE xml = rb_define_module_under(nokogiri, \"XML\");\n  VALUE klass = rb_define_class_under(xml, \"RelaxNG\", cNokogiriXmlSchema);\n\n  cNokogiriXmlRelaxNG = klass;\n\n  rb_define_singleton_method(klass, \"read_memory\", read_memory, -1);\n  rb_define_singleton_method(klass, \"from_document\", from_document, -1);\n  rb_define_private_method(klass, \"validate_document\", validate_document, 1);\n}",
+  "function_modified_lines": {
+    "added": [
+      "  rb_define_singleton_method(klass, \"read_memory\", read_memory, -1);",
+      "  rb_define_singleton_method(klass, \"from_document\", from_document, -1);"
+    ],
+    "deleted": [
+      "  rb_define_singleton_method(klass, \"read_memory\", read_memory, 1);",
+      "  rb_define_singleton_method(klass, \"from_document\", from_document, 1);"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Nokogiri is a Rubygem providing HTML, XML, SAX, and Reader parsers with XPath and CSS selector support. In Nokogiri before version 1.11.0.rc4 there is an XXE vulnerability. XML Schemas parsed by Nokogiri::XML::Schema are trusted by default, allowing external resources to be accessed over the network, potentially enabling XXE or SSRF attacks. This behavior is counter to the security policy followed by Nokogiri maintainers, which is to treat all input as untrusted by default whenever possible. This is fixed in Nokogiri version 1.11.0.rc4.",
+  "id": 6042
+},
+{
+  "cve_id": "CVE-2020-26247",
+  "code_before_change": "static VALUE read_memory(VALUE klass, VALUE content)\n{\n  xmlSchemaPtr schema;\n  xmlSchemaParserCtxtPtr ctx = xmlSchemaNewMemParserCtxt(\n      (const char *)StringValuePtr(content),\n      (int)RSTRING_LEN(content)\n  );\n  VALUE rb_schema;\n  VALUE errors = rb_ary_new();\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLSCHEMASETPARSERSTRUCTUREDERRORS\n  xmlSchemaSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n  );\n#endif\n\n   schema = xmlSchemaParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlSchemaFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n\n  return rb_schema;\n}",
+  "code_after_change": "static VALUE read_memory(int argc, VALUE *argv, VALUE klass)\n{\n  VALUE content;\n  VALUE parse_options;\n  int parse_options_int;\n  xmlSchemaParserCtxtPtr ctx;\n  xmlSchemaPtr schema;\n  VALUE errors;\n  VALUE rb_schema;\n  int scanned_args = 0;\n\n  scanned_args = rb_scan_args(argc, argv, \"11\", &content, &parse_options);\n  if (scanned_args == 1) {\n    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));\n  }\n  parse_options_int = (int)NUM2INT(rb_funcall(parse_options, rb_intern(\"to_i\"), 0));\n\n  ctx = xmlSchemaNewMemParserCtxt((const char *)StringValuePtr(content), (int)RSTRING_LEN(content));\n\n  errors = rb_ary_new();\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLSCHEMASETPARSERSTRUCTUREDERRORS\n  xmlSchemaSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n    );\n#endif\n\n   schema = xmlSchemaParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlSchemaFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n  rb_iv_set(rb_schema, \"@parse_options\", parse_options);\n\n  return rb_schema;\n}",
+  "function_modified_lines": {
+    "added": [
+      "static VALUE read_memory(int argc, VALUE *argv, VALUE klass)",
+      "  VALUE content;",
+      "  VALUE parse_options;",
+      "  int parse_options_int;",
+      "  xmlSchemaParserCtxtPtr ctx;",
+      "  VALUE errors;",
+      "  int scanned_args = 0;",
+      "  scanned_args = rb_scan_args(argc, argv, \"11\", &content, &parse_options);",
+      "  if (scanned_args == 1) {",
+      "    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));",
+      "  }",
+      "  parse_options_int = (int)NUM2INT(rb_funcall(parse_options, rb_intern(\"to_i\"), 0));",
+      "  ctx = xmlSchemaNewMemParserCtxt((const char *)StringValuePtr(content), (int)RSTRING_LEN(content));",
+      "  errors = rb_ary_new();",
+      "    );",
+      "  rb_iv_set(rb_schema, \"@parse_options\", parse_options);"
+    ],
+    "deleted": [
+      "static VALUE read_memory(VALUE klass, VALUE content)",
+      "  xmlSchemaParserCtxtPtr ctx = xmlSchemaNewMemParserCtxt(",
+      "      (const char *)StringValuePtr(content),",
+      "      (int)RSTRING_LEN(content)",
+      "  );",
+      "  VALUE errors = rb_ary_new();",
+      "  );"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Nokogiri is a Rubygem providing HTML, XML, SAX, and Reader parsers with XPath and CSS selector support. In Nokogiri before version 1.11.0.rc4 there is an XXE vulnerability. XML Schemas parsed by Nokogiri::XML::Schema are trusted by default, allowing external resources to be accessed over the network, potentially enabling XXE or SSRF attacks. This behavior is counter to the security policy followed by Nokogiri maintainers, which is to treat all input as untrusted by default whenever possible. This is fixed in Nokogiri version 1.11.0.rc4.",
+  "id": 6043
+},
+{
+  "cve_id": "CVE-2020-26247",
+  "code_before_change": "static VALUE from_document(VALUE klass, VALUE document)\n{\n  xmlDocPtr doc;\n  xmlSchemaParserCtxtPtr ctx;\n  xmlSchemaPtr schema;\n  VALUE errors;\n  VALUE rb_schema;\n\n  Data_Get_Struct(document, xmlDoc, doc);\n\n  /* In case someone passes us a node. ugh. */\n  doc = doc->doc;\n\n  if (has_blank_nodes_p(DOC_NODE_CACHE(doc))) {\n    rb_raise(rb_eArgError, \"Creating a schema from a document that has blank nodes exposed to Ruby is dangerous\");\n  }\n\n  ctx = xmlSchemaNewDocParserCtxt(doc);\n\n  errors = rb_ary_new();\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLSCHEMASETPARSERSTRUCTUREDERRORS\n  xmlSchemaSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n  );\n#endif\n\n  schema = xmlSchemaParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlSchemaFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n\n  return rb_schema;\n\n  return Qnil;\n}",
+  "code_after_change": "static VALUE from_document(int argc, VALUE *argv, VALUE klass)\n{\n  VALUE document;\n  VALUE parse_options;\n  int parse_options_int;\n  xmlDocPtr doc;\n  xmlSchemaParserCtxtPtr ctx;\n  xmlSchemaPtr schema;\n  VALUE errors;\n  VALUE rb_schema;\n  int scanned_args = 0;\n\n  scanned_args = rb_scan_args(argc, argv, \"11\", &document, &parse_options);\n\n  Data_Get_Struct(document, xmlDoc, doc);\n  doc = doc->doc; /* In case someone passes us a node. ugh. */\n\n  if (scanned_args == 1) {\n    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));\n  }\n  parse_options_int = (int)NUM2INT(rb_funcall(parse_options, rb_intern(\"to_i\"), 0));\n\n  if (has_blank_nodes_p(DOC_NODE_CACHE(doc))) {\n    rb_raise(rb_eArgError, \"Creating a schema from a document that has blank nodes exposed to Ruby is dangerous\");\n  }\n\n  ctx = xmlSchemaNewDocParserCtxt(doc);\n\n  errors = rb_ary_new();\n  xmlSetStructuredErrorFunc((void *)errors, Nokogiri_error_array_pusher);\n\n#ifdef HAVE_XMLSCHEMASETPARSERSTRUCTUREDERRORS\n  xmlSchemaSetParserStructuredErrors(\n    ctx,\n    Nokogiri_error_array_pusher,\n    (void *)errors\n  );\n#endif\n\n  schema = xmlSchemaParse(ctx);\n\n  xmlSetStructuredErrorFunc(NULL, NULL);\n  xmlSchemaFreeParserCtxt(ctx);\n\n  if(NULL == schema) {\n    xmlErrorPtr error = xmlGetLastError();\n    if(error)\n      Nokogiri_error_raise(NULL, error);\n    else\n      rb_raise(rb_eRuntimeError, \"Could not parse document\");\n\n    return Qnil;\n  }\n\n  rb_schema = Data_Wrap_Struct(klass, 0, dealloc, schema);\n  rb_iv_set(rb_schema, \"@errors\", errors);\n  rb_iv_set(rb_schema, \"@parse_options\", parse_options);\n\n  return rb_schema;\n\n  return Qnil;\n}",
+  "function_modified_lines": {
+    "added": [
+      "static VALUE from_document(int argc, VALUE *argv, VALUE klass)",
+      "  VALUE document;",
+      "  VALUE parse_options;",
+      "  int parse_options_int;",
+      "  int scanned_args = 0;",
+      "  scanned_args = rb_scan_args(argc, argv, \"11\", &document, &parse_options);",
+      "  doc = doc->doc; /* In case someone passes us a node. ugh. */",
+      "  if (scanned_args == 1) {",
+      "    parse_options = rb_const_get(rb_const_get(mNokogiriXml, rb_intern(\"ParseOptions\")), rb_intern(\"DEFAULT_SCHEMA\"));",
+      "  }",
+      "  parse_options_int = (int)NUM2INT(rb_funcall(parse_options, rb_intern(\"to_i\"), 0));",
+      "  rb_iv_set(rb_schema, \"@parse_options\", parse_options);"
+    ],
+    "deleted": [
+      "static VALUE from_document(VALUE klass, VALUE document)",
+      "  /* In case someone passes us a node. ugh. */",
+      "  doc = doc->doc;"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Nokogiri is a Rubygem providing HTML, XML, SAX, and Reader parsers with XPath and CSS selector support. In Nokogiri before version 1.11.0.rc4 there is an XXE vulnerability. XML Schemas parsed by Nokogiri::XML::Schema are trusted by default, allowing external resources to be accessed over the network, potentially enabling XXE or SSRF attacks. This behavior is counter to the security policy followed by Nokogiri maintainers, which is to treat all input as untrusted by default whenever possible. This is fixed in Nokogiri version 1.11.0.rc4.",
+  "id": 6044
+},
+{
+  "cve_id": "CVE-2020-26247",
+  "code_before_change": "void init_xml_schema()\n{\n  VALUE nokogiri = rb_define_module(\"Nokogiri\");\n  VALUE xml = rb_define_module_under(nokogiri, \"XML\");\n  VALUE klass = rb_define_class_under(xml, \"Schema\", rb_cObject);\n\n  cNokogiriXmlSchema = klass;\n\n  rb_define_singleton_method(klass, \"read_memory\", read_memory, 1);\n  rb_define_singleton_method(klass, \"from_document\", from_document, 1);\n\n  rb_define_private_method(klass, \"validate_document\", validate_document, 1);\n  rb_define_private_method(klass, \"validate_file\",     validate_file, 1);\n}",
+  "code_after_change": "void init_xml_schema()\n{\n  VALUE nokogiri = rb_define_module(\"Nokogiri\");\n  VALUE xml = rb_define_module_under(nokogiri, \"XML\");\n  VALUE klass = rb_define_class_under(xml, \"Schema\", rb_cObject);\n\n  cNokogiriXmlSchema = klass;\n\n  rb_define_singleton_method(klass, \"read_memory\", read_memory, -1);\n  rb_define_singleton_method(klass, \"from_document\", from_document, -1);\n\n  rb_define_private_method(klass, \"validate_document\", validate_document, 1);\n  rb_define_private_method(klass, \"validate_file\",     validate_file, 1);\n}",
+  "function_modified_lines": {
+    "added": [
+      "  rb_define_singleton_method(klass, \"read_memory\", read_memory, -1);",
+      "  rb_define_singleton_method(klass, \"from_document\", from_document, -1);"
+    ],
+    "deleted": [
+      "  rb_define_singleton_method(klass, \"read_memory\", read_memory, 1);",
+      "  rb_define_singleton_method(klass, \"from_document\", from_document, 1);"
+    ]
+  },
+  "cwe": [
+    "CWE-611"
+  ],
+  "cve_description": "Nokogiri is a Rubygem providing HTML, XML, SAX, and Reader parsers with XPath and CSS selector support. In Nokogiri before version 1.11.0.rc4 there is an XXE vulnerability. XML Schemas parsed by Nokogiri::XML::Schema are trusted by default, allowing external resources to be accessed over the network, potentially enabling XXE or SSRF attacks. This behavior is counter to the security policy followed by Nokogiri maintainers, which is to treat all input as untrusted by default whenever possible. This is fixed in Nokogiri version 1.11.0.rc4.",
+  "id": 6045
+}
+]

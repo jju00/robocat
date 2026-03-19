@@ -1,0 +1,22 @@
+[
+{
+  "cve_id": "CVE-2022-29181",
+  "code_before_change": "parse_memory(VALUE klass, VALUE data)\n{\n  xmlParserCtxtPtr ctxt;\n\n  if (NIL_P(data)) {\n    rb_raise(rb_eArgError, \"data cannot be nil\");\n  }\n  if (!(int)RSTRING_LEN(data)) {\n    rb_raise(rb_eRuntimeError, \"data cannot be empty\");\n  }\n\n  ctxt = xmlCreateMemoryParserCtxt(StringValuePtr(data),\n                                   (int)RSTRING_LEN(data));\n  if (ctxt->sax) {\n    xmlFree(ctxt->sax);\n    ctxt->sax = NULL;\n  }\n\n  return Data_Wrap_Struct(klass, NULL, deallocate, ctxt);\n}",
+  "code_after_change": "parse_memory(VALUE klass, VALUE data)\n{\n  xmlParserCtxtPtr ctxt;\n\n  Check_Type(data, T_STRING);\n\n  if (!(int)RSTRING_LEN(data)) {\n    rb_raise(rb_eRuntimeError, \"data cannot be empty\");\n  }\n\n  ctxt = xmlCreateMemoryParserCtxt(StringValuePtr(data),\n                                   (int)RSTRING_LEN(data));\n  if (ctxt->sax) {\n    xmlFree(ctxt->sax);\n    ctxt->sax = NULL;\n  }\n\n  return Data_Wrap_Struct(klass, NULL, deallocate, ctxt);\n}",
+  "function_modified_lines": {
+    "added": [
+      "  Check_Type(data, T_STRING);"
+    ],
+    "deleted": [
+      "  if (NIL_P(data)) {",
+      "    rb_raise(rb_eArgError, \"data cannot be nil\");",
+      "  }"
+    ]
+  },
+  "cwe": [
+    "CWE-241"
+  ],
+  "cve_description": "Nokogiri is an open source XML and HTML library for Ruby. Nokogiri prior to version 1.13.6 does not type-check all inputs into the XML and HTML4 SAX parsers, allowing specially crafted untrusted inputs to cause illegal memory access errors (segfault) or reads from unrelated memory. Version 1.13.6 contains a patch for this issue. As a workaround, ensure the untrusted input is a `String` by calling `#to_s` or equivalent.",
+  "id": 3910
+}
+]
