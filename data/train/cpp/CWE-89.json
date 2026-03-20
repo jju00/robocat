@@ -1,0 +1,20 @@
+[
+{
+  "cve_id": "CVE-2019-10664",
+  "code_before_change": "\t\tvoid CWebServer::GetFloorplanImage(WebEmSession & session, const request& req, reply & rep)\n\t\t{\n\t\t\tstd::string idx = request::findValue(&req, \"idx\");\n\t\t\tif (idx == \"\") {\n\t\t\t\treturn;\n\t\t\t}\n\t\t\tstd::vector<std::vector<std::string> > result;\n\t\t\tresult = m_sql.safe_queryBlob(\"SELECT Image FROM Floorplans WHERE ID=%s\", idx.c_str());\n\t\t\tif (result.empty())\n\t\t\t\treturn;\n\t\t\treply::set_content(&rep, result[0][0].begin(), result[0][0].end());\n\t\t\tstd::string oname = \"floorplan\";\n\t\t\tif (result[0][0].size() > 10)\n\t\t\t{\n\t\t\t\tif (result[0][0][0] == 'P')\n\t\t\t\t\toname += \".png\";\n\t\t\t\telse if (result[0][0][0] == -1)\n\t\t\t\t\toname += \".jpg\";\n\t\t\t\telse if (result[0][0][0] == 'B')\n\t\t\t\t\toname += \".bmp\";\n\t\t\t\telse if (result[0][0][0] == 'G')\n\t\t\t\t\toname += \".gif\";\n\t\t\t}\n\t\t\treply::add_header_attachment(&rep, oname);\n\t\t}",
+  "code_after_change": "\t\tvoid CWebServer::GetFloorplanImage(WebEmSession & session, const request& req, reply & rep)\n\t\t{\n\t\t\tstd::string idx = request::findValue(&req, \"idx\");\n\t\t\tif (idx == \"\") {\n\t\t\t\treturn;\n\t\t\t}\n\t\t\tstd::vector<std::vector<std::string> > result;\n\t\t\tresult = m_sql.safe_queryBlob(\"SELECT Image FROM Floorplans WHERE ID=%d\", atol(idx.c_str()));\n\t\t\tif (result.empty())\n\t\t\t\treturn;\n\t\t\treply::set_content(&rep, result[0][0].begin(), result[0][0].end());\n\t\t\tstd::string oname = \"floorplan\";\n\t\t\tif (result[0][0].size() > 10)\n\t\t\t{\n\t\t\t\tif (result[0][0][0] == 'P')\n\t\t\t\t\toname += \".png\";\n\t\t\t\telse if (result[0][0][0] == -1)\n\t\t\t\t\toname += \".jpg\";\n\t\t\t\telse if (result[0][0][0] == 'B')\n\t\t\t\t\toname += \".bmp\";\n\t\t\t\telse if (result[0][0][0] == 'G')\n\t\t\t\t\toname += \".gif\";\n\t\t\t}\n\t\t\treply::add_header_attachment(&rep, oname);\n\t\t}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\tresult = m_sql.safe_queryBlob(\"SELECT Image FROM Floorplans WHERE ID=%d\", atol(idx.c_str()));"
+    ],
+    "deleted": [
+      "\t\t\tresult = m_sql.safe_queryBlob(\"SELECT Image FROM Floorplans WHERE ID=%s\", idx.c_str());"
+    ]
+  },
+  "cwe": [
+    "CWE-89"
+  ],
+  "cve_description": "Domoticz before 4.10578 allows SQL Injection via the idx parameter in CWebServer::GetFloorplanImage in WebServer.cpp.",
+  "id": 2459
+}
+]

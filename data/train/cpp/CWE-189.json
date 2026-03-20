@@ -1,0 +1,164 @@
+[
+{
+  "cve_id": "CVE-2012-1584",
+  "code_before_change": "ByteVector ByteVector::mid(uint index, uint length) const\n{\n  ByteVector v;\n\n  if(index > size())\n    return v;\n\n  ConstIterator endIt;\n\n  if(length < 0xffffffff && length + index < size())\n    endIt = d->data.begin() + index + length;\n  else\n    endIt = d->data.end();\n\n  v.d->data.insert(v.d->data.begin(), ConstIterator(d->data.begin() + index), endIt);\n  v.d->size = v.d->data.size();\n\n  return v;\n}",
+  "code_after_change": "ByteVector ByteVector::mid(uint index, uint length) const\n{\n  ByteVector v;\n\n  if(index > size())\n    return v;\n\n  ConstIterator endIt;\n\n  if(length < size() - index)\n    endIt = d->data.begin() + index + length;\n  else\n    endIt = d->data.end();\n\n  v.d->data.insert(v.d->data.begin(), ConstIterator(d->data.begin() + index), endIt);\n  v.d->size = v.d->data.size();\n\n  return v;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  if(length < size() - index)"
+    ],
+    "deleted": [
+      "  if(length < 0xffffffff && length + index < size())"
+    ]
+  },
+  "cwe": [
+    "CWE-189"
+  ],
+  "cve_description": "Integer overflow in the mid function in toolkit/tbytevector.cpp in TagLib 1.7 and earlier allows context-dependent attackers to cause a denial of service (application crash) via a crafted file header field in a media file, which triggers a large memory allocation.",
+  "id": 665
+},
+{
+  "cve_id": "CVE-2014-6228",
+  "code_before_change": "String string_chunk_split(const char *src, int srclen, const char *end,\n                          int endlen, int chunklen) {\n  int chunks = srclen / chunklen; // complete chunks!\n  int restlen = srclen - chunks * chunklen; /* srclen % chunklen */\n\n  int out_len = (chunks + 1) * endlen + srclen;\n  String ret(out_len, ReserveString);\n  char *dest = ret.bufferSlice().ptr;\n\n  const char *p; char *q;\n  const char *pMax = src + srclen - chunklen + 1;\n  for (p = src, q = dest; p < pMax; ) {\n    memcpy(q, p, chunklen);\n    q += chunklen;\n    memcpy(q, end, endlen);\n    q += endlen;\n    p += chunklen;\n  }\n\n  if (restlen) {\n    memcpy(q, p, restlen);\n    q += restlen;\n    memcpy(q, end, endlen);\n    q += endlen;\n  }\n\n  ret.setSize(q - dest);\n  return ret;\n}",
+  "code_after_change": "String string_chunk_split(const char *src, int srclen, const char *end,\n                          int endlen, int chunklen) {\n  int chunks = srclen / chunklen; // complete chunks!\n  int restlen = srclen - chunks * chunklen; /* srclen % chunklen */\n\n  String ret(\n    safe_address(\n      chunks + 1,\n      endlen,\n      srclen\n    ),\n    ReserveString\n  );\n  char *dest = ret.bufferSlice().ptr;\n\n  const char *p; char *q;\n  const char *pMax = src + srclen - chunklen + 1;\n  for (p = src, q = dest; p < pMax; ) {\n    memcpy(q, p, chunklen);\n    q += chunklen;\n    memcpy(q, end, endlen);\n    q += endlen;\n    p += chunklen;\n  }\n\n  if (restlen) {\n    memcpy(q, p, restlen);\n    q += restlen;\n    memcpy(q, end, endlen);\n    q += endlen;\n  }\n\n  ret.setSize(q - dest);\n  return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  String ret(",
+      "    safe_address(",
+      "      chunks + 1,",
+      "      endlen,",
+      "      srclen",
+      "    ),",
+      "    ReserveString",
+      "  );"
+    ],
+    "deleted": [
+      "  int out_len = (chunks + 1) * endlen + srclen;",
+      "  String ret(out_len, ReserveString);"
+    ]
+  },
+  "cwe": [
+    "CWE-189"
+  ],
+  "cve_description": "Integer overflow in the string_chunk_split function in hphp/runtime/base/zend-string.cpp in Facebook HipHop Virtual Machine (HHVM) before 3.3.0 allows remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via crafted arguments to the chunk_split function.",
+  "id": 666
+},
+{
+  "cve_id": "CVE-2015-3885",
+  "code_before_change": "int CLASS ljpeg_start (struct jhead *jh, int info_only)\n{\n  int c, tag, len;\n  uchar data[0x10000];\n  const uchar *dp;\n\n  memset (jh, 0, sizeof *jh);\n  jh->restart = INT_MAX;\n  fread (data, 2, 1, ifp);\n  if (data[1] != 0xd8) return 0;\n  do {\n    fread (data, 2, 2, ifp);\n    tag =  data[0] << 8 | data[1];\n    len = (data[2] << 8 | data[3]) - 2;\n    if (tag <= 0xff00) return 0;\n    fread (data, 1, len, ifp);\n    switch (tag) {\n      case 0xffc3:\n\tjh->sraw = ((data[7] >> 4) * (data[7] & 15) - 1) & 3;\n      case 0xffc0:\n\tjh->bits = data[0];\n\tjh->high = data[1] << 8 | data[2];\n\tjh->wide = data[3] << 8 | data[4];\n\tjh->clrs = data[5] + jh->sraw;\n\tif (len == 9 && !dng_version) getc(ifp);\n\tbreak;\n      case 0xffc4:\n\tif (info_only) break;\n\tfor (dp = data; dp < data+len && (c = *dp++) < 4; )\n\t  jh->free[c] = jh->huff[c] = make_decoder_ref (&dp);\n\tbreak;\n      case 0xffda:\n\tjh->psv = data[1+data[0]*2];\n\tjh->bits -= data[3+data[0]*2] & 15;\n\tbreak;\n      case 0xffdd:\n\tjh->restart = data[0] << 8 | data[1];\n    }\n  } while (tag != 0xffda);\n  if (info_only) return 1;\n  FORC(5) if (!jh->huff[c+1]) jh->huff[c+1] = jh->huff[c];\n  if (jh->sraw) {\n    FORC(4)        jh->huff[2+c] = jh->huff[1];\n    FORC(jh->sraw) jh->huff[1+c] = jh->huff[0];\n  }\n  jh->row = (ushort *) calloc (jh->wide*jh->clrs, 4);\n  merror (jh->row, \"ljpeg_start()\");\n  return zero_after_ff = 1;\n}",
+  "code_after_change": "int CLASS ljpeg_start (struct jhead *jh, int info_only)\n{\n  int c, tag;\n  ushort len;\n  uchar data[0x10000];\n  const uchar *dp;\n\n  memset (jh, 0, sizeof *jh);\n  jh->restart = INT_MAX;\n  fread (data, 2, 1, ifp);\n  if (data[1] != 0xd8) return 0;\n  do {\n    fread (data, 2, 2, ifp);\n    tag =  data[0] << 8 | data[1];\n    len = (data[2] << 8 | data[3]) - 2;\n    if (tag <= 0xff00) return 0;\n    fread (data, 1, len, ifp);\n    switch (tag) {\n      case 0xffc3:\n\tjh->sraw = ((data[7] >> 4) * (data[7] & 15) - 1) & 3;\n      case 0xffc0:\n\tjh->bits = data[0];\n\tjh->high = data[1] << 8 | data[2];\n\tjh->wide = data[3] << 8 | data[4];\n\tjh->clrs = data[5] + jh->sraw;\n\tif (len == 9 && !dng_version) getc(ifp);\n\tbreak;\n      case 0xffc4:\n\tif (info_only) break;\n\tfor (dp = data; dp < data+len && (c = *dp++) < 4; )\n\t  jh->free[c] = jh->huff[c] = make_decoder_ref (&dp);\n\tbreak;\n      case 0xffda:\n\tjh->psv = data[1+data[0]*2];\n\tjh->bits -= data[3+data[0]*2] & 15;\n\tbreak;\n      case 0xffdd:\n\tjh->restart = data[0] << 8 | data[1];\n    }\n  } while (tag != 0xffda);\n  if (info_only) return 1;\n  FORC(5) if (!jh->huff[c+1]) jh->huff[c+1] = jh->huff[c];\n  if (jh->sraw) {\n    FORC(4)        jh->huff[2+c] = jh->huff[1];\n    FORC(jh->sraw) jh->huff[1+c] = jh->huff[0];\n  }\n  jh->row = (ushort *) calloc (jh->wide*jh->clrs, 4);\n  merror (jh->row, \"ljpeg_start()\");\n  return zero_after_ff = 1;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  int c, tag;",
+      "  ushort len;"
+    ],
+    "deleted": [
+      "  int c, tag, len;"
+    ]
+  },
+  "cwe": [
+    "CWE-189"
+  ],
+  "cve_description": "Integer overflow in the ljpeg_start function in dcraw 7.00 and earlier allows remote attackers to cause a denial of service (crash) via a crafted image, which triggers a buffer overflow, related to the len variable.",
+  "id": 667
+},
+{
+  "cve_id": "CVE-2015-6781",
+  "code_before_change": "FontData::FontData(FontData* data, int32_t offset) {\n  Init(data->array_);\n  Bound(data->bound_offset_ + offset,\n        (data->bound_length_ == GROWABLE_SIZE)\n            ? GROWABLE_SIZE : data->bound_length_ - offset);\n}",
+  "code_after_change": "FontData::FontData(FontData* data, int32_t offset) {\n  Init(data->array_);\n  Bound(data->bound_offset_ + offset,\n        (data->bound_length_ == GROWABLE_SIZE)\n        ? GROWABLE_SIZE : data->bound_length_ - offset);\n}",
+  "function_modified_lines": {
+    "added": [
+      "        ? GROWABLE_SIZE : data->bound_length_ - offset);"
+    ],
+    "deleted": [
+      "            ? GROWABLE_SIZE : data->bound_length_ - offset);"
+    ]
+  },
+  "cwe": [
+    "CWE-189"
+  ],
+  "cve_description": "Integer overflow in the FontData::Bound function in data/font_data.cc in Google sfntly, as used in Google Chrome before 47.0.2526.73, allows remote attackers to cause a denial of service or possibly have unspecified other impact via a crafted offset or length value within font data in an SFNT container.",
+  "id": 668
+},
+{
+  "cve_id": "CVE-2015-6781",
+  "code_before_change": "bool FontData::Bound(int32_t offset) {\nif (offset > Size() || offset < 0)\n    return false;\n\n  bound_offset_ += offset;\n  return true;\n}",
+  "code_after_change": "void FontData::Bound(int32_t offset, int32_t length) {\n  // Inputs should not be negative.\n  CHECK(offset >= 0);\n  CHECK(length >= 0);\n\n  // Check to make sure |bound_offset_| will not overflow.\n  CHECK(bound_offset_ <= std::numeric_limits<int32_t>::max() - offset);\n  const int32_t new_offset = bound_offset_ + offset;\n\n  if (length == GROWABLE_SIZE) {\n    // When |length| has the special value of GROWABLE_SIZE, it means the size\n    // should not have any artificial limits, thus it is just the underlying\n    // |array_|'s size. Just make sure |new_offset| is still within bounds.\n    CHECK(new_offset <= array_->Size());\n  } else {\n    // When |length| has any other value, |new_offset| + |length| points to the\n    // end of the array. Make sure that is within bounds, but use subtraction to\n    // avoid an integer overflow.\n    CHECK(new_offset <= array_->Size() - length);\n  }\n\n  bound_offset_ = new_offset;\n  bound_length_ = length;\n}",
+  "function_modified_lines": {
+    "added": [
+      "void FontData::Bound(int32_t offset, int32_t length) {",
+      "  // Inputs should not be negative.",
+      "  CHECK(offset >= 0);",
+      "  CHECK(length >= 0);",
+      "  // Check to make sure |bound_offset_| will not overflow.",
+      "  CHECK(bound_offset_ <= std::numeric_limits<int32_t>::max() - offset);",
+      "  const int32_t new_offset = bound_offset_ + offset;",
+      "  if (length == GROWABLE_SIZE) {",
+      "    // When |length| has the special value of GROWABLE_SIZE, it means the size",
+      "    // should not have any artificial limits, thus it is just the underlying",
+      "    // |array_|'s size. Just make sure |new_offset| is still within bounds.",
+      "    CHECK(new_offset <= array_->Size());",
+      "  } else {",
+      "    // When |length| has any other value, |new_offset| + |length| points to the",
+      "    // end of the array. Make sure that is within bounds, but use subtraction to",
+      "    // avoid an integer overflow.",
+      "    CHECK(new_offset <= array_->Size() - length);",
+      "  }",
+      "  bound_offset_ = new_offset;"
+    ],
+    "deleted": [
+      "bool FontData::Bound(int32_t offset) {",
+      "if (offset > Size() || offset < 0)",
+      "    return false;",
+      "  bound_offset_ += offset;",
+      "  return true;"
+    ]
+  },
+  "cwe": [
+    "CWE-189"
+  ],
+  "cve_description": "Integer overflow in the FontData::Bound function in data/font_data.cc in Google sfntly, as used in Google Chrome before 47.0.2526.73, allows remote attackers to cause a denial of service or possibly have unspecified other impact via a crafted offset or length value within font data in an SFNT container.",
+  "id": 669
+},
+{
+  "cve_id": "CVE-2015-6781",
+  "code_before_change": "bool FontData::Bound(int32_t offset, int32_t length) {\n  if (offset + length > Size() || offset < 0 || length < 0)\n    return false;\n\n  bound_offset_ += offset;\n  bound_length_ = length;\n  return true;\n}",
+  "code_after_change": "void FontData::Bound(int32_t offset, int32_t length) {\n  // Inputs should not be negative.\n  CHECK(offset >= 0);\n  CHECK(length >= 0);\n\n  // Check to make sure |bound_offset_| will not overflow.\n  CHECK(bound_offset_ <= std::numeric_limits<int32_t>::max() - offset);\n  const int32_t new_offset = bound_offset_ + offset;\n\n  if (length == GROWABLE_SIZE) {\n    // When |length| has the special value of GROWABLE_SIZE, it means the size\n    // should not have any artificial limits, thus it is just the underlying\n    // |array_|'s size. Just make sure |new_offset| is still within bounds.\n    CHECK(new_offset <= array_->Size());\n  } else {\n    // When |length| has any other value, |new_offset| + |length| points to the\n    // end of the array. Make sure that is within bounds, but use subtraction to\n    // avoid an integer overflow.\n    CHECK(new_offset <= array_->Size() - length);\n  }\n\n  bound_offset_ = new_offset;\n  bound_length_ = length;\n}",
+  "function_modified_lines": {
+    "added": [
+      "void FontData::Bound(int32_t offset, int32_t length) {",
+      "  // Inputs should not be negative.",
+      "  CHECK(offset >= 0);",
+      "  CHECK(length >= 0);",
+      "  // Check to make sure |bound_offset_| will not overflow.",
+      "  CHECK(bound_offset_ <= std::numeric_limits<int32_t>::max() - offset);",
+      "  const int32_t new_offset = bound_offset_ + offset;",
+      "  if (length == GROWABLE_SIZE) {",
+      "    // When |length| has the special value of GROWABLE_SIZE, it means the size",
+      "    // should not have any artificial limits, thus it is just the underlying",
+      "    // |array_|'s size. Just make sure |new_offset| is still within bounds.",
+      "    CHECK(new_offset <= array_->Size());",
+      "  } else {",
+      "    // When |length| has any other value, |new_offset| + |length| points to the",
+      "    // end of the array. Make sure that is within bounds, but use subtraction to",
+      "    // avoid an integer overflow.",
+      "    CHECK(new_offset <= array_->Size() - length);",
+      "  }",
+      "  bound_offset_ = new_offset;"
+    ],
+    "deleted": [
+      "bool FontData::Bound(int32_t offset, int32_t length) {",
+      "  if (offset + length > Size() || offset < 0 || length < 0)",
+      "    return false;",
+      "  bound_offset_ += offset;",
+      "  return true;",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-189"
+  ],
+  "cve_description": "Integer overflow in the FontData::Bound function in data/font_data.cc in Google sfntly, as used in Google Chrome before 47.0.2526.73, allows remote attackers to cause a denial of service or possibly have unspecified other impact via a crafted offset or length value within font data in an SFNT container.",
+  "id": 670
+}
+]

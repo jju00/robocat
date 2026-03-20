@@ -1,0 +1,24 @@
+[
+{
+  "cve_id": "CVE-2012-1909",
+  "code_before_change": "bool CTransaction::DisconnectInputs(CTxDB& txdb)\n{\n    // Relinquish previous transactions' spent pointers\n    if (!IsCoinBase())\n    {\n        BOOST_FOREACH(const CTxIn& txin, vin)\n        {\n            COutPoint prevout = txin.prevout;\n\n            // Get prev txindex from disk\n            CTxIndex txindex;\n            if (!txdb.ReadTxIndex(prevout.hash, txindex))\n                return error(\"DisconnectInputs() : ReadTxIndex failed\");\n\n            if (prevout.n >= txindex.vSpent.size())\n                return error(\"DisconnectInputs() : prevout.n out of range\");\n\n            // Mark outpoint as not spent\n            txindex.vSpent[prevout.n].SetNull();\n\n            // Write back\n            if (!txdb.UpdateTxIndex(prevout.hash, txindex))\n                return error(\"DisconnectInputs() : UpdateTxIndex failed\");\n        }\n    }\n\n    // Remove transaction from index\n    if (!txdb.EraseTxIndex(*this))\n        return error(\"DisconnectInputs() : EraseTxPos failed\");\n\n    return true;\n}",
+  "code_after_change": "bool CTransaction::DisconnectInputs(CTxDB& txdb)\n{\n    // Relinquish previous transactions' spent pointers\n    if (!IsCoinBase())\n    {\n        BOOST_FOREACH(const CTxIn& txin, vin)\n        {\n            COutPoint prevout = txin.prevout;\n\n            // Get prev txindex from disk\n            CTxIndex txindex;\n            if (!txdb.ReadTxIndex(prevout.hash, txindex))\n                return error(\"DisconnectInputs() : ReadTxIndex failed\");\n\n            if (prevout.n >= txindex.vSpent.size())\n                return error(\"DisconnectInputs() : prevout.n out of range\");\n\n            // Mark outpoint as not spent\n            txindex.vSpent[prevout.n].SetNull();\n\n            // Write back\n            if (!txdb.UpdateTxIndex(prevout.hash, txindex))\n                return error(\"DisconnectInputs() : UpdateTxIndex failed\");\n        }\n    }\n\n    // Remove transaction from index\n    // This can fail if a duplicate of this transaction was in a chain that got\n    // reorganized away. This is only possible if this transaction was completely\n    // spent, so erasing it would be a no-op anway.\n    txdb.EraseTxIndex(*this);\n\n    return true;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    // This can fail if a duplicate of this transaction was in a chain that got",
+      "    // reorganized away. This is only possible if this transaction was completely",
+      "    // spent, so erasing it would be a no-op anway.",
+      "    txdb.EraseTxIndex(*this);"
+    ],
+    "deleted": [
+      "    if (!txdb.EraseTxIndex(*this))",
+      "        return error(\"DisconnectInputs() : EraseTxPos failed\");"
+    ]
+  },
+  "cwe": [
+    "CWE-16"
+  ],
+  "cve_description": "The Bitcoin protocol, as used in bitcoind before 0.4.4, wxBitcoin, Bitcoin-Qt, and other programs, does not properly handle multiple transactions with the same identifier, which allows remote attackers to cause a denial of service (unspendable transaction) by leveraging the ability to create a duplicate coinbase transaction.",
+  "id": 664
+}
+]

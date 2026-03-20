@@ -1,0 +1,376 @@
+[
+{
+  "cve_id": "CVE-2019-11599",
+  "code_before_change": "find_extend_vma(struct mm_struct *mm, unsigned long addr)\n{\n\tstruct vm_area_struct *vma, *prev;\n\n\taddr &= PAGE_MASK;\n\tvma = find_vma_prev(mm, addr, &prev);\n\tif (vma && (vma->vm_start <= addr))\n\t\treturn vma;\n\tif (!prev || expand_stack(prev, addr))\n\t\treturn NULL;\n\tif (prev->vm_flags & VM_LOCKED)\n\t\tpopulate_vma_page_range(prev, addr, prev->vm_end, NULL);\n\treturn prev;\n}",
+  "code_after_change": "find_extend_vma(struct mm_struct *mm, unsigned long addr)\n{\n\tstruct vm_area_struct *vma, *prev;\n\n\taddr &= PAGE_MASK;\n\tvma = find_vma_prev(mm, addr, &prev);\n\tif (vma && (vma->vm_start <= addr))\n\t\treturn vma;\n\t/* don't alter vm_end if the coredump is running */\n\tif (!prev || !mmget_still_valid(mm) || expand_stack(prev, addr))\n\t\treturn NULL;\n\tif (prev->vm_flags & VM_LOCKED)\n\t\tpopulate_vma_page_range(prev, addr, prev->vm_end, NULL);\n\treturn prev;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t/* don't alter vm_end if the coredump is running */",
+      "\tif (!prev || !mmget_still_valid(mm) || expand_stack(prev, addr))"
+    ],
+    "deleted": [
+      "\tif (!prev || expand_stack(prev, addr))"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "The coredump implementation in the Linux kernel before 5.0.10 does not use locking or other mechanisms to prevent vma layout or vma flags changes while it runs, which allows local users to obtain sensitive information, cause a denial of service, or possibly have unspecified other impact by triggering a race condition with mmget_not_zero or get_task_mm calls. This is related to fs/userfaultfd.c, mm/mmap.c, fs/proc/task_mmu.c, and drivers/infiniband/core/uverbs_main.c.",
+  "id": 6104
+},
+{
+  "cve_id": "CVE-2019-14763",
+  "code_before_change": "void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,\n\t\tint status)\n{\n\tstruct dwc3\t\t\t*dwc = dep->dwc;\n\n\treq->started = false;\n\tlist_del(&req->list);\n\treq->remaining = 0;\n\n\tif (req->request.status == -EINPROGRESS)\n\t\treq->request.status = status;\n\n\tif (req->trb)\n\t\tusb_gadget_unmap_request_by_dev(dwc->sysdev,\n\t\t\t\t\t\t&req->request, req->direction);\n\n\treq->trb = NULL;\n\n\ttrace_dwc3_gadget_giveback(req);\n\n\tspin_unlock(&dwc->lock);\n\tusb_gadget_giveback_request(&dep->endpoint, &req->request);\n\tspin_lock(&dwc->lock);\n\n\tif (dep->number > 1)\n\t\tpm_runtime_put(dwc->dev);\n}",
+  "code_after_change": "void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,\n\t\tint status)\n{\n\tstruct dwc3\t\t\t*dwc = dep->dwc;\n\n\tdwc3_gadget_del_and_unmap_request(dep, req, status);\n\n\tspin_unlock(&dwc->lock);\n\tusb_gadget_giveback_request(&dep->endpoint, &req->request);\n\tspin_lock(&dwc->lock);\n}",
+  "function_modified_lines": {
+    "added": [
+      "void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,",
+      "\t\tint status)",
+      "{",
+      "\tstruct dwc3\t\t\t*dwc = dep->dwc;",
+      "\tdwc3_gadget_del_and_unmap_request(dep, req, status);"
+    ],
+    "deleted": [
+      "void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,",
+      "\t\tint status)",
+      "\t\t\t\t\t\t&req->request, req->direction);",
+      "\tif (dep->number > 1)",
+      "\t\tpm_runtime_put(dwc->dev);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "In the Linux kernel before 4.16.4, a double-locking error in drivers/usb/dwc3/gadget.c may potentially cause a deadlock with f_hid.",
+  "id": 6105
+},
+{
+  "cve_id": "CVE-2019-14763",
+  "code_before_change": "static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep)\n{\n\tstruct dwc3_gadget_ep_cmd_params params;\n\tstruct dwc3_request\t\t*req;\n\tint\t\t\t\tstarting;\n\tint\t\t\t\tret;\n\tu32\t\t\t\tcmd;\n\n\tif (!dwc3_calc_trbs_left(dep))\n\t\treturn 0;\n\n\tstarting = !(dep->flags & DWC3_EP_BUSY);\n\n\tdwc3_prepare_trbs(dep);\n\treq = next_request(&dep->started_list);\n\tif (!req) {\n\t\tdep->flags |= DWC3_EP_PENDING_REQUEST;\n\t\treturn 0;\n\t}\n\n\tmemset(&params, 0, sizeof(params));\n\n\tif (starting) {\n\t\tparams.param0 = upper_32_bits(req->trb_dma);\n\t\tparams.param1 = lower_32_bits(req->trb_dma);\n\t\tcmd = DWC3_DEPCMD_STARTTRANSFER;\n\n\t\tif (usb_endpoint_xfer_isoc(dep->endpoint.desc))\n\t\t\tcmd |= DWC3_DEPCMD_PARAM(dep->frame_number);\n\t} else {\n\t\tcmd = DWC3_DEPCMD_UPDATETRANSFER |\n\t\t\tDWC3_DEPCMD_PARAM(dep->resource_index);\n\t}\n\n\tret = dwc3_send_gadget_ep_cmd(dep, cmd, &params);\n\tif (ret < 0) {\n\t\t/*\n\t\t * FIXME we need to iterate over the list of requests\n\t\t * here and stop, unmap, free and del each of the linked\n\t\t * requests instead of what we do now.\n\t\t */\n\t\tif (req->trb)\n\t\t\tmemset(req->trb, 0, sizeof(struct dwc3_trb));\n\t\tdep->queued_requests--;\n\t\tdwc3_gadget_giveback(dep, req, ret);\n\t\treturn ret;\n\t}\n\n\tdep->flags |= DWC3_EP_BUSY;\n\n\tif (starting) {\n\t\tdep->resource_index = dwc3_gadget_ep_get_transfer_index(dep);\n\t\tWARN_ON_ONCE(!dep->resource_index);\n\t}\n\n\treturn 0;\n}",
+  "code_after_change": "static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep)\n{\n\tstruct dwc3_gadget_ep_cmd_params params;\n\tstruct dwc3_request\t\t*req;\n\tint\t\t\t\tstarting;\n\tint\t\t\t\tret;\n\tu32\t\t\t\tcmd;\n\n\tif (!dwc3_calc_trbs_left(dep))\n\t\treturn 0;\n\n\tstarting = !(dep->flags & DWC3_EP_BUSY);\n\n\tdwc3_prepare_trbs(dep);\n\treq = next_request(&dep->started_list);\n\tif (!req) {\n\t\tdep->flags |= DWC3_EP_PENDING_REQUEST;\n\t\treturn 0;\n\t}\n\n\tmemset(&params, 0, sizeof(params));\n\n\tif (starting) {\n\t\tparams.param0 = upper_32_bits(req->trb_dma);\n\t\tparams.param1 = lower_32_bits(req->trb_dma);\n\t\tcmd = DWC3_DEPCMD_STARTTRANSFER;\n\n\t\tif (usb_endpoint_xfer_isoc(dep->endpoint.desc))\n\t\t\tcmd |= DWC3_DEPCMD_PARAM(dep->frame_number);\n\t} else {\n\t\tcmd = DWC3_DEPCMD_UPDATETRANSFER |\n\t\t\tDWC3_DEPCMD_PARAM(dep->resource_index);\n\t}\n\n\tret = dwc3_send_gadget_ep_cmd(dep, cmd, &params);\n\tif (ret < 0) {\n\t\t/*\n\t\t * FIXME we need to iterate over the list of requests\n\t\t * here and stop, unmap, free and del each of the linked\n\t\t * requests instead of what we do now.\n\t\t */\n\t\tif (req->trb)\n\t\t\tmemset(req->trb, 0, sizeof(struct dwc3_trb));\n\t\tdep->queued_requests--;\n\t\tdwc3_gadget_del_and_unmap_request(dep, req, ret);\n\t\treturn ret;\n\t}\n\n\tdep->flags |= DWC3_EP_BUSY;\n\n\tif (starting) {\n\t\tdep->resource_index = dwc3_gadget_ep_get_transfer_index(dep);\n\t\tWARN_ON_ONCE(!dep->resource_index);\n\t}\n\n\treturn 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tdwc3_gadget_del_and_unmap_request(dep, req, ret);"
+    ],
+    "deleted": [
+      "\t\tdwc3_gadget_giveback(dep, req, ret);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "In the Linux kernel before 4.16.4, a double-locking error in drivers/usb/dwc3/gadget.c may potentially cause a deadlock with f_hid.",
+  "id": 6106
+},
+{
+  "cve_id": "CVE-2019-14763",
+  "code_before_change": "static ssize_t f_hidg_write(struct file *file, const char __user *buffer,\n\t\t\t    size_t count, loff_t *offp)\n{\n\tstruct f_hidg *hidg  = file->private_data;\n\tstruct usb_request *req;\n\tunsigned long flags;\n\tssize_t status = -ENOMEM;\n\n\tif (!access_ok(buffer, count))\n\t\treturn -EFAULT;\n\n\tspin_lock_irqsave(&hidg->write_spinlock, flags);\n\n#define WRITE_COND (!hidg->write_pending)\ntry_again:\n\t/* write queue */\n\twhile (!WRITE_COND) {\n\t\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\t\tif (file->f_flags & O_NONBLOCK)\n\t\t\treturn -EAGAIN;\n\n\t\tif (wait_event_interruptible_exclusive(\n\t\t\t\thidg->write_queue, WRITE_COND))\n\t\t\treturn -ERESTARTSYS;\n\n\t\tspin_lock_irqsave(&hidg->write_spinlock, flags);\n\t}\n\n\thidg->write_pending = 1;\n\treq = hidg->req;\n\tcount  = min_t(unsigned, count, hidg->report_length);\n\n\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\tstatus = copy_from_user(req->buf, buffer, count);\n\n\tif (status != 0) {\n\t\tERROR(hidg->func.config->cdev,\n\t\t\t\"copy_from_user error\\n\");\n\t\tstatus = -EINVAL;\n\t\tgoto release_write_pending;\n\t}\n\n\tspin_lock_irqsave(&hidg->write_spinlock, flags);\n\n\t/* when our function has been disabled by host */\n\tif (!hidg->req) {\n\t\tfree_ep_req(hidg->in_ep, req);\n\t\t/*\n\t\t * TODO\n\t\t * Should we fail with error here?\n\t\t */\n\t\tgoto try_again;\n\t}\n\n\treq->status   = 0;\n\treq->zero     = 0;\n\treq->length   = count;\n\treq->complete = f_hidg_req_complete;\n\treq->context  = hidg;\n\n\tstatus = usb_ep_queue(hidg->in_ep, req, GFP_ATOMIC);\n\tif (status < 0) {\n\t\tERROR(hidg->func.config->cdev,\n\t\t\t\"usb_ep_queue error on int endpoint %zd\\n\", status);\n\t\tgoto release_write_pending_unlocked;\n\t} else {\n\t\tstatus = count;\n\t}\n\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\n\treturn status;\nrelease_write_pending:\n\tspin_lock_irqsave(&hidg->write_spinlock, flags);\nrelease_write_pending_unlocked:\n\thidg->write_pending = 0;\n\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\n\twake_up(&hidg->write_queue);\n\n\treturn status;\n}",
+  "code_after_change": "static ssize_t f_hidg_write(struct file *file, const char __user *buffer,\n\t\t\t    size_t count, loff_t *offp)\n{\n\tstruct f_hidg *hidg  = file->private_data;\n\tstruct usb_request *req;\n\tunsigned long flags;\n\tssize_t status = -ENOMEM;\n\n\tif (!access_ok(buffer, count))\n\t\treturn -EFAULT;\n\n\tspin_lock_irqsave(&hidg->write_spinlock, flags);\n\n#define WRITE_COND (!hidg->write_pending)\ntry_again:\n\t/* write queue */\n\twhile (!WRITE_COND) {\n\t\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\t\tif (file->f_flags & O_NONBLOCK)\n\t\t\treturn -EAGAIN;\n\n\t\tif (wait_event_interruptible_exclusive(\n\t\t\t\thidg->write_queue, WRITE_COND))\n\t\t\treturn -ERESTARTSYS;\n\n\t\tspin_lock_irqsave(&hidg->write_spinlock, flags);\n\t}\n\n\thidg->write_pending = 1;\n\treq = hidg->req;\n\tcount  = min_t(unsigned, count, hidg->report_length);\n\n\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\tstatus = copy_from_user(req->buf, buffer, count);\n\n\tif (status != 0) {\n\t\tERROR(hidg->func.config->cdev,\n\t\t\t\"copy_from_user error\\n\");\n\t\tstatus = -EINVAL;\n\t\tgoto release_write_pending;\n\t}\n\n\tspin_lock_irqsave(&hidg->write_spinlock, flags);\n\n\t/* when our function has been disabled by host */\n\tif (!hidg->req) {\n\t\tfree_ep_req(hidg->in_ep, req);\n\t\t/*\n\t\t * TODO\n\t\t * Should we fail with error here?\n\t\t */\n\t\tgoto try_again;\n\t}\n\n\treq->status   = 0;\n\treq->zero     = 0;\n\treq->length   = count;\n\treq->complete = f_hidg_req_complete;\n\treq->context  = hidg;\n\n\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\n\tstatus = usb_ep_queue(hidg->in_ep, req, GFP_ATOMIC);\n\tif (status < 0) {\n\t\tERROR(hidg->func.config->cdev,\n\t\t\t\"usb_ep_queue error on int endpoint %zd\\n\", status);\n\t\tgoto release_write_pending;\n\t} else {\n\t\tstatus = count;\n\t}\n\n\treturn status;\nrelease_write_pending:\n\tspin_lock_irqsave(&hidg->write_spinlock, flags);\n\thidg->write_pending = 0;\n\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);\n\n\twake_up(&hidg->write_queue);\n\n\treturn status;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);",
+      "\t\tgoto release_write_pending;"
+    ],
+    "deleted": [
+      "\t\tgoto release_write_pending_unlocked;",
+      "\tspin_unlock_irqrestore(&hidg->write_spinlock, flags);",
+      "release_write_pending_unlocked:"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "In the Linux kernel before 4.16.4, a double-locking error in drivers/usb/dwc3/gadget.c may potentially cause a deadlock with f_hid.",
+  "id": 6107
+},
+{
+  "cve_id": "CVE-2021-38203",
+  "code_before_change": "void check_system_chunk(struct btrfs_trans_handle *trans, u64 type)\n{\n\tstruct btrfs_transaction *cur_trans = trans->transaction;\n\tstruct btrfs_fs_info *fs_info = trans->fs_info;\n\tstruct btrfs_space_info *info;\n\tu64 left;\n\tu64 thresh;\n\tint ret = 0;\n\tu64 num_devs;\n\n\t/*\n\t * Needed because we can end up allocating a system chunk and for an\n\t * atomic and race free space reservation in the chunk block reserve.\n\t */\n\tlockdep_assert_held(&fs_info->chunk_mutex);\n\n\tinfo = btrfs_find_space_info(fs_info, BTRFS_BLOCK_GROUP_SYSTEM);\nagain:\n\tspin_lock(&info->lock);\n\tleft = info->total_bytes - btrfs_space_info_used(info, true);\n\tspin_unlock(&info->lock);\n\n\tnum_devs = get_profile_num_devs(fs_info, type);\n\n\t/* num_devs device items to update and 1 chunk item to add or remove */\n\tthresh = btrfs_calc_metadata_size(fs_info, num_devs) +\n\t\tbtrfs_calc_insert_metadata_size(fs_info, 1);\n\n\tif (left < thresh && btrfs_test_opt(fs_info, ENOSPC_DEBUG)) {\n\t\tbtrfs_info(fs_info, \"left=%llu, need=%llu, flags=%llu\",\n\t\t\t   left, thresh, type);\n\t\tbtrfs_dump_space_info(fs_info, info, 0, 0);\n\t}\n\n\tif (left < thresh) {\n\t\tu64 flags = btrfs_system_alloc_profile(fs_info);\n\t\tu64 reserved = atomic64_read(&cur_trans->chunk_bytes_reserved);\n\n\t\t/*\n\t\t * If there's not available space for the chunk tree (system\n\t\t * space) and there are other tasks that reserved space for\n\t\t * creating a new system block group, wait for them to complete\n\t\t * the creation of their system block group and release excess\n\t\t * reserved space. We do this because:\n\t\t *\n\t\t * *) We can end up allocating more system chunks than necessary\n\t\t *    when there are multiple tasks that are concurrently\n\t\t *    allocating block groups, which can lead to exhaustion of\n\t\t *    the system array in the superblock;\n\t\t *\n\t\t * *) If we allocate extra and unnecessary system block groups,\n\t\t *    despite being empty for a long time, and possibly forever,\n\t\t *    they end not being added to the list of unused block groups\n\t\t *    because that typically happens only when deallocating the\n\t\t *    last extent from a block group - which never happens since\n\t\t *    we never allocate from them in the first place. The few\n\t\t *    exceptions are when mounting a filesystem or running scrub,\n\t\t *    which add unused block groups to the list of unused block\n\t\t *    groups, to be deleted by the cleaner kthread.\n\t\t *    And even when they are added to the list of unused block\n\t\t *    groups, it can take a long time until they get deleted,\n\t\t *    since the cleaner kthread might be sleeping or busy with\n\t\t *    other work (deleting subvolumes, running delayed iputs,\n\t\t *    defrag scheduling, etc);\n\t\t *\n\t\t * This is rare in practice, but can happen when too many tasks\n\t\t * are allocating blocks groups in parallel (via fallocate())\n\t\t * and before the one that reserved space for a new system block\n\t\t * group finishes the block group creation and releases the space\n\t\t * reserved in excess (at btrfs_create_pending_block_groups()),\n\t\t * other tasks end up here and see free system space temporarily\n\t\t * not enough for updating the chunk tree.\n\t\t *\n\t\t * We unlock the chunk mutex before waiting for such tasks and\n\t\t * lock it again after the wait, otherwise we would deadlock.\n\t\t * It is safe to do so because allocating a system chunk is the\n\t\t * first thing done while allocating a new block group.\n\t\t */\n\t\tif (reserved > trans->chunk_bytes_reserved) {\n\t\t\tconst u64 min_needed = reserved - thresh;\n\n\t\t\tmutex_unlock(&fs_info->chunk_mutex);\n\t\t\twait_event(cur_trans->chunk_reserve_wait,\n\t\t\t   atomic64_read(&cur_trans->chunk_bytes_reserved) <=\n\t\t\t   min_needed);\n\t\t\tmutex_lock(&fs_info->chunk_mutex);\n\t\t\tgoto again;\n\t\t}\n\n\t\t/*\n\t\t * Ignore failure to create system chunk. We might end up not\n\t\t * needing it, as we might not need to COW all nodes/leafs from\n\t\t * the paths we visit in the chunk tree (they were already COWed\n\t\t * or created in the current transaction for example).\n\t\t */\n\t\tret = btrfs_alloc_chunk(trans, flags);\n\t}\n\n\tif (!ret) {\n\t\tret = btrfs_block_rsv_add(fs_info->chunk_root,\n\t\t\t\t\t  &fs_info->chunk_block_rsv,\n\t\t\t\t\t  thresh, BTRFS_RESERVE_NO_FLUSH);\n\t\tif (!ret) {\n\t\t\tatomic64_add(thresh, &cur_trans->chunk_bytes_reserved);\n\t\t\ttrans->chunk_bytes_reserved += thresh;\n\t\t}\n\t}\n}",
+  "code_after_change": "void check_system_chunk(struct btrfs_trans_handle *trans, u64 type)\n{\n\tstruct btrfs_fs_info *fs_info = trans->fs_info;\n\tstruct btrfs_space_info *info;\n\tu64 left;\n\tu64 thresh;\n\tint ret = 0;\n\tu64 num_devs;\n\n\t/*\n\t * Needed because we can end up allocating a system chunk and for an\n\t * atomic and race free space reservation in the chunk block reserve.\n\t */\n\tlockdep_assert_held(&fs_info->chunk_mutex);\n\n\tinfo = btrfs_find_space_info(fs_info, BTRFS_BLOCK_GROUP_SYSTEM);\n\tspin_lock(&info->lock);\n\tleft = info->total_bytes - btrfs_space_info_used(info, true);\n\tspin_unlock(&info->lock);\n\n\tnum_devs = get_profile_num_devs(fs_info, type);\n\n\t/* num_devs device items to update and 1 chunk item to add or remove */\n\tthresh = btrfs_calc_metadata_size(fs_info, num_devs) +\n\t\tbtrfs_calc_insert_metadata_size(fs_info, 1);\n\n\tif (left < thresh && btrfs_test_opt(fs_info, ENOSPC_DEBUG)) {\n\t\tbtrfs_info(fs_info, \"left=%llu, need=%llu, flags=%llu\",\n\t\t\t   left, thresh, type);\n\t\tbtrfs_dump_space_info(fs_info, info, 0, 0);\n\t}\n\n\tif (left < thresh) {\n\t\tu64 flags = btrfs_system_alloc_profile(fs_info);\n\n\t\t/*\n\t\t * Ignore failure to create system chunk. We might end up not\n\t\t * needing it, as we might not need to COW all nodes/leafs from\n\t\t * the paths we visit in the chunk tree (they were already COWed\n\t\t * or created in the current transaction for example).\n\t\t */\n\t\tret = btrfs_alloc_chunk(trans, flags);\n\t}\n\n\tif (!ret) {\n\t\tret = btrfs_block_rsv_add(fs_info->chunk_root,\n\t\t\t\t\t  &fs_info->chunk_block_rsv,\n\t\t\t\t\t  thresh, BTRFS_RESERVE_NO_FLUSH);\n\t\tif (!ret)\n\t\t\ttrans->chunk_bytes_reserved += thresh;\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif (!ret)"
+    ],
+    "deleted": [
+      "\tstruct btrfs_transaction *cur_trans = trans->transaction;",
+      "again:",
+      "\t\tu64 reserved = atomic64_read(&cur_trans->chunk_bytes_reserved);",
+      "\t\t/*",
+      "\t\t * If there's not available space for the chunk tree (system",
+      "\t\t * space) and there are other tasks that reserved space for",
+      "\t\t * creating a new system block group, wait for them to complete",
+      "\t\t * the creation of their system block group and release excess",
+      "\t\t * reserved space. We do this because:",
+      "\t\t *",
+      "\t\t * *) We can end up allocating more system chunks than necessary",
+      "\t\t *    when there are multiple tasks that are concurrently",
+      "\t\t *    allocating block groups, which can lead to exhaustion of",
+      "\t\t *    the system array in the superblock;",
+      "\t\t *",
+      "\t\t * *) If we allocate extra and unnecessary system block groups,",
+      "\t\t *    despite being empty for a long time, and possibly forever,",
+      "\t\t *    they end not being added to the list of unused block groups",
+      "\t\t *    because that typically happens only when deallocating the",
+      "\t\t *    last extent from a block group - which never happens since",
+      "\t\t *    we never allocate from them in the first place. The few",
+      "\t\t *    exceptions are when mounting a filesystem or running scrub,",
+      "\t\t *    which add unused block groups to the list of unused block",
+      "\t\t *    groups, to be deleted by the cleaner kthread.",
+      "\t\t *    And even when they are added to the list of unused block",
+      "\t\t *    groups, it can take a long time until they get deleted,",
+      "\t\t *    since the cleaner kthread might be sleeping or busy with",
+      "\t\t *    other work (deleting subvolumes, running delayed iputs,",
+      "\t\t *    defrag scheduling, etc);",
+      "\t\t *",
+      "\t\t * This is rare in practice, but can happen when too many tasks",
+      "\t\t * are allocating blocks groups in parallel (via fallocate())",
+      "\t\t * and before the one that reserved space for a new system block",
+      "\t\t * group finishes the block group creation and releases the space",
+      "\t\t * reserved in excess (at btrfs_create_pending_block_groups()),",
+      "\t\t * other tasks end up here and see free system space temporarily",
+      "\t\t * not enough for updating the chunk tree.",
+      "\t\t *",
+      "\t\t * We unlock the chunk mutex before waiting for such tasks and",
+      "\t\t * lock it again after the wait, otherwise we would deadlock.",
+      "\t\t * It is safe to do so because allocating a system chunk is the",
+      "\t\t * first thing done while allocating a new block group.",
+      "\t\t */",
+      "\t\tif (reserved > trans->chunk_bytes_reserved) {",
+      "\t\t\tconst u64 min_needed = reserved - thresh;",
+      "\t\t\tmutex_unlock(&fs_info->chunk_mutex);",
+      "\t\t\twait_event(cur_trans->chunk_reserve_wait,",
+      "\t\t\t   atomic64_read(&cur_trans->chunk_bytes_reserved) <=",
+      "\t\t\t   min_needed);",
+      "\t\t\tmutex_lock(&fs_info->chunk_mutex);",
+      "\t\t\tgoto again;",
+      "\t\t}",
+      "\t\tif (!ret) {",
+      "\t\t\tatomic64_add(thresh, &cur_trans->chunk_bytes_reserved);",
+      "\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "btrfs in the Linux kernel before 5.13.4 allows attackers to cause a denial of service (deadlock) via processes that trigger allocation of new system chunks during times when there is a shortage of free space in the system space_info.",
+  "id": 6108
+},
+{
+  "cve_id": "CVE-2021-38203",
+  "code_before_change": "static noinline int join_transaction(struct btrfs_fs_info *fs_info,\n\t\t\t\t     unsigned int type)\n{\n\tstruct btrfs_transaction *cur_trans;\n\n\tspin_lock(&fs_info->trans_lock);\nloop:\n\t/* The file system has been taken offline. No new transactions. */\n\tif (test_bit(BTRFS_FS_STATE_ERROR, &fs_info->fs_state)) {\n\t\tspin_unlock(&fs_info->trans_lock);\n\t\treturn -EROFS;\n\t}\n\n\tcur_trans = fs_info->running_transaction;\n\tif (cur_trans) {\n\t\tif (TRANS_ABORTED(cur_trans)) {\n\t\t\tspin_unlock(&fs_info->trans_lock);\n\t\t\treturn cur_trans->aborted;\n\t\t}\n\t\tif (btrfs_blocked_trans_types[cur_trans->state] & type) {\n\t\t\tspin_unlock(&fs_info->trans_lock);\n\t\t\treturn -EBUSY;\n\t\t}\n\t\trefcount_inc(&cur_trans->use_count);\n\t\tatomic_inc(&cur_trans->num_writers);\n\t\textwriter_counter_inc(cur_trans, type);\n\t\tspin_unlock(&fs_info->trans_lock);\n\t\treturn 0;\n\t}\n\tspin_unlock(&fs_info->trans_lock);\n\n\t/*\n\t * If we are ATTACH, we just want to catch the current transaction,\n\t * and commit it. If there is no transaction, just return ENOENT.\n\t */\n\tif (type == TRANS_ATTACH)\n\t\treturn -ENOENT;\n\n\t/*\n\t * JOIN_NOLOCK only happens during the transaction commit, so\n\t * it is impossible that ->running_transaction is NULL\n\t */\n\tBUG_ON(type == TRANS_JOIN_NOLOCK);\n\n\tcur_trans = kmalloc(sizeof(*cur_trans), GFP_NOFS);\n\tif (!cur_trans)\n\t\treturn -ENOMEM;\n\n\tspin_lock(&fs_info->trans_lock);\n\tif (fs_info->running_transaction) {\n\t\t/*\n\t\t * someone started a transaction after we unlocked.  Make sure\n\t\t * to redo the checks above\n\t\t */\n\t\tkfree(cur_trans);\n\t\tgoto loop;\n\t} else if (test_bit(BTRFS_FS_STATE_ERROR, &fs_info->fs_state)) {\n\t\tspin_unlock(&fs_info->trans_lock);\n\t\tkfree(cur_trans);\n\t\treturn -EROFS;\n\t}\n\n\tcur_trans->fs_info = fs_info;\n\tatomic_set(&cur_trans->pending_ordered, 0);\n\tinit_waitqueue_head(&cur_trans->pending_wait);\n\tatomic_set(&cur_trans->num_writers, 1);\n\textwriter_counter_init(cur_trans, type);\n\tinit_waitqueue_head(&cur_trans->writer_wait);\n\tinit_waitqueue_head(&cur_trans->commit_wait);\n\tcur_trans->state = TRANS_STATE_RUNNING;\n\t/*\n\t * One for this trans handle, one so it will live on until we\n\t * commit the transaction.\n\t */\n\trefcount_set(&cur_trans->use_count, 2);\n\tcur_trans->flags = 0;\n\tcur_trans->start_time = ktime_get_seconds();\n\n\tmemset(&cur_trans->delayed_refs, 0, sizeof(cur_trans->delayed_refs));\n\n\tcur_trans->delayed_refs.href_root = RB_ROOT_CACHED;\n\tcur_trans->delayed_refs.dirty_extent_root = RB_ROOT;\n\tatomic_set(&cur_trans->delayed_refs.num_entries, 0);\n\n\t/*\n\t * although the tree mod log is per file system and not per transaction,\n\t * the log must never go across transaction boundaries.\n\t */\n\tsmp_mb();\n\tif (!list_empty(&fs_info->tree_mod_seq_list))\n\t\tWARN(1, KERN_ERR \"BTRFS: tree_mod_seq_list not empty when creating a fresh transaction\\n\");\n\tif (!RB_EMPTY_ROOT(&fs_info->tree_mod_log))\n\t\tWARN(1, KERN_ERR \"BTRFS: tree_mod_log rb tree not empty when creating a fresh transaction\\n\");\n\tatomic64_set(&fs_info->tree_mod_seq, 0);\n\n\tspin_lock_init(&cur_trans->delayed_refs.lock);\n\n\tINIT_LIST_HEAD(&cur_trans->pending_snapshots);\n\tINIT_LIST_HEAD(&cur_trans->dev_update_list);\n\tINIT_LIST_HEAD(&cur_trans->switch_commits);\n\tINIT_LIST_HEAD(&cur_trans->dirty_bgs);\n\tINIT_LIST_HEAD(&cur_trans->io_bgs);\n\tINIT_LIST_HEAD(&cur_trans->dropped_roots);\n\tmutex_init(&cur_trans->cache_write_mutex);\n\tspin_lock_init(&cur_trans->dirty_bgs_lock);\n\tINIT_LIST_HEAD(&cur_trans->deleted_bgs);\n\tspin_lock_init(&cur_trans->dropped_roots_lock);\n\tINIT_LIST_HEAD(&cur_trans->releasing_ebs);\n\tspin_lock_init(&cur_trans->releasing_ebs_lock);\n\tatomic64_set(&cur_trans->chunk_bytes_reserved, 0);\n\tinit_waitqueue_head(&cur_trans->chunk_reserve_wait);\n\tlist_add_tail(&cur_trans->list, &fs_info->trans_list);\n\textent_io_tree_init(fs_info, &cur_trans->dirty_pages,\n\t\t\tIO_TREE_TRANS_DIRTY_PAGES, fs_info->btree_inode);\n\textent_io_tree_init(fs_info, &cur_trans->pinned_extents,\n\t\t\tIO_TREE_FS_PINNED_EXTENTS, NULL);\n\tfs_info->generation++;\n\tcur_trans->transid = fs_info->generation;\n\tfs_info->running_transaction = cur_trans;\n\tcur_trans->aborted = 0;\n\tspin_unlock(&fs_info->trans_lock);\n\n\treturn 0;\n}",
+  "code_after_change": "\tstruct btrfs_transaction *cur_trans;\n\n\tspin_lock(&fs_info->trans_lock);\nloop:\n\t/* The file system has been taken offline. No new transactions. */\n\tif (test_bit(BTRFS_FS_STATE_ERROR, &fs_info->fs_state)) {\n\t\tspin_unlock(&fs_info->trans_lock);\n\t\treturn -EROFS;\n\t}\n\n\tcur_trans = fs_info->running_transaction;\n\tif (cur_trans) {\n\t\tif (TRANS_ABORTED(cur_trans)) {\n\t\t\tspin_unlock(&fs_info->trans_lock);\n\t\t\treturn cur_trans->aborted;\n\t\t}\n\t\tif (btrfs_blocked_trans_types[cur_trans->state] & type) {\n\t\t\tspin_unlock(&fs_info->trans_lock);\n\t\t\treturn -EBUSY;\n\t\t}\n\t\trefcount_inc(&cur_trans->use_count);\n\t\tatomic_inc(&cur_trans->num_writers);\n\t\textwriter_counter_inc(cur_trans, type);\n\t\tspin_unlock(&fs_info->trans_lock);\n\t\treturn 0;\n\t}\n\tspin_unlock(&fs_info->trans_lock);\n\n\t/*\n\t * If we are ATTACH, we just want to catch the current transaction,\n\t * and commit it. If there is no transaction, just return ENOENT.\n\t */\n\tif (type == TRANS_ATTACH)\n\t\treturn -ENOENT;\n\n\t/*\n\t * JOIN_NOLOCK only happens during the transaction commit, so\n\t * it is impossible that ->running_transaction is NULL\n\t */\n\tBUG_ON(type == TRANS_JOIN_NOLOCK);\n\n\tcur_trans = kmalloc(sizeof(*cur_trans), GFP_NOFS);\n\tif (!cur_trans)\n\t\treturn -ENOMEM;\n\n\tspin_lock(&fs_info->trans_lock);\n\tif (fs_info->running_transaction) {\n\t\t/*\n\t\t * someone started a transaction after we unlocked.  Make sure\n\t\t * to redo the checks above\n\t\t */\n\t\tkfree(cur_trans);\n\t\tgoto loop;\n\t} else if (test_bit(BTRFS_FS_STATE_ERROR, &fs_info->fs_state)) {\n\t\tspin_unlock(&fs_info->trans_lock);\n\t\tkfree(cur_trans);\n\t\treturn -EROFS;\n\t}\n\n\tcur_trans->fs_info = fs_info;\n\tatomic_set(&cur_trans->pending_ordered, 0);\n\tinit_waitqueue_head(&cur_trans->pending_wait);\n\tatomic_set(&cur_trans->num_writers, 1);\n\textwriter_counter_init(cur_trans, type);\n\tinit_waitqueue_head(&cur_trans->writer_wait);\n\tinit_waitqueue_head(&cur_trans->commit_wait);\n\tcur_trans->state = TRANS_STATE_RUNNING;\n\t/*\n\t * One for this trans handle, one so it will live on until we\n\t * commit the transaction.\n\t */\n\trefcount_set(&cur_trans->use_count, 2);\n\tcur_trans->flags = 0;\n\tcur_trans->start_time = ktime_get_seconds();\n\n\tmemset(&cur_trans->delayed_refs, 0, sizeof(cur_trans->delayed_refs));\n\n\tcur_trans->delayed_refs.href_root = RB_ROOT_CACHED;\n\tcur_trans->delayed_refs.dirty_extent_root = RB_ROOT;\n\tatomic_set(&cur_trans->delayed_refs.num_entries, 0);\n\n\t/*\n\t * although the tree mod log is per file system and not per transaction,\n\t * the log must never go across transaction boundaries.\n\t */\n\tsmp_mb();\n\tif (!list_empty(&fs_info->tree_mod_seq_list))\n\t\tWARN(1, KERN_ERR \"BTRFS: tree_mod_seq_list not empty when creating a fresh transaction\\n\");\n\tif (!RB_EMPTY_ROOT(&fs_info->tree_mod_log))\n\t\tWARN(1, KERN_ERR \"BTRFS: tree_mod_log rb tree not empty when creating a fresh transaction\\n\");\n\tatomic64_set(&fs_info->tree_mod_seq, 0);\n\n\tspin_lock_init(&cur_trans->delayed_refs.lock);\n\n\tINIT_LIST_HEAD(&cur_trans->pending_snapshots);\n\tINIT_LIST_HEAD(&cur_trans->dev_update_list);\n\tINIT_LIST_HEAD(&cur_trans->switch_commits);\n\tINIT_LIST_HEAD(&cur_trans->dirty_bgs);\n\tINIT_LIST_HEAD(&cur_trans->io_bgs);\n\tINIT_LIST_HEAD(&cur_trans->dropped_roots);\n\tmutex_init(&cur_trans->cache_write_mutex);\n\tspin_lock_init(&cur_trans->dirty_bgs_lock);\n\tINIT_LIST_HEAD(&cur_trans->deleted_bgs);\n\tspin_lock_init(&cur_trans->dropped_roots_lock);\n\tINIT_LIST_HEAD(&cur_trans->releasing_ebs);\n\tspin_lock_init(&cur_trans->releasing_ebs_lock);\n\tlist_add_tail(&cur_trans->list, &fs_info->trans_list);\n\textent_io_tree_init(fs_info, &cur_trans->dirty_pages,\n\t\t\tIO_TREE_TRANS_DIRTY_PAGES, fs_info->btree_inode);\n\textent_io_tree_init(fs_info, &cur_trans->pinned_extents,\n\t\t\tIO_TREE_FS_PINNED_EXTENTS, NULL);\n\tfs_info->generation++;\n\tcur_trans->transid = fs_info->generation;\n\tfs_info->running_transaction = cur_trans;\n\tcur_trans->aborted = 0;\n\tspin_unlock(&fs_info->trans_lock);\n\n\treturn 0;\n}\n\n/*\n * This does all the record keeping required to make sure that a shareable root\n * is properly recorded in a given transaction.  This is required to make sure\n * the old root from before we joined the transaction is deleted when the",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "\tatomic64_set(&cur_trans->chunk_bytes_reserved, 0);",
+      "\tinit_waitqueue_head(&cur_trans->chunk_reserve_wait);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "btrfs in the Linux kernel before 5.13.4 allows attackers to cause a denial of service (deadlock) via processes that trigger allocation of new system chunks during times when there is a shortage of free space in the system space_info.",
+  "id": 6109
+},
+{
+  "cve_id": "CVE-2021-38203",
+  "code_before_change": "void btrfs_trans_release_chunk_metadata(struct btrfs_trans_handle *trans)\n{\n\tstruct btrfs_fs_info *fs_info = trans->fs_info;\n\tstruct btrfs_transaction *cur_trans = trans->transaction;\n\n\tif (!trans->chunk_bytes_reserved)\n\t\treturn;\n\n\tWARN_ON_ONCE(!list_empty(&trans->new_bgs));\n\n\tbtrfs_block_rsv_release(fs_info, &fs_info->chunk_block_rsv,\n\t\t\t\ttrans->chunk_bytes_reserved, NULL);\n\tatomic64_sub(trans->chunk_bytes_reserved, &cur_trans->chunk_bytes_reserved);\n\tcond_wake_up(&cur_trans->chunk_reserve_wait);\n\ttrans->chunk_bytes_reserved = 0;\n}",
+  "code_after_change": "void btrfs_trans_release_chunk_metadata(struct btrfs_trans_handle *trans)\n{\n\tstruct btrfs_fs_info *fs_info = trans->fs_info;\n\n\tif (!trans->chunk_bytes_reserved)\n\t\treturn;\n\n\tWARN_ON_ONCE(!list_empty(&trans->new_bgs));\n\n\tbtrfs_block_rsv_release(fs_info, &fs_info->chunk_block_rsv,\n\t\t\t\ttrans->chunk_bytes_reserved, NULL);\n\ttrans->chunk_bytes_reserved = 0;\n}\n\n/*\n * either allocate a new transaction or hop into the existing one",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "\tstruct btrfs_transaction *cur_trans = trans->transaction;",
+      "\tatomic64_sub(trans->chunk_bytes_reserved, &cur_trans->chunk_bytes_reserved);",
+      "\tcond_wake_up(&cur_trans->chunk_reserve_wait);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "btrfs in the Linux kernel before 5.13.4 allows attackers to cause a denial of service (deadlock) via processes that trigger allocation of new system chunks during times when there is a shortage of free space in the system space_info.",
+  "id": 6110
+},
+{
+  "cve_id": "CVE-2021-41141",
+  "code_before_change": "PJ_DEF(pj_status_t) pjmedia_vid_conf_add_port( pjmedia_vid_conf *vid_conf,\n\t\t\t\t\t       pj_pool_t *parent_pool,\n\t\t\t\t\t       pjmedia_port *port,\n\t\t\t\t\t       const pj_str_t *name,\n\t\t\t\t\t       void *opt,\n\t\t\t\t\t       unsigned *p_slot)\n{\n    pj_pool_t *pool;\n    vconf_port *cport;\n    unsigned index;\n\n    PJ_ASSERT_RETURN(vid_conf && parent_pool && port, PJ_EINVAL);\n    PJ_ASSERT_RETURN(port->info.fmt.type==PJMEDIA_TYPE_VIDEO &&\n\t\t     port->info.fmt.detail_type==PJMEDIA_FORMAT_DETAIL_VIDEO,\n\t\t     PJ_EINVAL);\n    PJ_UNUSED_ARG(opt);\n\n    /* If name is not specified, use the port's name */\n    if (!name)\n\tname = &port->info.name;\n\n    pj_mutex_lock(vid_conf->mutex);\n\n    if (vid_conf->port_cnt >= vid_conf->opt.max_slot_cnt) {\n\tpj_assert(!\"Too many ports\");\n\tpj_mutex_unlock(vid_conf->mutex);\n\treturn PJ_ETOOMANY;\n    }\n\n    /* Find empty port in the conference bridge. */\n    for (index=0; index < vid_conf->opt.max_slot_cnt; ++index) {\n\tif (vid_conf->ports[index] == NULL)\n\t    break;\n    }\n    pj_assert(index != vid_conf->opt.max_slot_cnt);\n\n    /* Create pool */\n    pool = pj_pool_create(parent_pool->factory, name->ptr, 500, 500, NULL);\n    PJ_ASSERT_RETURN(pool, PJ_ENOMEM);\n\n    /* Create port. */\n    cport = PJ_POOL_ZALLOC_T(pool, vconf_port);\n    PJ_ASSERT_RETURN(cport, PJ_ENOMEM);\n\n    /* Set pool, port, index, and name */\n    cport->pool = pool;\n    cport->port = port;\n    cport->format = port->info.fmt;\n    cport->idx  = index;\n    pj_strdup_with_null(pool, &cport->name, name);\n\n    /* Init put/get_frame() intervals */\n    {\n\tpjmedia_ratio *fps = &port->info.fmt.det.vid.fps;\n\tpj_uint32_t vconf_interval = (pj_uint32_t)\n\t\t\t\t     (TS_CLOCK_RATE * 1.0 /\n\t\t\t\t     vid_conf->opt.frame_rate);\n\tcport->ts_interval = (pj_uint32_t)(TS_CLOCK_RATE * 1.0 /\n\t\t\t\t\t   fps->num * fps->denum);\n\n\t/* Normalize the interval */\n\tif (cport->ts_interval < vconf_interval) {\n\t    cport->ts_interval = vconf_interval;\n\t    PJ_LOG(3,(THIS_FILE, \"Warning: frame rate of port %s is higher \"\n\t\t\t\t \"than video conference bridge (%d > %d)\",\n\t\t\t\t name->ptr, (int)(fps->num/fps->denum),\n\t\t\t\t vid_conf->opt.frame_rate));\n\t}\n    }\n\n    /* Allocate buffer for put/get_frame() */\n    {\n\tconst pjmedia_video_format_info *vfi;\n\tpjmedia_video_apply_fmt_param vafp;\n\tpj_status_t status;\n\n\tvfi = pjmedia_get_video_format_info(NULL, port->info.fmt.id);\n\tif (!vfi) {\n\t    PJ_LOG(4,(THIS_FILE, \"pjmedia_vid_conf_add_port(): \"\n\t\t\t\t \"unrecognized format %04X\",\n\t\t\t\t port->info.fmt.id));\n\t    return PJMEDIA_EBADFMT;\n\t}\n\n\tpj_bzero(&vafp, sizeof(vafp));\n\tvafp.size = port->info.fmt.det.vid.size;\n\tstatus = (*vfi->apply_fmt)(vfi, &vafp);\n\tif (status != PJ_SUCCESS) {\n\t    PJ_LOG(4,(THIS_FILE, \"pjmedia_vid_conf_add_port(): \"\n\t\t\t\t \"Failed to apply format %04X\",\n\t\t\t\t port->info.fmt.id));\n\t    return status;\n\t}\n\tif (port->put_frame) {\n\t    cport->put_buf_size = vafp.framebytes;\n\t    cport->put_buf = pj_pool_zalloc(cport->pool, cport->put_buf_size);\n\t}\n\tif (port->get_frame) {\n\t    cport->get_buf_size = vafp.framebytes;\n\t    cport->get_buf = pj_pool_zalloc(cport->pool, cport->get_buf_size);\n\t}\n    }\n\n    /* Create listener array */\n    cport->listener_slots = (unsigned*)\n\t\t\t    pj_pool_zalloc(pool,\n\t\t\t\t\t   vid_conf->opt.max_slot_cnt *\n\t\t\t\t\t   sizeof(unsigned));\n    PJ_ASSERT_RETURN(cport->listener_slots, PJ_ENOMEM);\n\n    /* Create transmitter array */\n    cport->transmitter_slots = (unsigned*)\n\t\t\t       pj_pool_zalloc(pool,\n\t\t\t\t\t      vid_conf->opt.max_slot_cnt *\n\t\t\t\t\t      sizeof(unsigned));\n    PJ_ASSERT_RETURN(cport->transmitter_slots, PJ_ENOMEM);\n\n    /* Create pointer-to-render_state array */\n    cport->render_states = (render_state**)\n\t\t\t   pj_pool_zalloc(pool,\n\t\t\t\t\t  vid_conf->opt.max_slot_cnt *\n\t\t\t\t\t  sizeof(render_state*));\n    PJ_ASSERT_RETURN(cport->render_states, PJ_ENOMEM);\n\n    /* Create pointer-to-render-pool array */\n    cport->render_pool = (pj_pool_t**)\n\t\t\t pj_pool_zalloc(pool,\n\t\t\t\t\tvid_conf->opt.max_slot_cnt *\n\t\t\t\t\tsizeof(pj_pool_t*));\n    PJ_ASSERT_RETURN(cport->render_pool, PJ_ENOMEM);\n\n    /* Register the conf port. */\n    vid_conf->ports[index] = cport;\n    vid_conf->port_cnt++;\n\n    PJ_LOG(4,(THIS_FILE,\"Added port %d (%.*s)\",\n\t      index, (int)cport->name.slen, cport->name.ptr));\n\n    pj_mutex_unlock(vid_conf->mutex);\n\n    /* Done. */\n    if (p_slot) {\n\t*p_slot = index;\n    }\n\n    return PJ_SUCCESS;\n}",
+  "code_after_change": "PJ_DEF(pj_status_t) pjmedia_vid_conf_add_port( pjmedia_vid_conf *vid_conf,\n\t\t\t\t\t       pj_pool_t *parent_pool,\n\t\t\t\t\t       pjmedia_port *port,\n\t\t\t\t\t       const pj_str_t *name,\n\t\t\t\t\t       void *opt,\n\t\t\t\t\t       unsigned *p_slot)\n{\n    pj_pool_t *pool;\n    vconf_port *cport;\n    unsigned index;\n\n    PJ_ASSERT_RETURN(vid_conf && parent_pool && port, PJ_EINVAL);\n    PJ_ASSERT_RETURN(port->info.fmt.type==PJMEDIA_TYPE_VIDEO &&\n\t\t     port->info.fmt.detail_type==PJMEDIA_FORMAT_DETAIL_VIDEO,\n\t\t     PJ_EINVAL);\n    PJ_UNUSED_ARG(opt);\n\n    /* If name is not specified, use the port's name */\n    if (!name)\n\tname = &port->info.name;\n\n    pj_mutex_lock(vid_conf->mutex);\n\n    if (vid_conf->port_cnt >= vid_conf->opt.max_slot_cnt) {\n\tpj_assert(!\"Too many ports\");\n\tpj_mutex_unlock(vid_conf->mutex);\n\treturn PJ_ETOOMANY;\n    }\n\n    /* Find empty port in the conference bridge. */\n    for (index=0; index < vid_conf->opt.max_slot_cnt; ++index) {\n\tif (vid_conf->ports[index] == NULL)\n\t    break;\n    }\n    pj_assert(index != vid_conf->opt.max_slot_cnt);\n\n    /* Create pool */\n    pool = pj_pool_create(parent_pool->factory, name->ptr, 500, 500, NULL);\n    PJ_ASSERT_RETURN(pool, PJ_ENOMEM);\n\n    /* Create port. */\n    cport = PJ_POOL_ZALLOC_T(pool, vconf_port);\n    PJ_ASSERT_RETURN(cport, PJ_ENOMEM);\n\n    /* Set pool, port, index, and name */\n    cport->pool = pool;\n    cport->port = port;\n    cport->format = port->info.fmt;\n    cport->idx  = index;\n    pj_strdup_with_null(pool, &cport->name, name);\n\n    /* Init put/get_frame() intervals */\n    {\n\tpjmedia_ratio *fps = &port->info.fmt.det.vid.fps;\n\tpj_uint32_t vconf_interval = (pj_uint32_t)\n\t\t\t\t     (TS_CLOCK_RATE * 1.0 /\n\t\t\t\t     vid_conf->opt.frame_rate);\n\tcport->ts_interval = (pj_uint32_t)(TS_CLOCK_RATE * 1.0 /\n\t\t\t\t\t   fps->num * fps->denum);\n\n\t/* Normalize the interval */\n\tif (cport->ts_interval < vconf_interval) {\n\t    cport->ts_interval = vconf_interval;\n\t    PJ_LOG(3,(THIS_FILE, \"Warning: frame rate of port %s is higher \"\n\t\t\t\t \"than video conference bridge (%d > %d)\",\n\t\t\t\t name->ptr, (int)(fps->num/fps->denum),\n\t\t\t\t vid_conf->opt.frame_rate));\n\t}\n    }\n\n    /* Allocate buffer for put/get_frame() */\n    {\n\tconst pjmedia_video_format_info *vfi;\n\tpjmedia_video_apply_fmt_param vafp;\n\tpj_status_t status;\n\n\tvfi = pjmedia_get_video_format_info(NULL, port->info.fmt.id);\n\tif (!vfi) {\n\t    PJ_LOG(4,(THIS_FILE, \"pjmedia_vid_conf_add_port(): \"\n\t\t\t\t \"unrecognized format %04X\",\n\t\t\t\t port->info.fmt.id));\n\t    pj_mutex_unlock(vid_conf->mutex);\n\t    return PJMEDIA_EBADFMT;\n\t}\n\n\tpj_bzero(&vafp, sizeof(vafp));\n\tvafp.size = port->info.fmt.det.vid.size;\n\tstatus = (*vfi->apply_fmt)(vfi, &vafp);\n\tif (status != PJ_SUCCESS) {\n\t    PJ_LOG(4,(THIS_FILE, \"pjmedia_vid_conf_add_port(): \"\n\t\t\t\t \"Failed to apply format %04X\",\n\t\t\t\t port->info.fmt.id));\n\t    pj_mutex_unlock(vid_conf->mutex);\n\t    return status;\n\t}\n\tif (port->put_frame) {\n\t    cport->put_buf_size = vafp.framebytes;\n\t    cport->put_buf = pj_pool_zalloc(cport->pool, cport->put_buf_size);\n\t}\n\tif (port->get_frame) {\n\t    cport->get_buf_size = vafp.framebytes;\n\t    cport->get_buf = pj_pool_zalloc(cport->pool, cport->get_buf_size);\n\t}\n    }\n\n    /* Create listener array */\n    cport->listener_slots = (unsigned*)\n\t\t\t    pj_pool_zalloc(pool,\n\t\t\t\t\t   vid_conf->opt.max_slot_cnt *\n\t\t\t\t\t   sizeof(unsigned));\n    if (!cport->listener_slots) {\t\n\tpj_mutex_unlock(vid_conf->mutex);\n\treturn PJ_ENOMEM;\n    }\n\n    /* Create transmitter array */\n    cport->transmitter_slots = (unsigned*)\n\t\t\t       pj_pool_zalloc(pool,\n\t\t\t\t\t      vid_conf->opt.max_slot_cnt *\n\t\t\t\t\t      sizeof(unsigned));    \n    if (!cport->transmitter_slots) {\n\tpj_mutex_unlock(vid_conf->mutex);\n\treturn PJ_ENOMEM;\n    }\n\n    /* Create pointer-to-render_state array */\n    cport->render_states = (render_state**)\n\t\t\t   pj_pool_zalloc(pool,\n\t\t\t\t\t  vid_conf->opt.max_slot_cnt *\n\t\t\t\t\t  sizeof(render_state*));\n\n    if (!cport->render_states) {\n\tpj_mutex_unlock(vid_conf->mutex);\n\treturn PJ_ENOMEM;\n    }\n\n    /* Create pointer-to-render-pool array */\n    cport->render_pool = (pj_pool_t**)\n\t\t\t pj_pool_zalloc(pool,\n\t\t\t\t\tvid_conf->opt.max_slot_cnt *\n\t\t\t\t\tsizeof(pj_pool_t*));    \n    if (!cport->render_pool) {\n\tpj_mutex_unlock(vid_conf->mutex);\n\treturn PJ_ENOMEM;\n    }\n\n    /* Register the conf port. */\n    vid_conf->ports[index] = cport;\n    vid_conf->port_cnt++;\n\n    PJ_LOG(4,(THIS_FILE,\"Added port %d (%.*s)\",\n\t      index, (int)cport->name.slen, cport->name.ptr));\n\n    pj_mutex_unlock(vid_conf->mutex);\n\n    /* Done. */\n    if (p_slot) {\n\t*p_slot = index;\n    }\n\n    return PJ_SUCCESS;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t    pj_mutex_unlock(vid_conf->mutex);",
+      "\t    pj_mutex_unlock(vid_conf->mutex);",
+      "    if (!cport->listener_slots) {",
+      "\tpj_mutex_unlock(vid_conf->mutex);",
+      "\treturn PJ_ENOMEM;",
+      "    }",
+      "\t\t\t\t\t      sizeof(unsigned));",
+      "    if (!cport->transmitter_slots) {",
+      "\tpj_mutex_unlock(vid_conf->mutex);",
+      "\treturn PJ_ENOMEM;",
+      "    }",
+      "    if (!cport->render_states) {",
+      "\tpj_mutex_unlock(vid_conf->mutex);",
+      "\treturn PJ_ENOMEM;",
+      "    }",
+      "\t\t\t\t\tsizeof(pj_pool_t*));",
+      "    if (!cport->render_pool) {",
+      "\tpj_mutex_unlock(vid_conf->mutex);",
+      "\treturn PJ_ENOMEM;",
+      "    }"
+    ],
+    "deleted": [
+      "    PJ_ASSERT_RETURN(cport->listener_slots, PJ_ENOMEM);",
+      "\t\t\t\t\t      sizeof(unsigned));",
+      "    PJ_ASSERT_RETURN(cport->transmitter_slots, PJ_ENOMEM);",
+      "    PJ_ASSERT_RETURN(cport->render_states, PJ_ENOMEM);",
+      "\t\t\t\t\tsizeof(pj_pool_t*));",
+      "    PJ_ASSERT_RETURN(cport->render_pool, PJ_ENOMEM);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "PJSIP is a free and open source multimedia communication library written in the C language implementing standard based protocols such as SIP, SDP, RTP, STUN, TURN, and ICE. In various parts of PJSIP, when error/failure occurs, it is found that the function returns without releasing the currently held locks. This could result in a system deadlock, which cause a denial of service for the users. No release has yet been made which contains the linked fix commit. All versions up to an including 2.11.1 are affected. Users may need to manually apply the patch.",
+  "id": 6111
+},
+{
+  "cve_id": "CVE-2021-43395",
+  "code_before_change": "tdirenter(\n\tstruct tmount\t*tm,\n\tstruct tmpnode\t*dir,\t\t/* target directory to make entry in */\n\tchar\t\t*name,\t\t/* name of entry */\n\tenum de_op\top,\t\t/* entry operation */\n\tstruct tmpnode\t*fromparent,\t/* source directory if rename */\n\tstruct tmpnode\t*tp,\t\t/* source tmpnode, if link/rename */\n\tstruct vattr\t*va,\n\tstruct tmpnode\t**tpp,\t\t/* return tmpnode, if create/mkdir */\n\tstruct cred\t*cred,\n\tcaller_context_t *ctp)\n{\n\tstruct tdirent *tdp;\n\tstruct tmpnode *found = NULL;\n\tint error = 0;\n\tchar *s;\n\n\t/*\n\t * tn_rwlock is held to serialize direnter and dirdeletes\n\t */\n\tASSERT(RW_WRITE_HELD(&dir->tn_rwlock));\n\tASSERT(dir->tn_type == VDIR);\n\n\t/*\n\t * Don't allow '/' characters in pathname component\n\t * (thus in ufs_direnter()).\n\t */\n\tfor (s = name; *s; s++)\n\t\tif (*s == '/')\n\t\t\treturn (EACCES);\n\n\tif (name[0] == '\\0')\n\t\tpanic(\"tdirenter: NULL name\");\n\n\t/*\n\t * For link and rename lock the source entry and check the link count\n\t * to see if it has been removed while it was unlocked.\n\t */\n\tif (op == DE_LINK || op == DE_RENAME) {\n\t\tif (tp != dir)\n\t\t\trw_enter(&tp->tn_rwlock, RW_WRITER);\n\t\tmutex_enter(&tp->tn_tlock);\n\t\tif (tp->tn_nlink == 0) {\n\t\t\tmutex_exit(&tp->tn_tlock);\n\t\t\tif (tp != dir)\n\t\t\t\trw_exit(&tp->tn_rwlock);\n\t\t\treturn (ENOENT);\n\t\t}\n\n\t\tif (tp->tn_nlink == MAXLINK) {\n\t\t\tmutex_exit(&tp->tn_tlock);\n\t\t\tif (tp != dir)\n\t\t\t\trw_exit(&tp->tn_rwlock);\n\t\t\treturn (EMLINK);\n\t\t}\n\t\ttp->tn_nlink++;\n\t\tgethrestime(&tp->tn_ctime);\n\t\tmutex_exit(&tp->tn_tlock);\n\t\tif (tp != dir)\n\t\t\trw_exit(&tp->tn_rwlock);\n\t}\n\n\t/*\n\t * This might be a \"dangling detached directory\".\n\t * it could have been removed, but a reference\n\t * to it kept in u_cwd.  don't bother searching\n\t * it, and with any luck the user will get tired\n\t * of dealing with us and cd to some absolute\n\t * pathway.  *sigh*, thus in ufs, too.\n\t */\n\tif (dir->tn_nlink == 0) {\n\t\terror = ENOENT;\n\t\tgoto out;\n\t}\n\n\t/*\n\t * If this is a rename of a directory and the parent is\n\t * different (\"..\" must be changed), then the source\n\t * directory must not be in the directory hierarchy\n\t * above the target, as this would orphan everything\n\t * below the source directory.\n\t */\n\tif (op == DE_RENAME) {\n\t\tif (tp == dir) {\n\t\t\terror = EINVAL;\n\t\t\tgoto out;\n\t\t}\n\t\tif (tp->tn_type == VDIR) {\n\t\t\tif ((fromparent != dir) &&\n\t\t\t    (error = tdircheckpath(tp, dir, cred))) {\n\t\t\t\tgoto out;\n\t\t\t}\n\t\t}\n\t}\n\n\t/*\n\t * Search for the entry.  Return \"found\" if it exists.\n\t */\n\ttdp = tmpfs_hash_lookup(name, dir, 1, &found);\n\n\tif (tdp) {\n\t\tASSERT(found);\n\t\tswitch (op) {\n\t\tcase DE_CREATE:\n\t\tcase DE_MKDIR:\n\t\t\tif (tpp) {\n\t\t\t\t*tpp = found;\n\t\t\t\terror = EEXIST;\n\t\t\t} else {\n\t\t\t\ttmpnode_rele(found);\n\t\t\t}\n\t\t\tbreak;\n\n\t\tcase DE_RENAME:\n\t\t\terror = tdirrename(fromparent, tp,\n\t\t\t    dir, name, found, tdp, cred);\n\t\t\tif (error == 0) {\n\t\t\t\tif (found != NULL) {\n\t\t\t\t\tvnevent_rename_dest(TNTOV(found),\n\t\t\t\t\t    TNTOV(dir), name, ctp);\n\t\t\t\t}\n\t\t\t}\n\n\t\t\ttmpnode_rele(found);\n\t\t\tbreak;\n\n\t\tcase DE_LINK:\n\t\t\t/*\n\t\t\t * Can't link to an existing file.\n\t\t\t */\n\t\t\terror = EEXIST;\n\t\t\ttmpnode_rele(found);\n\t\t\tbreak;\n\t\t}\n\t} else {\n\n\t\t/*\n\t\t * The entry does not exist. Check write permission in\n\t\t * directory to see if entry can be created.\n\t\t */\n\t\tif (error = tmp_taccess(dir, VWRITE, cred))\n\t\t\tgoto out;\n\t\tif (op == DE_CREATE || op == DE_MKDIR) {\n\t\t\t/*\n\t\t\t * Make new tmpnode and directory entry as required.\n\t\t\t */\n\t\t\terror = tdirmaketnode(dir, tm, va, op, &tp, cred);\n\t\t\tif (error)\n\t\t\t\tgoto out;\n\t\t}\n\t\tif (error = tdiraddentry(dir, tp, name, op, fromparent)) {\n\t\t\tif (op == DE_CREATE || op == DE_MKDIR) {\n\t\t\t\t/*\n\t\t\t\t * Unmake the inode we just made.\n\t\t\t\t */\n\t\t\t\trw_enter(&tp->tn_rwlock, RW_WRITER);\n\t\t\t\tif ((tp->tn_type) == VDIR) {\n\t\t\t\t\tASSERT(tdp == NULL);\n\t\t\t\t\t/*\n\t\t\t\t\t * cleanup allocs made by tdirinit()\n\t\t\t\t\t */\n\t\t\t\t\ttdirtrunc(tp);\n\t\t\t\t}\n\t\t\t\tmutex_enter(&tp->tn_tlock);\n\t\t\t\ttp->tn_nlink = 0;\n\t\t\t\tmutex_exit(&tp->tn_tlock);\n\t\t\t\tgethrestime(&tp->tn_ctime);\n\t\t\t\trw_exit(&tp->tn_rwlock);\n\t\t\t\ttmpnode_rele(tp);\n\t\t\t\ttp = NULL;\n\t\t\t}\n\t\t} else if (tpp) {\n\t\t\t*tpp = tp;\n\t\t} else if (op == DE_CREATE || op == DE_MKDIR) {\n\t\t\ttmpnode_rele(tp);\n\t\t}\n\t}\n\nout:\n\tif (error && (op == DE_LINK || op == DE_RENAME)) {\n\t\t/*\n\t\t * Undo bumped link count.\n\t\t */\n\t\tDECR_COUNT(&tp->tn_nlink, &tp->tn_tlock);\n\t\tgethrestime(&tp->tn_ctime);\n\t}\n\treturn (error);\n}",
+  "code_after_change": "tdirenter(\n\tstruct tmount\t*tm,\n\tstruct tmpnode\t*dir,\t\t/* target directory to make entry in */\n\tchar\t\t*name,\t\t/* name of entry */\n\tenum de_op\top,\t\t/* entry operation */\n\tstruct tmpnode\t*fromparent,\t/* source directory if rename */\n\tstruct tmpnode\t*tp,\t\t/* source tmpnode, if link/rename */\n\tstruct vattr\t*va,\n\tstruct tmpnode\t**tpp,\t\t/* return tmpnode, if create/mkdir */\n\tstruct cred\t*cred,\n\tcaller_context_t *ctp)\n{\n\tstruct tdirent *tdp;\n\tstruct tmpnode *found = NULL;\n\tint error = 0;\n\tchar *s;\n\n\t/*\n\t * tn_rwlock is held to serialize direnter and dirdeletes\n\t */\n\tASSERT(RW_WRITE_HELD(&dir->tn_rwlock));\n\tASSERT(dir->tn_type == VDIR);\n\n\t/*\n\t * Don't allow '/' characters in pathname component\n\t * (thus in ufs_direnter()).\n\t */\n\tfor (s = name; *s; s++)\n\t\tif (*s == '/')\n\t\t\treturn (EACCES);\n\n\tif (name[0] == '\\0')\n\t\tpanic(\"tdirenter: NULL name\");\n\n\t/*\n\t * For link and rename lock the source entry and check the link count\n\t * to see if it has been removed while it was unlocked.\n\t */\n\tif (op == DE_LINK || op == DE_RENAME) {\n\t\tif (tp != dir) {\n\t\t\tunsigned int tries = 0;\n\n\t\t\t/*\n\t\t\t * If we are acquiring tp->tn_rwlock (for SOURCE)\n\t\t\t * inside here, we must consider the following:\n\t\t\t *\n\t\t\t * - dir->tn_rwlock (TARGET) is already HELD (see\n\t\t\t * above ASSERT()).\n\t\t\t *\n\t\t\t * - It is possible our SOURCE is a parent of our\n\t\t\t * TARGET. Yes it's unusual, but it will return an\n\t\t\t * error below via tdircheckpath().\n\t\t\t *\n\t\t\t * - It is also possible that another thread,\n\t\t\t * concurrent to this one, is performing\n\t\t\t * rmdir(TARGET), which means it will first acquire\n\t\t\t * SOURCE's lock, THEN acquire TARGET's lock, which\n\t\t\t * could result in this thread holding TARGET and\n\t\t\t * trying for SOURCE, but the other thread holding\n\t\t\t * SOURCE and trying for TARGET.  This is deadlock,\n\t\t\t * and it's inducible.\n\t\t\t *\n\t\t\t * To prevent this, we borrow some techniques from UFS\n\t\t\t * and rw_tryenter(), delaying if we fail, and\n\t\t\t * if someone tweaks the number of backoff tries to be\n\t\t\t * nonzero, return EBUSY after that number of tries.\n\t\t\t */\n\t\t\twhile (!rw_tryenter(&tp->tn_rwlock, RW_WRITER)) {\n\t\t\t\t/*\n\t\t\t\t * Sloppy, but this is a diagnostic so atomic\n\t\t\t\t * increment would be overkill.\n\t\t\t\t */\n\t\t\t\ttmpfs_rename_loops++;\n\n\t\t\t\tif (tmpfs_rename_backoff_tries != 0) {\n\t\t\t\t\tif (tries > tmpfs_rename_backoff_tries)\n\t\t\t\t\t\treturn (EBUSY);\n\t\t\t\t\ttries++;\n\t\t\t\t}\n\t\t\t\t/*\n\t\t\t\t * NOTE: We're still holding dir->tn_rwlock,\n\t\t\t\t * so drop it over the delay, so any other\n\t\t\t\t * thread can get its business done.\n\t\t\t\t *\n\t\t\t\t * No state change or state inspection happens\n\t\t\t\t * prior to here, so it is not wholly dangerous\n\t\t\t\t * to release-and-reacquire dir->tn_rwlock.\n\t\t\t\t *\n\t\t\t\t * Hold the vnode of dir in case it gets\n\t\t\t\t * released by another thread, though.\n\t\t\t\t */\n\t\t\t\tVN_HOLD(TNTOV(dir));\n\t\t\t\trw_exit(&dir->tn_rwlock);\n\t\t\t\tdelay(tmpfs_rename_backoff_delay);\n\t\t\t\trw_enter(&dir->tn_rwlock, RW_WRITER);\n\t\t\t\tVN_RELE(TNTOV(dir));\n\t\t\t}\n\t\t}\n\t\tmutex_enter(&tp->tn_tlock);\n\t\tif (tp->tn_nlink == 0) {\n\t\t\tmutex_exit(&tp->tn_tlock);\n\t\t\tif (tp != dir)\n\t\t\t\trw_exit(&tp->tn_rwlock);\n\t\t\treturn (ENOENT);\n\t\t}\n\n\t\tif (tp->tn_nlink == MAXLINK) {\n\t\t\tmutex_exit(&tp->tn_tlock);\n\t\t\tif (tp != dir)\n\t\t\t\trw_exit(&tp->tn_rwlock);\n\t\t\treturn (EMLINK);\n\t\t}\n\t\ttp->tn_nlink++;\n\t\tgethrestime(&tp->tn_ctime);\n\t\tmutex_exit(&tp->tn_tlock);\n\t\tif (tp != dir)\n\t\t\trw_exit(&tp->tn_rwlock);\n\t}\n\n\t/*\n\t * This might be a \"dangling detached directory\".\n\t * it could have been removed, but a reference\n\t * to it kept in u_cwd.  don't bother searching\n\t * it, and with any luck the user will get tired\n\t * of dealing with us and cd to some absolute\n\t * pathway.  *sigh*, thus in ufs, too.\n\t */\n\tif (dir->tn_nlink == 0) {\n\t\terror = ENOENT;\n\t\tgoto out;\n\t}\n\n\t/*\n\t * If this is a rename of a directory and the parent is\n\t * different (\"..\" must be changed), then the source\n\t * directory must not be in the directory hierarchy\n\t * above the target, as this would orphan everything\n\t * below the source directory.\n\t */\n\tif (op == DE_RENAME) {\n\t\tif (tp == dir) {\n\t\t\terror = EINVAL;\n\t\t\tgoto out;\n\t\t}\n\t\tif (tp->tn_type == VDIR) {\n\t\t\tif ((fromparent != dir) &&\n\t\t\t    (error = tdircheckpath(tp, dir, cred))) {\n\t\t\t\tgoto out;\n\t\t\t}\n\t\t}\n\t}\n\n\t/*\n\t * Search for the entry.  Return \"found\" if it exists.\n\t */\n\ttdp = tmpfs_hash_lookup(name, dir, 1, &found);\n\n\tif (tdp) {\n\t\tASSERT(found);\n\t\tswitch (op) {\n\t\tcase DE_CREATE:\n\t\tcase DE_MKDIR:\n\t\t\tif (tpp) {\n\t\t\t\t*tpp = found;\n\t\t\t\terror = EEXIST;\n\t\t\t} else {\n\t\t\t\ttmpnode_rele(found);\n\t\t\t}\n\t\t\tbreak;\n\n\t\tcase DE_RENAME:\n\t\t\terror = tdirrename(fromparent, tp,\n\t\t\t    dir, name, found, tdp, cred);\n\t\t\tif (error == 0) {\n\t\t\t\tif (found != NULL) {\n\t\t\t\t\tvnevent_rename_dest(TNTOV(found),\n\t\t\t\t\t    TNTOV(dir), name, ctp);\n\t\t\t\t}\n\t\t\t}\n\n\t\t\ttmpnode_rele(found);\n\t\t\tbreak;\n\n\t\tcase DE_LINK:\n\t\t\t/*\n\t\t\t * Can't link to an existing file.\n\t\t\t */\n\t\t\terror = EEXIST;\n\t\t\ttmpnode_rele(found);\n\t\t\tbreak;\n\t\t}\n\t} else {\n\n\t\t/*\n\t\t * The entry does not exist. Check write permission in\n\t\t * directory to see if entry can be created.\n\t\t */\n\t\tif (error = tmp_taccess(dir, VWRITE, cred))\n\t\t\tgoto out;\n\t\tif (op == DE_CREATE || op == DE_MKDIR) {\n\t\t\t/*\n\t\t\t * Make new tmpnode and directory entry as required.\n\t\t\t */\n\t\t\terror = tdirmaketnode(dir, tm, va, op, &tp, cred);\n\t\t\tif (error)\n\t\t\t\tgoto out;\n\t\t}\n\t\tif (error = tdiraddentry(dir, tp, name, op, fromparent)) {\n\t\t\tif (op == DE_CREATE || op == DE_MKDIR) {\n\t\t\t\t/*\n\t\t\t\t * Unmake the inode we just made.\n\t\t\t\t */\n\t\t\t\trw_enter(&tp->tn_rwlock, RW_WRITER);\n\t\t\t\tif ((tp->tn_type) == VDIR) {\n\t\t\t\t\tASSERT(tdp == NULL);\n\t\t\t\t\t/*\n\t\t\t\t\t * cleanup allocs made by tdirinit()\n\t\t\t\t\t */\n\t\t\t\t\ttdirtrunc(tp);\n\t\t\t\t}\n\t\t\t\tmutex_enter(&tp->tn_tlock);\n\t\t\t\ttp->tn_nlink = 0;\n\t\t\t\tmutex_exit(&tp->tn_tlock);\n\t\t\t\tgethrestime(&tp->tn_ctime);\n\t\t\t\trw_exit(&tp->tn_rwlock);\n\t\t\t\ttmpnode_rele(tp);\n\t\t\t\ttp = NULL;\n\t\t\t}\n\t\t} else if (tpp) {\n\t\t\t*tpp = tp;\n\t\t} else if (op == DE_CREATE || op == DE_MKDIR) {\n\t\t\ttmpnode_rele(tp);\n\t\t}\n\t}\n\nout:\n\tif (error && (op == DE_LINK || op == DE_RENAME)) {\n\t\t/*\n\t\t * Undo bumped link count.\n\t\t */\n\t\tDECR_COUNT(&tp->tn_nlink, &tp->tn_tlock);\n\t\tgethrestime(&tp->tn_ctime);\n\t}\n\treturn (error);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif (tp != dir) {",
+      "\t\t\tunsigned int tries = 0;",
+      "\t\t\t/*",
+      "\t\t\t * If we are acquiring tp->tn_rwlock (for SOURCE)",
+      "\t\t\t * inside here, we must consider the following:",
+      "\t\t\t *",
+      "\t\t\t * - dir->tn_rwlock (TARGET) is already HELD (see",
+      "\t\t\t * above ASSERT()).",
+      "\t\t\t *",
+      "\t\t\t * - It is possible our SOURCE is a parent of our",
+      "\t\t\t * TARGET. Yes it's unusual, but it will return an",
+      "\t\t\t * error below via tdircheckpath().",
+      "\t\t\t *",
+      "\t\t\t * - It is also possible that another thread,",
+      "\t\t\t * concurrent to this one, is performing",
+      "\t\t\t * rmdir(TARGET), which means it will first acquire",
+      "\t\t\t * SOURCE's lock, THEN acquire TARGET's lock, which",
+      "\t\t\t * could result in this thread holding TARGET and",
+      "\t\t\t * trying for SOURCE, but the other thread holding",
+      "\t\t\t * SOURCE and trying for TARGET.  This is deadlock,",
+      "\t\t\t * and it's inducible.",
+      "\t\t\t *",
+      "\t\t\t * To prevent this, we borrow some techniques from UFS",
+      "\t\t\t * and rw_tryenter(), delaying if we fail, and",
+      "\t\t\t * if someone tweaks the number of backoff tries to be",
+      "\t\t\t * nonzero, return EBUSY after that number of tries.",
+      "\t\t\t */",
+      "\t\t\twhile (!rw_tryenter(&tp->tn_rwlock, RW_WRITER)) {",
+      "\t\t\t\t/*",
+      "\t\t\t\t * Sloppy, but this is a diagnostic so atomic",
+      "\t\t\t\t * increment would be overkill.",
+      "\t\t\t\t */",
+      "\t\t\t\ttmpfs_rename_loops++;",
+      "\t\t\t\tif (tmpfs_rename_backoff_tries != 0) {",
+      "\t\t\t\t\tif (tries > tmpfs_rename_backoff_tries)",
+      "\t\t\t\t\t\treturn (EBUSY);",
+      "\t\t\t\t\ttries++;",
+      "\t\t\t\t}",
+      "\t\t\t\t/*",
+      "\t\t\t\t * NOTE: We're still holding dir->tn_rwlock,",
+      "\t\t\t\t * so drop it over the delay, so any other",
+      "\t\t\t\t * thread can get its business done.",
+      "\t\t\t\t *",
+      "\t\t\t\t * No state change or state inspection happens",
+      "\t\t\t\t * prior to here, so it is not wholly dangerous",
+      "\t\t\t\t * to release-and-reacquire dir->tn_rwlock.",
+      "\t\t\t\t *",
+      "\t\t\t\t * Hold the vnode of dir in case it gets",
+      "\t\t\t\t * released by another thread, though.",
+      "\t\t\t\t */",
+      "\t\t\t\tVN_HOLD(TNTOV(dir));",
+      "\t\t\t\trw_exit(&dir->tn_rwlock);",
+      "\t\t\t\tdelay(tmpfs_rename_backoff_delay);",
+      "\t\t\t\trw_enter(&dir->tn_rwlock, RW_WRITER);",
+      "\t\t\t\tVN_RELE(TNTOV(dir));",
+      "\t\t\t}",
+      "\t\t}"
+    ],
+    "deleted": [
+      "\t\tif (tp != dir)",
+      "\t\t\trw_enter(&tp->tn_rwlock, RW_WRITER);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "An issue was discovered in illumos before f859e7171bb5db34321e45585839c6c3200ebb90, OmniOS Community Edition r151038, OpenIndiana Hipster 2021.04, and SmartOS 20210923. A local unprivileged user can cause a deadlock and kernel panic via crafted rename and rmdir calls on tmpfs filesystems. Oracle Solaris 10 and 11 is also affected.",
+  "id": 6112
+},
+{
+  "cve_id": "CVE-2022-31621",
+  "code_before_change": "xbstream_open(ds_ctxt_t *ctxt, const char *path, MY_STAT *mystat)\n{\n\tds_file_t\t\t*file;\n\tds_stream_file_t\t*stream_file;\n\tds_stream_ctxt_t\t*stream_ctxt;\n\tds_ctxt_t\t\t*dest_ctxt;\n\txb_wstream_t\t\t*xbstream;\n\txb_wstream_file_t\t*xbstream_file;\n\n\n\txb_ad(ctxt->pipe_ctxt != NULL);\n\tdest_ctxt = ctxt->pipe_ctxt;\n\n\tstream_ctxt = (ds_stream_ctxt_t *) ctxt->ptr;\n\n\tpthread_mutex_lock(&stream_ctxt->mutex);\n\tif (stream_ctxt->dest_file == NULL) {\n\t\tstream_ctxt->dest_file = ds_open(dest_ctxt, path, mystat);\n\t\tif (stream_ctxt->dest_file == NULL) {\n\t\t\treturn NULL;\n\t\t}\n\t}\n\tpthread_mutex_unlock(&stream_ctxt->mutex);\n\n\tfile = (ds_file_t *) my_malloc(sizeof(ds_file_t) +\n\t\t\t\t       sizeof(ds_stream_file_t),\n\t\t\t\t       MYF(MY_FAE));\n\tstream_file = (ds_stream_file_t *) (file + 1);\n\n\txbstream = stream_ctxt->xbstream;\n\n\txbstream_file = xb_stream_write_open(xbstream, path, mystat,\n\t\t                             stream_ctxt,\n\t\t\t\t\t     my_xbstream_write_callback);\n\n\tif (xbstream_file == NULL) {\n\t\tmsg(\"xb_stream_write_open() failed.\");\n\t\tgoto err;\n\t}\n\n\tstream_file->xbstream_file = xbstream_file;\n\tstream_file->stream_ctxt = stream_ctxt;\n\tfile->ptr = stream_file;\n\tfile->path = stream_ctxt->dest_file->path;\n\n\treturn file;\n\nerr:\n\tif (stream_ctxt->dest_file) {\n\t\tds_close(stream_ctxt->dest_file);\n\t\tstream_ctxt->dest_file = NULL;\n\t}\n\tmy_free(file);\n\n\treturn NULL;\n}",
+  "code_after_change": "xbstream_open(ds_ctxt_t *ctxt, const char *path, MY_STAT *mystat)\n{\n\tds_file_t\t\t*file;\n\tds_stream_file_t\t*stream_file;\n\tds_stream_ctxt_t\t*stream_ctxt;\n\tds_ctxt_t\t\t*dest_ctxt;\n\txb_wstream_t\t\t*xbstream;\n\txb_wstream_file_t\t*xbstream_file;\n\n\n\txb_ad(ctxt->pipe_ctxt != NULL);\n\tdest_ctxt = ctxt->pipe_ctxt;\n\n\tstream_ctxt = (ds_stream_ctxt_t *) ctxt->ptr;\n\n\tpthread_mutex_lock(&stream_ctxt->mutex);\n\tif (stream_ctxt->dest_file == NULL) {\n\t\tstream_ctxt->dest_file = ds_open(dest_ctxt, path, mystat);\n\t}\n\tpthread_mutex_unlock(&stream_ctxt->mutex);\n\tif (stream_ctxt->dest_file == NULL) {\n\t\treturn NULL;\n\t}\n\n\tfile = (ds_file_t *) my_malloc(sizeof(ds_file_t) +\n\t\t\t\t       sizeof(ds_stream_file_t),\n\t\t\t\t       MYF(MY_FAE));\n\tif (!file) {\n\t\tmsg(\"my_malloc() failed.\");\n\t\tgoto err;\n\t}\n\tstream_file = (ds_stream_file_t *) (file + 1);\n\n\txbstream = stream_ctxt->xbstream;\n\n\txbstream_file = xb_stream_write_open(xbstream, path, mystat,\n\t\t                             stream_ctxt,\n\t\t\t\t\t     my_xbstream_write_callback);\n\n\tif (xbstream_file == NULL) {\n\t\tmsg(\"xb_stream_write_open() failed.\");\n\t\tgoto err;\n\t}\n\n\tstream_file->xbstream_file = xbstream_file;\n\tstream_file->stream_ctxt = stream_ctxt;\n\tfile->ptr = stream_file;\n\tfile->path = stream_ctxt->dest_file->path;\n\n\treturn file;\n\nerr:\n\tif (stream_ctxt->dest_file) {\n\t\tds_close(stream_ctxt->dest_file);\n\t\tstream_ctxt->dest_file = NULL;\n\t}\n\tmy_free(file);\n\n\treturn NULL;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tif (stream_ctxt->dest_file == NULL) {",
+      "\t\treturn NULL;",
+      "\t}",
+      "\tif (!file) {",
+      "\t\tmsg(\"my_malloc() failed.\");",
+      "\t\tgoto err;",
+      "\t}"
+    ],
+    "deleted": [
+      "\t\tif (stream_ctxt->dest_file == NULL) {",
+      "\t\t\treturn NULL;",
+      "\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "MariaDB Server before 10.7 is vulnerable to Denial of Service. In extra/mariabackup/ds_xbstream.cc, when an error occurs (stream_ctxt->dest_file == NULL) while executing the method xbstream_open, the held lock is not released correctly, which allows local users to trigger a denial of service due to the deadlock. Note: The vendor argues this is just an improper locking bug and not a vulnerability with adverse effects.",
+  "id": 6113
+},
+{
+  "cve_id": "CVE-2024-0639",
+  "code_before_change": "static void sctp_auto_asconf_init(struct sctp_sock *sp)\n{\n\tstruct net *net = sock_net(&sp->inet.sk);\n\n\tif (net->sctp.default_auto_asconf) {\n\t\tspin_lock(&net->sctp.addr_wq_lock);\n\t\tlist_add_tail(&sp->auto_asconf_list, &net->sctp.auto_asconf_splist);\n\t\tspin_unlock(&net->sctp.addr_wq_lock);\n\t\tsp->do_auto_asconf = 1;\n\t}\n}",
+  "code_after_change": "static void sctp_auto_asconf_init(struct sctp_sock *sp)\n{\n\tstruct net *net = sock_net(&sp->inet.sk);\n\n\tif (net->sctp.default_auto_asconf) {\n\t\tspin_lock_bh(&net->sctp.addr_wq_lock);\n\t\tlist_add_tail(&sp->auto_asconf_list, &net->sctp.auto_asconf_splist);\n\t\tspin_unlock_bh(&net->sctp.addr_wq_lock);\n\t\tsp->do_auto_asconf = 1;\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tspin_lock_bh(&net->sctp.addr_wq_lock);",
+      "\t\tspin_unlock_bh(&net->sctp.addr_wq_lock);"
+    ],
+    "deleted": [
+      "\t\tspin_lock(&net->sctp.addr_wq_lock);",
+      "\t\tspin_unlock(&net->sctp.addr_wq_lock);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "A denial of service vulnerability due to a deadlock was found in sctp_auto_asconf_init in net/sctp/socket.c in the Linux kernel’s SCTP subsystem. This flaw allows guests with local user privileges to trigger a deadlock and potentially crash the system.",
+  "id": 6114
+},
+{
+  "cve_id": "CVE-2024-0641",
+  "code_before_change": "static int tipc_crypto_key_revoke(struct net *net, u8 tx_key)\n{\n\tstruct tipc_crypto *tx = tipc_net(net)->crypto_tx;\n\tstruct tipc_key key;\n\n\tspin_lock(&tx->lock);\n\tkey = tx->key;\n\tWARN_ON(!key.active || tx_key != key.active);\n\n\t/* Free the active key */\n\ttipc_crypto_key_set_state(tx, key.passive, 0, key.pending);\n\ttipc_crypto_key_detach(tx->aead[key.active], &tx->lock);\n\tspin_unlock(&tx->lock);\n\n\tpr_warn(\"%s: key is revoked\\n\", tx->name);\n\treturn -EKEYREVOKED;\n}",
+  "code_after_change": "static int tipc_crypto_key_revoke(struct net *net, u8 tx_key)\n{\n\tstruct tipc_crypto *tx = tipc_net(net)->crypto_tx;\n\tstruct tipc_key key;\n\n\tspin_lock_bh(&tx->lock);\n\tkey = tx->key;\n\tWARN_ON(!key.active || tx_key != key.active);\n\n\t/* Free the active key */\n\ttipc_crypto_key_set_state(tx, key.passive, 0, key.pending);\n\ttipc_crypto_key_detach(tx->aead[key.active], &tx->lock);\n\tspin_unlock_bh(&tx->lock);\n\n\tpr_warn(\"%s: key is revoked\\n\", tx->name);\n\treturn -EKEYREVOKED;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspin_lock_bh(&tx->lock);",
+      "\tspin_unlock_bh(&tx->lock);"
+    ],
+    "deleted": [
+      "\tspin_lock(&tx->lock);",
+      "\tspin_unlock(&tx->lock);"
+    ]
+  },
+  "cwe": [
+    "CWE-667"
+  ],
+  "cve_description": "A denial of service vulnerability was found in tipc_crypto_key_revoke in net/tipc/crypto.c in the Linux kernel’s TIPC subsystem. This flaw allows guests with local user privileges to trigger a deadlock and potentially crash the system.",
+  "id": 6115
+}
+]

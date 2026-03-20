@@ -1,0 +1,438 @@
+[
+{
+  "cve_id": "CVE-2016-10229",
+  "code_before_change": "int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,\n\t\tint flags, int *addr_len)\n{\n\tstruct inet_sock *inet = inet_sk(sk);\n\tDECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);\n\tstruct sk_buff *skb;\n\tunsigned int ulen, copied;\n\tint peeked, off = 0;\n\tint err;\n\tint is_udplite = IS_UDPLITE(sk);\n\tbool slow;\n\n\tif (flags & MSG_ERRQUEUE)\n\t\treturn ip_recv_error(sk, msg, len, addr_len);\n\ntry_again:\n\tskb = __skb_recv_datagram(sk, flags | (noblock ? MSG_DONTWAIT : 0),\n\t\t\t\t  &peeked, &off, &err);\n\tif (!skb)\n\t\tgoto out;\n\n\tulen = skb->len - sizeof(struct udphdr);\n\tcopied = len;\n\tif (copied > ulen)\n\t\tcopied = ulen;\n\telse if (copied < ulen)\n\t\tmsg->msg_flags |= MSG_TRUNC;\n\n\t/*\n\t * If checksum is needed at all, try to do it while copying the\n\t * data.  If the data is truncated, or if we only want a partial\n\t * coverage checksum (UDP-Lite), do it before the copy.\n\t */\n\n\tif (copied < ulen || UDP_SKB_CB(skb)->partial_cov) {\n\t\tif (udp_lib_checksum_complete(skb))\n\t\t\tgoto csum_copy_err;\n\t}\n\n\tif (skb_csum_unnecessary(skb))\n\t\terr = skb_copy_datagram_msg(skb, sizeof(struct udphdr),\n\t\t\t\t\t    msg, copied);\n\telse {\n\t\terr = skb_copy_and_csum_datagram_msg(skb, sizeof(struct udphdr),\n\t\t\t\t\t\t     msg);\n\n\t\tif (err == -EINVAL)\n\t\t\tgoto csum_copy_err;\n\t}\n\n\tif (unlikely(err)) {\n\t\ttrace_kfree_skb(skb, udp_recvmsg);\n\t\tif (!peeked) {\n\t\t\tatomic_inc(&sk->sk_drops);\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\t   UDP_MIB_INERRORS, is_udplite);\n\t\t}\n\t\tgoto out_free;\n\t}\n\n\tif (!peeked)\n\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\tUDP_MIB_INDATAGRAMS, is_udplite);\n\n\tsock_recv_ts_and_drops(msg, sk, skb);\n\n\t/* Copy the address. */\n\tif (sin) {\n\t\tsin->sin_family = AF_INET;\n\t\tsin->sin_port = udp_hdr(skb)->source;\n\t\tsin->sin_addr.s_addr = ip_hdr(skb)->saddr;\n\t\tmemset(sin->sin_zero, 0, sizeof(sin->sin_zero));\n\t\t*addr_len = sizeof(*sin);\n\t}\n\tif (inet->cmsg_flags)\n\t\tip_cmsg_recv_offset(msg, skb, sizeof(struct udphdr));\n\n\terr = copied;\n\tif (flags & MSG_TRUNC)\n\t\terr = ulen;\n\nout_free:\n\tskb_free_datagram_locked(sk, skb);\nout:\n\treturn err;\n\ncsum_copy_err:\n\tslow = lock_sock_fast(sk);\n\tif (!skb_kill_datagram(sk, skb, flags)) {\n\t\tUDP_INC_STATS_USER(sock_net(sk), UDP_MIB_CSUMERRORS, is_udplite);\n\t\tUDP_INC_STATS_USER(sock_net(sk), UDP_MIB_INERRORS, is_udplite);\n\t}\n\tunlock_sock_fast(sk, slow);\n\n\t/* starting over for a new packet, but check if we need to yield */\n\tcond_resched();\n\tmsg->msg_flags &= ~MSG_TRUNC;\n\tgoto try_again;\n}",
+  "code_after_change": "int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,\n\t\tint flags, int *addr_len)\n{\n\tstruct inet_sock *inet = inet_sk(sk);\n\tDECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);\n\tstruct sk_buff *skb;\n\tunsigned int ulen, copied;\n\tint peeked, off = 0;\n\tint err;\n\tint is_udplite = IS_UDPLITE(sk);\n\tbool checksum_valid = false;\n\tbool slow;\n\n\tif (flags & MSG_ERRQUEUE)\n\t\treturn ip_recv_error(sk, msg, len, addr_len);\n\ntry_again:\n\tskb = __skb_recv_datagram(sk, flags | (noblock ? MSG_DONTWAIT : 0),\n\t\t\t\t  &peeked, &off, &err);\n\tif (!skb)\n\t\tgoto out;\n\n\tulen = skb->len - sizeof(struct udphdr);\n\tcopied = len;\n\tif (copied > ulen)\n\t\tcopied = ulen;\n\telse if (copied < ulen)\n\t\tmsg->msg_flags |= MSG_TRUNC;\n\n\t/*\n\t * If checksum is needed at all, try to do it while copying the\n\t * data.  If the data is truncated, or if we only want a partial\n\t * coverage checksum (UDP-Lite), do it before the copy.\n\t */\n\n\tif (copied < ulen || UDP_SKB_CB(skb)->partial_cov) {\n\t\tchecksum_valid = !udp_lib_checksum_complete(skb);\n\t\tif (!checksum_valid)\n\t\t\tgoto csum_copy_err;\n\t}\n\n\tif (checksum_valid || skb_csum_unnecessary(skb))\n\t\terr = skb_copy_datagram_msg(skb, sizeof(struct udphdr),\n\t\t\t\t\t    msg, copied);\n\telse {\n\t\terr = skb_copy_and_csum_datagram_msg(skb, sizeof(struct udphdr),\n\t\t\t\t\t\t     msg);\n\n\t\tif (err == -EINVAL)\n\t\t\tgoto csum_copy_err;\n\t}\n\n\tif (unlikely(err)) {\n\t\ttrace_kfree_skb(skb, udp_recvmsg);\n\t\tif (!peeked) {\n\t\t\tatomic_inc(&sk->sk_drops);\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\t   UDP_MIB_INERRORS, is_udplite);\n\t\t}\n\t\tgoto out_free;\n\t}\n\n\tif (!peeked)\n\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\tUDP_MIB_INDATAGRAMS, is_udplite);\n\n\tsock_recv_ts_and_drops(msg, sk, skb);\n\n\t/* Copy the address. */\n\tif (sin) {\n\t\tsin->sin_family = AF_INET;\n\t\tsin->sin_port = udp_hdr(skb)->source;\n\t\tsin->sin_addr.s_addr = ip_hdr(skb)->saddr;\n\t\tmemset(sin->sin_zero, 0, sizeof(sin->sin_zero));\n\t\t*addr_len = sizeof(*sin);\n\t}\n\tif (inet->cmsg_flags)\n\t\tip_cmsg_recv_offset(msg, skb, sizeof(struct udphdr));\n\n\terr = copied;\n\tif (flags & MSG_TRUNC)\n\t\terr = ulen;\n\nout_free:\n\tskb_free_datagram_locked(sk, skb);\nout:\n\treturn err;\n\ncsum_copy_err:\n\tslow = lock_sock_fast(sk);\n\tif (!skb_kill_datagram(sk, skb, flags)) {\n\t\tUDP_INC_STATS_USER(sock_net(sk), UDP_MIB_CSUMERRORS, is_udplite);\n\t\tUDP_INC_STATS_USER(sock_net(sk), UDP_MIB_INERRORS, is_udplite);\n\t}\n\tunlock_sock_fast(sk, slow);\n\n\t/* starting over for a new packet, but check if we need to yield */\n\tcond_resched();\n\tmsg->msg_flags &= ~MSG_TRUNC;\n\tgoto try_again;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tbool checksum_valid = false;",
+      "\t\tchecksum_valid = !udp_lib_checksum_complete(skb);",
+      "\t\tif (!checksum_valid)",
+      "\tif (checksum_valid || skb_csum_unnecessary(skb))"
+    ],
+    "deleted": [
+      "\t\tif (udp_lib_checksum_complete(skb))",
+      "\tif (skb_csum_unnecessary(skb))"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "udp.c in the Linux kernel before 4.5 allows remote attackers to execute arbitrary code via UDP traffic that triggers an unsafe second checksum calculation during execution of a recv system call with the MSG_PEEK flag.",
+  "id": 4499
+},
+{
+  "cve_id": "CVE-2016-10229",
+  "code_before_change": "int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,\n\t\t  int noblock, int flags, int *addr_len)\n{\n\tstruct ipv6_pinfo *np = inet6_sk(sk);\n\tstruct inet_sock *inet = inet_sk(sk);\n\tstruct sk_buff *skb;\n\tunsigned int ulen, copied;\n\tint peeked, off = 0;\n\tint err;\n\tint is_udplite = IS_UDPLITE(sk);\n\tint is_udp4;\n\tbool slow;\n\n\tif (flags & MSG_ERRQUEUE)\n\t\treturn ipv6_recv_error(sk, msg, len, addr_len);\n\n\tif (np->rxpmtu && np->rxopt.bits.rxpmtu)\n\t\treturn ipv6_recv_rxpmtu(sk, msg, len, addr_len);\n\ntry_again:\n\tskb = __skb_recv_datagram(sk, flags | (noblock ? MSG_DONTWAIT : 0),\n\t\t\t\t  &peeked, &off, &err);\n\tif (!skb)\n\t\tgoto out;\n\n\tulen = skb->len - sizeof(struct udphdr);\n\tcopied = len;\n\tif (copied > ulen)\n\t\tcopied = ulen;\n\telse if (copied < ulen)\n\t\tmsg->msg_flags |= MSG_TRUNC;\n\n\tis_udp4 = (skb->protocol == htons(ETH_P_IP));\n\n\t/*\n\t * If checksum is needed at all, try to do it while copying the\n\t * data.  If the data is truncated, or if we only want a partial\n\t * coverage checksum (UDP-Lite), do it before the copy.\n\t */\n\n\tif (copied < ulen || UDP_SKB_CB(skb)->partial_cov) {\n\t\tif (udp_lib_checksum_complete(skb))\n\t\t\tgoto csum_copy_err;\n\t}\n\n\tif (skb_csum_unnecessary(skb))\n\t\terr = skb_copy_datagram_msg(skb, sizeof(struct udphdr),\n\t\t\t\t\t    msg, copied);\n\telse {\n\t\terr = skb_copy_and_csum_datagram_msg(skb, sizeof(struct udphdr), msg);\n\t\tif (err == -EINVAL)\n\t\t\tgoto csum_copy_err;\n\t}\n\tif (unlikely(err)) {\n\t\ttrace_kfree_skb(skb, udpv6_recvmsg);\n\t\tif (!peeked) {\n\t\t\tatomic_inc(&sk->sk_drops);\n\t\t\tif (is_udp4)\n\t\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\t\t   UDP_MIB_INERRORS,\n\t\t\t\t\t\t   is_udplite);\n\t\t\telse\n\t\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\t\t    UDP_MIB_INERRORS,\n\t\t\t\t\t\t    is_udplite);\n\t\t}\n\t\tgoto out_free;\n\t}\n\tif (!peeked) {\n\t\tif (is_udp4)\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INDATAGRAMS, is_udplite);\n\t\telse\n\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INDATAGRAMS, is_udplite);\n\t}\n\n\tsock_recv_ts_and_drops(msg, sk, skb);\n\n\t/* Copy the address. */\n\tif (msg->msg_name) {\n\t\tDECLARE_SOCKADDR(struct sockaddr_in6 *, sin6, msg->msg_name);\n\t\tsin6->sin6_family = AF_INET6;\n\t\tsin6->sin6_port = udp_hdr(skb)->source;\n\t\tsin6->sin6_flowinfo = 0;\n\n\t\tif (is_udp4) {\n\t\t\tipv6_addr_set_v4mapped(ip_hdr(skb)->saddr,\n\t\t\t\t\t       &sin6->sin6_addr);\n\t\t\tsin6->sin6_scope_id = 0;\n\t\t} else {\n\t\t\tsin6->sin6_addr = ipv6_hdr(skb)->saddr;\n\t\t\tsin6->sin6_scope_id =\n\t\t\t\tipv6_iface_scope_id(&sin6->sin6_addr,\n\t\t\t\t\t\t    inet6_iif(skb));\n\t\t}\n\t\t*addr_len = sizeof(*sin6);\n\t}\n\n\tif (np->rxopt.all)\n\t\tip6_datagram_recv_common_ctl(sk, msg, skb);\n\n\tif (is_udp4) {\n\t\tif (inet->cmsg_flags)\n\t\t\tip_cmsg_recv(msg, skb);\n\t} else {\n\t\tif (np->rxopt.all)\n\t\t\tip6_datagram_recv_specific_ctl(sk, msg, skb);\n\t}\n\n\terr = copied;\n\tif (flags & MSG_TRUNC)\n\t\terr = ulen;\n\nout_free:\n\tskb_free_datagram_locked(sk, skb);\nout:\n\treturn err;\n\ncsum_copy_err:\n\tslow = lock_sock_fast(sk);\n\tif (!skb_kill_datagram(sk, skb, flags)) {\n\t\tif (is_udp4) {\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_CSUMERRORS, is_udplite);\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INERRORS, is_udplite);\n\t\t} else {\n\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_CSUMERRORS, is_udplite);\n\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INERRORS, is_udplite);\n\t\t}\n\t}\n\tunlock_sock_fast(sk, slow);\n\n\t/* starting over for a new packet, but check if we need to yield */\n\tcond_resched();\n\tmsg->msg_flags &= ~MSG_TRUNC;\n\tgoto try_again;\n}",
+  "code_after_change": "int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,\n\t\t  int noblock, int flags, int *addr_len)\n{\n\tstruct ipv6_pinfo *np = inet6_sk(sk);\n\tstruct inet_sock *inet = inet_sk(sk);\n\tstruct sk_buff *skb;\n\tunsigned int ulen, copied;\n\tint peeked, off = 0;\n\tint err;\n\tint is_udplite = IS_UDPLITE(sk);\n\tbool checksum_valid = false;\n\tint is_udp4;\n\tbool slow;\n\n\tif (flags & MSG_ERRQUEUE)\n\t\treturn ipv6_recv_error(sk, msg, len, addr_len);\n\n\tif (np->rxpmtu && np->rxopt.bits.rxpmtu)\n\t\treturn ipv6_recv_rxpmtu(sk, msg, len, addr_len);\n\ntry_again:\n\tskb = __skb_recv_datagram(sk, flags | (noblock ? MSG_DONTWAIT : 0),\n\t\t\t\t  &peeked, &off, &err);\n\tif (!skb)\n\t\tgoto out;\n\n\tulen = skb->len - sizeof(struct udphdr);\n\tcopied = len;\n\tif (copied > ulen)\n\t\tcopied = ulen;\n\telse if (copied < ulen)\n\t\tmsg->msg_flags |= MSG_TRUNC;\n\n\tis_udp4 = (skb->protocol == htons(ETH_P_IP));\n\n\t/*\n\t * If checksum is needed at all, try to do it while copying the\n\t * data.  If the data is truncated, or if we only want a partial\n\t * coverage checksum (UDP-Lite), do it before the copy.\n\t */\n\n\tif (copied < ulen || UDP_SKB_CB(skb)->partial_cov) {\n\t\tchecksum_valid = !udp_lib_checksum_complete(skb);\n\t\tif (!checksum_valid)\n\t\t\tgoto csum_copy_err;\n\t}\n\n\tif (checksum_valid || skb_csum_unnecessary(skb))\n\t\terr = skb_copy_datagram_msg(skb, sizeof(struct udphdr),\n\t\t\t\t\t    msg, copied);\n\telse {\n\t\terr = skb_copy_and_csum_datagram_msg(skb, sizeof(struct udphdr), msg);\n\t\tif (err == -EINVAL)\n\t\t\tgoto csum_copy_err;\n\t}\n\tif (unlikely(err)) {\n\t\ttrace_kfree_skb(skb, udpv6_recvmsg);\n\t\tif (!peeked) {\n\t\t\tatomic_inc(&sk->sk_drops);\n\t\t\tif (is_udp4)\n\t\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\t\t   UDP_MIB_INERRORS,\n\t\t\t\t\t\t   is_udplite);\n\t\t\telse\n\t\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\t\t    UDP_MIB_INERRORS,\n\t\t\t\t\t\t    is_udplite);\n\t\t}\n\t\tgoto out_free;\n\t}\n\tif (!peeked) {\n\t\tif (is_udp4)\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INDATAGRAMS, is_udplite);\n\t\telse\n\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INDATAGRAMS, is_udplite);\n\t}\n\n\tsock_recv_ts_and_drops(msg, sk, skb);\n\n\t/* Copy the address. */\n\tif (msg->msg_name) {\n\t\tDECLARE_SOCKADDR(struct sockaddr_in6 *, sin6, msg->msg_name);\n\t\tsin6->sin6_family = AF_INET6;\n\t\tsin6->sin6_port = udp_hdr(skb)->source;\n\t\tsin6->sin6_flowinfo = 0;\n\n\t\tif (is_udp4) {\n\t\t\tipv6_addr_set_v4mapped(ip_hdr(skb)->saddr,\n\t\t\t\t\t       &sin6->sin6_addr);\n\t\t\tsin6->sin6_scope_id = 0;\n\t\t} else {\n\t\t\tsin6->sin6_addr = ipv6_hdr(skb)->saddr;\n\t\t\tsin6->sin6_scope_id =\n\t\t\t\tipv6_iface_scope_id(&sin6->sin6_addr,\n\t\t\t\t\t\t    inet6_iif(skb));\n\t\t}\n\t\t*addr_len = sizeof(*sin6);\n\t}\n\n\tif (np->rxopt.all)\n\t\tip6_datagram_recv_common_ctl(sk, msg, skb);\n\n\tif (is_udp4) {\n\t\tif (inet->cmsg_flags)\n\t\t\tip_cmsg_recv(msg, skb);\n\t} else {\n\t\tif (np->rxopt.all)\n\t\t\tip6_datagram_recv_specific_ctl(sk, msg, skb);\n\t}\n\n\terr = copied;\n\tif (flags & MSG_TRUNC)\n\t\terr = ulen;\n\nout_free:\n\tskb_free_datagram_locked(sk, skb);\nout:\n\treturn err;\n\ncsum_copy_err:\n\tslow = lock_sock_fast(sk);\n\tif (!skb_kill_datagram(sk, skb, flags)) {\n\t\tif (is_udp4) {\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_CSUMERRORS, is_udplite);\n\t\t\tUDP_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INERRORS, is_udplite);\n\t\t} else {\n\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_CSUMERRORS, is_udplite);\n\t\t\tUDP6_INC_STATS_USER(sock_net(sk),\n\t\t\t\t\tUDP_MIB_INERRORS, is_udplite);\n\t\t}\n\t}\n\tunlock_sock_fast(sk, slow);\n\n\t/* starting over for a new packet, but check if we need to yield */\n\tcond_resched();\n\tmsg->msg_flags &= ~MSG_TRUNC;\n\tgoto try_again;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tbool checksum_valid = false;",
+      "\t\tchecksum_valid = !udp_lib_checksum_complete(skb);",
+      "\t\tif (!checksum_valid)",
+      "\tif (checksum_valid || skb_csum_unnecessary(skb))"
+    ],
+    "deleted": [
+      "\t\tif (udp_lib_checksum_complete(skb))",
+      "\tif (skb_csum_unnecessary(skb))"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "udp.c in the Linux kernel before 4.5 allows remote attackers to execute arbitrary code via UDP traffic that triggers an unsafe second checksum calculation during execution of a recv system call with the MSG_PEEK flag.",
+  "id": 4500
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragInOrderSimpleTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = BuildTestPacket(id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p1, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n\n    reassembled = Defrag(NULL, NULL, p3, NULL);\n    if (reassembled == NULL) {\n        goto end;\n    }\n\n    if (IPV4_GET_HLEN(reassembled) != 20) {\n        goto end;\n    }\n    if (IPV4_GET_IPLEN(reassembled) != 39) {\n        goto end;\n    }\n\n    /* 20 bytes in we should find 8 bytes of A. */\n    for (i = 20; i < 20 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A') {\n            goto end;\n        }\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 28; i < 28 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B') {\n            goto end;\n        }\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 36; i < 36 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\n\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "DefragInOrderSimpleTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(IPPROTO_ICMP, id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(IPPROTO_ICMP, id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = BuildTestPacket(IPPROTO_ICMP, id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p1, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n\n    reassembled = Defrag(NULL, NULL, p3, NULL);\n    if (reassembled == NULL) {\n        goto end;\n    }\n\n    if (IPV4_GET_HLEN(reassembled) != 20) {\n        goto end;\n    }\n    if (IPV4_GET_IPLEN(reassembled) != 39) {\n        goto end;\n    }\n\n    /* 20 bytes in we should find 8 bytes of A. */\n    for (i = 20; i < 20 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A') {\n            goto end;\n        }\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 28; i < 28 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B') {\n            goto end;\n        }\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 36; i < 36 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\n\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p1 = BuildTestPacket(IPPROTO_ICMP, id, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(IPPROTO_ICMP, id, 1, 1, 'B', 8);",
+      "    p3 = BuildTestPacket(IPPROTO_ICMP, id, 2, 0, 'C', 3);"
+    ],
+    "deleted": [
+      "    p1 = BuildTestPacket(id, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(id, 1, 1, 'B', 8);",
+      "    p3 = BuildTestPacket(id, 2, 0, 'C', 3);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4501
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "IPV6DefragInOrderSimpleTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = IPV6BuildTestPacket(id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = IPV6BuildTestPacket(id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = IPV6BuildTestPacket(id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p1, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n    reassembled = Defrag(NULL, NULL, p3, NULL);\n    if (reassembled == NULL)\n        goto end;\n\n    if (IPV6_GET_PLEN(reassembled) != 19)\n        goto end;\n\n    /* 40 bytes in we should find 8 bytes of A. */\n    for (i = 40; i < 40 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A')\n            goto end;\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 48; i < 48 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B')\n            goto end;\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 56; i < 56 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "IPV6DefragInOrderSimpleTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p1, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n    reassembled = Defrag(NULL, NULL, p3, NULL);\n    if (reassembled == NULL)\n        goto end;\n\n    if (IPV6_GET_PLEN(reassembled) != 19)\n        goto end;\n\n    /* 40 bytes in we should find 8 bytes of A. */\n    for (i = 40; i < 40 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A')\n            goto end;\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 48; i < 48 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B')\n            goto end;\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 56; i < 56 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p1 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 0, 1, 'A', 8);",
+      "    p2 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 1, 1, 'B', 8);",
+      "    p3 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 2, 0, 'C', 3);"
+    ],
+    "deleted": [
+      "    p1 = IPV6BuildTestPacket(id, 0, 1, 'A', 8);",
+      "    p2 = IPV6BuildTestPacket(id, 1, 1, 'B', 8);",
+      "    p3 = IPV6BuildTestPacket(id, 2, 0, 'C', 3);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4502
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "IPV6DefragDoSturgesNovakTest(int policy, u_char *expected, size_t expected_len)\n{\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    /*\n     * Build the packets.\n     */\n\n    int id = 1;\n    Packet *packets[17];\n    memset(packets, 0x00, sizeof(packets));\n\n    /*\n     * Original fragments.\n     */\n\n    /* A*24 at 0. */\n    packets[0] = IPV6BuildTestPacket(id, 0, 1, 'A', 24);\n\n    /* B*15 at 32. */\n    packets[1] = IPV6BuildTestPacket(id, 32 >> 3, 1, 'B', 16);\n\n    /* C*24 at 48. */\n    packets[2] = IPV6BuildTestPacket(id, 48 >> 3, 1, 'C', 24);\n\n    /* D*8 at 80. */\n    packets[3] = IPV6BuildTestPacket(id, 80 >> 3, 1, 'D', 8);\n\n    /* E*16 at 104. */\n    packets[4] = IPV6BuildTestPacket(id, 104 >> 3, 1, 'E', 16);\n\n    /* F*24 at 120. */\n    packets[5] = IPV6BuildTestPacket(id, 120 >> 3, 1, 'F', 24);\n\n    /* G*16 at 144. */\n    packets[6] = IPV6BuildTestPacket(id, 144 >> 3, 1, 'G', 16);\n\n    /* H*16 at 160. */\n    packets[7] = IPV6BuildTestPacket(id, 160 >> 3, 1, 'H', 16);\n\n    /* I*8 at 176. */\n    packets[8] = IPV6BuildTestPacket(id, 176 >> 3, 1, 'I', 8);\n\n    /*\n     * Overlapping subsequent fragments.\n     */\n\n    /* J*32 at 8. */\n    packets[9] = IPV6BuildTestPacket(id, 8 >> 3, 1, 'J', 32);\n\n    /* K*24 at 48. */\n    packets[10] = IPV6BuildTestPacket(id, 48 >> 3, 1, 'K', 24);\n\n    /* L*24 at 72. */\n    packets[11] = IPV6BuildTestPacket(id, 72 >> 3, 1, 'L', 24);\n\n    /* M*24 at 96. */\n    packets[12] = IPV6BuildTestPacket(id, 96 >> 3, 1, 'M', 24);\n\n    /* N*8 at 128. */\n    packets[13] = IPV6BuildTestPacket(id, 128 >> 3, 1, 'N', 8);\n\n    /* O*8 at 152. */\n    packets[14] = IPV6BuildTestPacket(id, 152 >> 3, 1, 'O', 8);\n\n    /* P*8 at 160. */\n    packets[15] = IPV6BuildTestPacket(id, 160 >> 3, 1, 'P', 8);\n\n    /* Q*16 at 176. */\n    packets[16] = IPV6BuildTestPacket(id, 176 >> 3, 0, 'Q', 16);\n\n    default_policy = policy;\n\n    /* Send all but the last. */\n    for (i = 0; i < 9; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV6_FRAG_OVERLAP)) {\n            goto end;\n        }\n    }\n    int overlap = 0;\n    for (; i < 16; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV6_FRAG_OVERLAP)) {\n            overlap++;\n        }\n    }\n    if (!overlap)\n        goto end;\n\n    /* And now the last one. */\n    Packet *reassembled = Defrag(NULL, NULL, packets[16], NULL);\n    if (reassembled == NULL)\n        goto end;\n    if (memcmp(GET_PKT_DATA(reassembled) + 40, expected, expected_len) != 0)\n        goto end;\n\n    if (IPV6_GET_PLEN(reassembled) != 192)\n        goto end;\n\n    SCFree(reassembled);\n\n    /* Make sure all frags were returned to the pool. */\n    if (defrag_context->frag_pool->outstanding != 0) {\n        printf(\"defrag_context->frag_pool->outstanding %u: \", defrag_context->frag_pool->outstanding);\n        goto end;\n    }\n\n    ret = 1;\n\nend:\n    for (i = 0; i < 17; i++) {\n        SCFree(packets[i]);\n    }\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "IPV6DefragDoSturgesNovakTest(int policy, u_char *expected, size_t expected_len)\n{\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    /*\n     * Build the packets.\n     */\n\n    int id = 1;\n    Packet *packets[17];\n    memset(packets, 0x00, sizeof(packets));\n\n    /*\n     * Original fragments.\n     */\n\n    /* A*24 at 0. */\n    packets[0] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 0, 1, 'A', 24);\n\n    /* B*15 at 32. */\n    packets[1] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 32 >> 3, 1, 'B', 16);\n\n    /* C*24 at 48. */\n    packets[2] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 48 >> 3, 1, 'C', 24);\n\n    /* D*8 at 80. */\n    packets[3] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 80 >> 3, 1, 'D', 8);\n\n    /* E*16 at 104. */\n    packets[4] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 104 >> 3, 1, 'E', 16);\n\n    /* F*24 at 120. */\n    packets[5] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 120 >> 3, 1, 'F', 24);\n\n    /* G*16 at 144. */\n    packets[6] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 144 >> 3, 1, 'G', 16);\n\n    /* H*16 at 160. */\n    packets[7] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 160 >> 3, 1, 'H', 16);\n\n    /* I*8 at 176. */\n    packets[8] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 176 >> 3, 1, 'I', 8);\n\n    /*\n     * Overlapping subsequent fragments.\n     */\n\n    /* J*32 at 8. */\n    packets[9] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 8 >> 3, 1, 'J', 32);\n\n    /* K*24 at 48. */\n    packets[10] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 48 >> 3, 1, 'K', 24);\n\n    /* L*24 at 72. */\n    packets[11] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 72 >> 3, 1, 'L', 24);\n\n    /* M*24 at 96. */\n    packets[12] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 96 >> 3, 1, 'M', 24);\n\n    /* N*8 at 128. */\n    packets[13] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 128 >> 3, 1, 'N', 8);\n\n    /* O*8 at 152. */\n    packets[14] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 152 >> 3, 1, 'O', 8);\n\n    /* P*8 at 160. */\n    packets[15] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 160 >> 3, 1, 'P', 8);\n\n    /* Q*16 at 176. */\n    packets[16] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 176 >> 3, 0, 'Q', 16);\n\n    default_policy = policy;\n\n    /* Send all but the last. */\n    for (i = 0; i < 9; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV6_FRAG_OVERLAP)) {\n            goto end;\n        }\n    }\n    int overlap = 0;\n    for (; i < 16; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV6_FRAG_OVERLAP)) {\n            overlap++;\n        }\n    }\n    if (!overlap)\n        goto end;\n\n    /* And now the last one. */\n    Packet *reassembled = Defrag(NULL, NULL, packets[16], NULL);\n    if (reassembled == NULL)\n        goto end;\n    if (memcmp(GET_PKT_DATA(reassembled) + 40, expected, expected_len) != 0)\n        goto end;\n\n    if (IPV6_GET_PLEN(reassembled) != 192)\n        goto end;\n\n    SCFree(reassembled);\n\n    /* Make sure all frags were returned to the pool. */\n    if (defrag_context->frag_pool->outstanding != 0) {\n        printf(\"defrag_context->frag_pool->outstanding %u: \", defrag_context->frag_pool->outstanding);\n        goto end;\n    }\n\n    ret = 1;\n\nend:\n    for (i = 0; i < 17; i++) {\n        SCFree(packets[i]);\n    }\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    packets[0] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 0, 1, 'A', 24);",
+      "    packets[1] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 32 >> 3, 1, 'B', 16);",
+      "    packets[2] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 48 >> 3, 1, 'C', 24);",
+      "    packets[3] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 80 >> 3, 1, 'D', 8);",
+      "    packets[4] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 104 >> 3, 1, 'E', 16);",
+      "    packets[5] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 120 >> 3, 1, 'F', 24);",
+      "    packets[6] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 144 >> 3, 1, 'G', 16);",
+      "    packets[7] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 160 >> 3, 1, 'H', 16);",
+      "    packets[8] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 176 >> 3, 1, 'I', 8);",
+      "    packets[9] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 8 >> 3, 1, 'J', 32);",
+      "    packets[10] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 48 >> 3, 1, 'K', 24);",
+      "    packets[11] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 72 >> 3, 1, 'L', 24);",
+      "    packets[12] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 96 >> 3, 1, 'M', 24);",
+      "    packets[13] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 128 >> 3, 1, 'N', 8);",
+      "    packets[14] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 152 >> 3, 1, 'O', 8);",
+      "    packets[15] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 160 >> 3, 1, 'P', 8);",
+      "    packets[16] = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 176 >> 3, 0, 'Q', 16);"
+    ],
+    "deleted": [
+      "    packets[0] = IPV6BuildTestPacket(id, 0, 1, 'A', 24);",
+      "    packets[1] = IPV6BuildTestPacket(id, 32 >> 3, 1, 'B', 16);",
+      "    packets[2] = IPV6BuildTestPacket(id, 48 >> 3, 1, 'C', 24);",
+      "    packets[3] = IPV6BuildTestPacket(id, 80 >> 3, 1, 'D', 8);",
+      "    packets[4] = IPV6BuildTestPacket(id, 104 >> 3, 1, 'E', 16);",
+      "    packets[5] = IPV6BuildTestPacket(id, 120 >> 3, 1, 'F', 24);",
+      "    packets[6] = IPV6BuildTestPacket(id, 144 >> 3, 1, 'G', 16);",
+      "    packets[7] = IPV6BuildTestPacket(id, 160 >> 3, 1, 'H', 16);",
+      "    packets[8] = IPV6BuildTestPacket(id, 176 >> 3, 1, 'I', 8);",
+      "    packets[9] = IPV6BuildTestPacket(id, 8 >> 3, 1, 'J', 32);",
+      "    packets[10] = IPV6BuildTestPacket(id, 48 >> 3, 1, 'K', 24);",
+      "    packets[11] = IPV6BuildTestPacket(id, 72 >> 3, 1, 'L', 24);",
+      "    packets[12] = IPV6BuildTestPacket(id, 96 >> 3, 1, 'M', 24);",
+      "    packets[13] = IPV6BuildTestPacket(id, 128 >> 3, 1, 'N', 8);",
+      "    packets[14] = IPV6BuildTestPacket(id, 152 >> 3, 1, 'O', 8);",
+      "    packets[15] = IPV6BuildTestPacket(id, 160 >> 3, 1, 'P', 8);",
+      "    packets[16] = IPV6BuildTestPacket(id, 176 >> 3, 0, 'Q', 16);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4503
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragDoSturgesNovakTest(int policy, u_char *expected, size_t expected_len)\n{\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    /*\n     * Build the packets.\n     */\n\n    int id = 1;\n    Packet *packets[17];\n    memset(packets, 0x00, sizeof(packets));\n\n    /*\n     * Original fragments.\n     */\n\n    /* A*24 at 0. */\n    packets[0] = BuildTestPacket(id, 0, 1, 'A', 24);\n\n    /* B*15 at 32. */\n    packets[1] = BuildTestPacket(id, 32 >> 3, 1, 'B', 16);\n\n    /* C*24 at 48. */\n    packets[2] = BuildTestPacket(id, 48 >> 3, 1, 'C', 24);\n\n    /* D*8 at 80. */\n    packets[3] = BuildTestPacket(id, 80 >> 3, 1, 'D', 8);\n\n    /* E*16 at 104. */\n    packets[4] = BuildTestPacket(id, 104 >> 3, 1, 'E', 16);\n\n    /* F*24 at 120. */\n    packets[5] = BuildTestPacket(id, 120 >> 3, 1, 'F', 24);\n\n    /* G*16 at 144. */\n    packets[6] = BuildTestPacket(id, 144 >> 3, 1, 'G', 16);\n\n    /* H*16 at 160. */\n    packets[7] = BuildTestPacket(id, 160 >> 3, 1, 'H', 16);\n\n    /* I*8 at 176. */\n    packets[8] = BuildTestPacket(id, 176 >> 3, 1, 'I', 8);\n\n    /*\n     * Overlapping subsequent fragments.\n     */\n\n    /* J*32 at 8. */\n    packets[9] = BuildTestPacket(id, 8 >> 3, 1, 'J', 32);\n\n    /* K*24 at 48. */\n    packets[10] = BuildTestPacket(id, 48 >> 3, 1, 'K', 24);\n\n    /* L*24 at 72. */\n    packets[11] = BuildTestPacket(id, 72 >> 3, 1, 'L', 24);\n\n    /* M*24 at 96. */\n    packets[12] = BuildTestPacket(id, 96 >> 3, 1, 'M', 24);\n\n    /* N*8 at 128. */\n    packets[13] = BuildTestPacket(id, 128 >> 3, 1, 'N', 8);\n\n    /* O*8 at 152. */\n    packets[14] = BuildTestPacket(id, 152 >> 3, 1, 'O', 8);\n\n    /* P*8 at 160. */\n    packets[15] = BuildTestPacket(id, 160 >> 3, 1, 'P', 8);\n\n    /* Q*16 at 176. */\n    packets[16] = BuildTestPacket(id, 176 >> 3, 0, 'Q', 16);\n\n    default_policy = policy;\n\n    /* Send all but the last. */\n    for (i = 0; i < 9; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV4_FRAG_OVERLAP)) {\n            goto end;\n        }\n    }\n    int overlap = 0;\n    for (; i < 16; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV4_FRAG_OVERLAP)) {\n            overlap++;\n        }\n    }\n    if (!overlap) {\n        goto end;\n    }\n\n    /* And now the last one. */\n    Packet *reassembled = Defrag(NULL, NULL, packets[16], NULL);\n    if (reassembled == NULL) {\n        goto end;\n    }\n\n    if (IPV4_GET_HLEN(reassembled) != 20) {\n        goto end;\n    }\n    if (IPV4_GET_IPLEN(reassembled) != 20 + 192) {\n        goto end;\n    }\n\n    if (memcmp(GET_PKT_DATA(reassembled) + 20, expected, expected_len) != 0) {\n        goto end;\n    }\n    SCFree(reassembled);\n\n    /* Make sure all frags were returned back to the pool. */\n    if (defrag_context->frag_pool->outstanding != 0) {\n        goto end;\n    }\n\n    ret = 1;\nend:\n    for (i = 0; i < 17; i++) {\n        SCFree(packets[i]);\n    }\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "DefragDoSturgesNovakTest(int policy, u_char *expected, size_t expected_len)\n{\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    /*\n     * Build the packets.\n     */\n\n    int id = 1;\n    Packet *packets[17];\n    memset(packets, 0x00, sizeof(packets));\n\n    /*\n     * Original fragments.\n     */\n\n    /* A*24 at 0. */\n    packets[0] = BuildTestPacket(IPPROTO_ICMP, id, 0, 1, 'A', 24);\n\n    /* B*15 at 32. */\n    packets[1] = BuildTestPacket(IPPROTO_ICMP, id, 32 >> 3, 1, 'B', 16);\n\n    /* C*24 at 48. */\n    packets[2] = BuildTestPacket(IPPROTO_ICMP, id, 48 >> 3, 1, 'C', 24);\n\n    /* D*8 at 80. */\n    packets[3] = BuildTestPacket(IPPROTO_ICMP, id, 80 >> 3, 1, 'D', 8);\n\n    /* E*16 at 104. */\n    packets[4] = BuildTestPacket(IPPROTO_ICMP, id, 104 >> 3, 1, 'E', 16);\n\n    /* F*24 at 120. */\n    packets[5] = BuildTestPacket(IPPROTO_ICMP, id, 120 >> 3, 1, 'F', 24);\n\n    /* G*16 at 144. */\n    packets[6] = BuildTestPacket(IPPROTO_ICMP, id, 144 >> 3, 1, 'G', 16);\n\n    /* H*16 at 160. */\n    packets[7] = BuildTestPacket(IPPROTO_ICMP, id, 160 >> 3, 1, 'H', 16);\n\n    /* I*8 at 176. */\n    packets[8] = BuildTestPacket(IPPROTO_ICMP, id, 176 >> 3, 1, 'I', 8);\n\n    /*\n     * Overlapping subsequent fragments.\n     */\n\n    /* J*32 at 8. */\n    packets[9] = BuildTestPacket(IPPROTO_ICMP, id, 8 >> 3, 1, 'J', 32);\n\n    /* K*24 at 48. */\n    packets[10] = BuildTestPacket(IPPROTO_ICMP, id, 48 >> 3, 1, 'K', 24);\n\n    /* L*24 at 72. */\n    packets[11] = BuildTestPacket(IPPROTO_ICMP, id, 72 >> 3, 1, 'L', 24);\n\n    /* M*24 at 96. */\n    packets[12] = BuildTestPacket(IPPROTO_ICMP, id, 96 >> 3, 1, 'M', 24);\n\n    /* N*8 at 128. */\n    packets[13] = BuildTestPacket(IPPROTO_ICMP, id, 128 >> 3, 1, 'N', 8);\n\n    /* O*8 at 152. */\n    packets[14] = BuildTestPacket(IPPROTO_ICMP, id, 152 >> 3, 1, 'O', 8);\n\n    /* P*8 at 160. */\n    packets[15] = BuildTestPacket(IPPROTO_ICMP, id, 160 >> 3, 1, 'P', 8);\n\n    /* Q*16 at 176. */\n    packets[16] = BuildTestPacket(IPPROTO_ICMP, id, 176 >> 3, 0, 'Q', 16);\n\n    default_policy = policy;\n\n    /* Send all but the last. */\n    for (i = 0; i < 9; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV4_FRAG_OVERLAP)) {\n            goto end;\n        }\n    }\n    int overlap = 0;\n    for (; i < 16; i++) {\n        Packet *tp = Defrag(NULL, NULL, packets[i], NULL);\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n        if (ENGINE_ISSET_EVENT(packets[i], IPV4_FRAG_OVERLAP)) {\n            overlap++;\n        }\n    }\n    if (!overlap) {\n        goto end;\n    }\n\n    /* And now the last one. */\n    Packet *reassembled = Defrag(NULL, NULL, packets[16], NULL);\n    if (reassembled == NULL) {\n        goto end;\n    }\n\n    if (IPV4_GET_HLEN(reassembled) != 20) {\n        goto end;\n    }\n    if (IPV4_GET_IPLEN(reassembled) != 20 + 192) {\n        goto end;\n    }\n\n    if (memcmp(GET_PKT_DATA(reassembled) + 20, expected, expected_len) != 0) {\n        goto end;\n    }\n    SCFree(reassembled);\n\n    /* Make sure all frags were returned back to the pool. */\n    if (defrag_context->frag_pool->outstanding != 0) {\n        goto end;\n    }\n\n    ret = 1;\nend:\n    for (i = 0; i < 17; i++) {\n        SCFree(packets[i]);\n    }\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    packets[0] = BuildTestPacket(IPPROTO_ICMP, id, 0, 1, 'A', 24);",
+      "    packets[1] = BuildTestPacket(IPPROTO_ICMP, id, 32 >> 3, 1, 'B', 16);",
+      "    packets[2] = BuildTestPacket(IPPROTO_ICMP, id, 48 >> 3, 1, 'C', 24);",
+      "    packets[3] = BuildTestPacket(IPPROTO_ICMP, id, 80 >> 3, 1, 'D', 8);",
+      "    packets[4] = BuildTestPacket(IPPROTO_ICMP, id, 104 >> 3, 1, 'E', 16);",
+      "    packets[5] = BuildTestPacket(IPPROTO_ICMP, id, 120 >> 3, 1, 'F', 24);",
+      "    packets[6] = BuildTestPacket(IPPROTO_ICMP, id, 144 >> 3, 1, 'G', 16);",
+      "    packets[7] = BuildTestPacket(IPPROTO_ICMP, id, 160 >> 3, 1, 'H', 16);",
+      "    packets[8] = BuildTestPacket(IPPROTO_ICMP, id, 176 >> 3, 1, 'I', 8);",
+      "    packets[9] = BuildTestPacket(IPPROTO_ICMP, id, 8 >> 3, 1, 'J', 32);",
+      "    packets[10] = BuildTestPacket(IPPROTO_ICMP, id, 48 >> 3, 1, 'K', 24);",
+      "    packets[11] = BuildTestPacket(IPPROTO_ICMP, id, 72 >> 3, 1, 'L', 24);",
+      "    packets[12] = BuildTestPacket(IPPROTO_ICMP, id, 96 >> 3, 1, 'M', 24);",
+      "    packets[13] = BuildTestPacket(IPPROTO_ICMP, id, 128 >> 3, 1, 'N', 8);",
+      "    packets[14] = BuildTestPacket(IPPROTO_ICMP, id, 152 >> 3, 1, 'O', 8);",
+      "    packets[15] = BuildTestPacket(IPPROTO_ICMP, id, 160 >> 3, 1, 'P', 8);",
+      "    packets[16] = BuildTestPacket(IPPROTO_ICMP, id, 176 >> 3, 0, 'Q', 16);"
+    ],
+    "deleted": [
+      "    packets[0] = BuildTestPacket(id, 0, 1, 'A', 24);",
+      "    packets[1] = BuildTestPacket(id, 32 >> 3, 1, 'B', 16);",
+      "    packets[2] = BuildTestPacket(id, 48 >> 3, 1, 'C', 24);",
+      "    packets[3] = BuildTestPacket(id, 80 >> 3, 1, 'D', 8);",
+      "    packets[4] = BuildTestPacket(id, 104 >> 3, 1, 'E', 16);",
+      "    packets[5] = BuildTestPacket(id, 120 >> 3, 1, 'F', 24);",
+      "    packets[6] = BuildTestPacket(id, 144 >> 3, 1, 'G', 16);",
+      "    packets[7] = BuildTestPacket(id, 160 >> 3, 1, 'H', 16);",
+      "    packets[8] = BuildTestPacket(id, 176 >> 3, 1, 'I', 8);",
+      "    packets[9] = BuildTestPacket(id, 8 >> 3, 1, 'J', 32);",
+      "    packets[10] = BuildTestPacket(id, 48 >> 3, 1, 'K', 24);",
+      "    packets[11] = BuildTestPacket(id, 72 >> 3, 1, 'L', 24);",
+      "    packets[12] = BuildTestPacket(id, 96 >> 3, 1, 'M', 24);",
+      "    packets[13] = BuildTestPacket(id, 128 >> 3, 1, 'N', 8);",
+      "    packets[14] = BuildTestPacket(id, 152 >> 3, 1, 'O', 8);",
+      "    packets[15] = BuildTestPacket(id, 160 >> 3, 1, 'P', 8);",
+      "    packets[16] = BuildTestPacket(id, 176 >> 3, 0, 'Q', 16);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4504
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragIPv4TooLargeTest(void)\n{\n    DefragContext *dc = NULL;\n    Packet *p = NULL;\n    int ret = 0;\n\n    DefragInit();\n\n    dc = DefragContextNew();\n    if (dc == NULL)\n        goto end;\n\n    /* Create a fragment that would extend past the max allowable size\n     * for an IPv4 packet. */\n    p = BuildTestPacket(1, 8183, 0, 'A', 71);\n    if (p == NULL)\n        goto end;\n\n    /* We do not expect a packet returned. */\n    if (Defrag(NULL, NULL, p, NULL) != NULL)\n        goto end;\n    if (!ENGINE_ISSET_EVENT(p, IPV4_FRAG_PKT_TOO_LARGE))\n        goto end;\n\n    /* The fragment should have been ignored so no fragments should have\n     * been allocated from the pool. */\n    if (dc->frag_pool->outstanding != 0)\n        return 0;\n\n    ret = 1;\nend:\n    if (dc != NULL)\n        DefragContextDestroy(dc);\n    if (p != NULL)\n        SCFree(p);\n\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "DefragIPv4TooLargeTest(void)\n{\n    DefragContext *dc = NULL;\n    Packet *p = NULL;\n    int ret = 0;\n\n    DefragInit();\n\n    dc = DefragContextNew();\n    if (dc == NULL)\n        goto end;\n\n    /* Create a fragment that would extend past the max allowable size\n     * for an IPv4 packet. */\n    p = BuildTestPacket(IPPROTO_ICMP, 1, 8183, 0, 'A', 71);\n    if (p == NULL)\n        goto end;\n\n    /* We do not expect a packet returned. */\n    if (Defrag(NULL, NULL, p, NULL) != NULL)\n        goto end;\n    if (!ENGINE_ISSET_EVENT(p, IPV4_FRAG_PKT_TOO_LARGE))\n        goto end;\n\n    /* The fragment should have been ignored so no fragments should have\n     * been allocated from the pool. */\n    if (dc->frag_pool->outstanding != 0)\n        return 0;\n\n    ret = 1;\nend:\n    if (dc != NULL)\n        DefragContextDestroy(dc);\n    if (p != NULL)\n        SCFree(p);\n\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p = BuildTestPacket(IPPROTO_ICMP, 1, 8183, 0, 'A', 71);"
+    ],
+    "deleted": [
+      "    p = BuildTestPacket(1, 8183, 0, 'A', 71);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4505
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragVlanQinQTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *r = NULL;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(1, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(1, 1, 0, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n\n    /* With no VLAN IDs set, packets should re-assemble. */\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) == NULL)\n        goto end;\n    SCFree(r);\n\n    /* With mismatched VLANs, packets should not re-assemble. */\n    p1->vlan_id[0] = 1;\n    p2->vlan_id[0] = 1;\n    p1->vlan_id[1] = 1;\n    p2->vlan_id[1] = 2;\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) != NULL)\n        goto end;\n\n    /* Pass. */\n    ret = 1;\n\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    DefragDestroy();\n\n    return ret;\n}",
+  "code_after_change": "DefragVlanQinQTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *r = NULL;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(IPPROTO_ICMP, 1, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(IPPROTO_ICMP, 1, 1, 0, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n\n    /* With no VLAN IDs set, packets should re-assemble. */\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) == NULL)\n        goto end;\n    SCFree(r);\n\n    /* With mismatched VLANs, packets should not re-assemble. */\n    p1->vlan_id[0] = 1;\n    p2->vlan_id[0] = 1;\n    p1->vlan_id[1] = 1;\n    p2->vlan_id[1] = 2;\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) != NULL)\n        goto end;\n\n    /* Pass. */\n    ret = 1;\n\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    DefragDestroy();\n\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p1 = BuildTestPacket(IPPROTO_ICMP, 1, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(IPPROTO_ICMP, 1, 1, 0, 'B', 8);"
+    ],
+    "deleted": [
+      "    p1 = BuildTestPacket(1, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(1, 1, 0, 'B', 8);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4506
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragIPv4NoDataTest(void)\n{\n    DefragContext *dc = NULL;\n    Packet *p = NULL;\n    int id = 12;\n    int ret = 0;\n\n    DefragInit();\n\n    dc = DefragContextNew();\n    if (dc == NULL)\n        goto end;\n\n    /* This packet has an offset > 0, more frags set to 0 and no data. */\n    p = BuildTestPacket(id, 1, 0, 'A', 0);\n    if (p == NULL)\n        goto end;\n\n    /* We do not expect a packet returned. */\n    if (Defrag(NULL, NULL, p, NULL) != NULL)\n        goto end;\n\n    /* The fragment should have been ignored so no fragments should\n     * have been allocated from the pool. */\n    if (dc->frag_pool->outstanding != 0)\n        return 0;\n\n    ret = 1;\nend:\n    if (dc != NULL)\n        DefragContextDestroy(dc);\n    if (p != NULL)\n        SCFree(p);\n\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "DefragIPv4NoDataTest(void)\n{\n    DefragContext *dc = NULL;\n    Packet *p = NULL;\n    int id = 12;\n    int ret = 0;\n\n    DefragInit();\n\n    dc = DefragContextNew();\n    if (dc == NULL)\n        goto end;\n\n    /* This packet has an offset > 0, more frags set to 0 and no data. */\n    p = BuildTestPacket(IPPROTO_ICMP, id, 1, 0, 'A', 0);\n    if (p == NULL)\n        goto end;\n\n    /* We do not expect a packet returned. */\n    if (Defrag(NULL, NULL, p, NULL) != NULL)\n        goto end;\n\n    /* The fragment should have been ignored so no fragments should\n     * have been allocated from the pool. */\n    if (dc->frag_pool->outstanding != 0)\n        return 0;\n\n    ret = 1;\nend:\n    if (dc != NULL)\n        DefragContextDestroy(dc);\n    if (p != NULL)\n        SCFree(p);\n\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p = BuildTestPacket(IPPROTO_ICMP, id, 1, 0, 'A', 0);"
+    ],
+    "deleted": [
+      "    p = BuildTestPacket(id, 1, 0, 'A', 0);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4507
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "static int DefragTrackerReuseTest(void)\n{\n    int ret = 0;\n    int id = 1;\n    Packet *p1 = NULL;\n    DefragTracker *tracker1 = NULL, *tracker2 = NULL;\n\n    DefragInit();\n\n    /* Build a packet, its not a fragment but shouldn't matter for\n     * this test. */\n    p1 = BuildTestPacket(id, 0, 0, 'A', 8);\n    if (p1 == NULL) {\n        goto end;\n    }\n\n    /* Get a tracker. It shouldn't look like its already in use. */\n    tracker1 = DefragGetTracker(NULL, NULL, p1);\n    if (tracker1 == NULL) {\n        goto end;\n    }\n    if (tracker1->seen_last) {\n        goto end;\n    }\n    if (tracker1->remove) {\n        goto end;\n    }\n    DefragTrackerRelease(tracker1);\n\n    /* Get a tracker again, it should be the same one. */\n    tracker2 = DefragGetTracker(NULL, NULL, p1);\n    if (tracker2 == NULL) {\n        goto end;\n    }\n    if (tracker2 != tracker1) {\n        goto end;\n    }\n    DefragTrackerRelease(tracker1);\n\n    /* Now mark the tracker for removal. It should not be returned\n     * when we get a tracker for a packet that may have the same\n     * attributes. */\n    tracker1->remove = 1;\n\n    tracker2 = DefragGetTracker(NULL, NULL, p1);\n    if (tracker2 == NULL) {\n        goto end;\n    }\n    if (tracker2 == tracker1) {\n        goto end;\n    }\n    if (tracker2->remove) {\n        goto end;\n    }\n\n    ret = 1;\nend:\n    if (p1 != NULL) {\n        SCFree(p1);\n    }\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "static int DefragTrackerReuseTest(void)\n{\n    int ret = 0;\n    int id = 1;\n    Packet *p1 = NULL;\n    DefragTracker *tracker1 = NULL, *tracker2 = NULL;\n\n    DefragInit();\n\n    /* Build a packet, its not a fragment but shouldn't matter for\n     * this test. */\n    p1 = BuildTestPacket(IPPROTO_ICMP, id, 0, 0, 'A', 8);\n    if (p1 == NULL) {\n        goto end;\n    }\n\n    /* Get a tracker. It shouldn't look like its already in use. */\n    tracker1 = DefragGetTracker(NULL, NULL, p1);\n    if (tracker1 == NULL) {\n        goto end;\n    }\n    if (tracker1->seen_last) {\n        goto end;\n    }\n    if (tracker1->remove) {\n        goto end;\n    }\n    DefragTrackerRelease(tracker1);\n\n    /* Get a tracker again, it should be the same one. */\n    tracker2 = DefragGetTracker(NULL, NULL, p1);\n    if (tracker2 == NULL) {\n        goto end;\n    }\n    if (tracker2 != tracker1) {\n        goto end;\n    }\n    DefragTrackerRelease(tracker1);\n\n    /* Now mark the tracker for removal. It should not be returned\n     * when we get a tracker for a packet that may have the same\n     * attributes. */\n    tracker1->remove = 1;\n\n    tracker2 = DefragGetTracker(NULL, NULL, p1);\n    if (tracker2 == NULL) {\n        goto end;\n    }\n    if (tracker2 == tracker1) {\n        goto end;\n    }\n    if (tracker2->remove) {\n        goto end;\n    }\n\n    ret = 1;\nend:\n    if (p1 != NULL) {\n        SCFree(p1);\n    }\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p1 = BuildTestPacket(IPPROTO_ICMP, id, 0, 0, 'A', 8);"
+    ],
+    "deleted": [
+      "    p1 = BuildTestPacket(id, 0, 0, 'A', 8);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4508
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragVlanTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *r = NULL;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(1, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(1, 1, 0, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n\n    /* With no VLAN IDs set, packets should re-assemble. */\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) == NULL)\n        goto end;\n    SCFree(r);\n\n    /* With mismatched VLANs, packets should not re-assemble. */\n    p1->vlan_id[0] = 1;\n    p2->vlan_id[0] = 2;\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) != NULL)\n        goto end;\n\n    /* Pass. */\n    ret = 1;\n\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    DefragDestroy();\n\n    return ret;\n}",
+  "code_after_change": "DefragVlanTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *r = NULL;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(IPPROTO_ICMP, 1, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(IPPROTO_ICMP, 1, 1, 0, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n\n    /* With no VLAN IDs set, packets should re-assemble. */\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) == NULL)\n        goto end;\n    SCFree(r);\n\n    /* With mismatched VLANs, packets should not re-assemble. */\n    p1->vlan_id[0] = 1;\n    p2->vlan_id[0] = 2;\n    if ((r = Defrag(NULL, NULL, p1, NULL)) != NULL)\n        goto end;\n    if ((r = Defrag(NULL, NULL, p2, NULL)) != NULL)\n        goto end;\n\n    /* Pass. */\n    ret = 1;\n\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    DefragDestroy();\n\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p1 = BuildTestPacket(IPPROTO_ICMP, 1, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(IPPROTO_ICMP, 1, 1, 0, 'B', 8);"
+    ],
+    "deleted": [
+      "    p1 = BuildTestPacket(1, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(1, 1, 0, 'B', 8);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4509
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "static int DefragMfIpv6Test(void)\n{\n    int retval = 0;\n    int ip_id = 9;\n    Packet *p = NULL;\n\n    DefragInit();\n\n    Packet *p1 = IPV6BuildTestPacket(ip_id, 2, 1, 'C', 8);\n    Packet *p2 = IPV6BuildTestPacket(ip_id, 0, 1, 'A', 8);\n    Packet *p3 = IPV6BuildTestPacket(ip_id, 1, 0, 'B', 8);\n    if (p1 == NULL || p2 == NULL || p3 == NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p1, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p2, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    /* This should return a packet as MF=0. */\n    p = Defrag(NULL, NULL, p3, NULL);\n    if (p == NULL) {\n        goto end;\n    }\n\n    /* For IPv6 the expected length is just the length of the payload\n     * of 2 fragments, so 16. */\n    if (IPV6_GET_PLEN(p) != 16) {\n        goto end;\n    }\n\n    retval = 1;\nend:\n    if (p1 != NULL) {\n        SCFree(p1);\n    }\n    if (p2 != NULL) {\n        SCFree(p2);\n    }\n    if (p3 != NULL) {\n        SCFree(p3);\n    }\n    if (p != NULL) {\n        SCFree(p);\n    }\n    DefragDestroy();\n    return retval;\n}",
+  "code_after_change": "static int DefragMfIpv6Test(void)\n{\n    int retval = 0;\n    int ip_id = 9;\n    Packet *p = NULL;\n\n    DefragInit();\n\n    Packet *p1 = IPV6BuildTestPacket(IPPROTO_ICMPV6, ip_id, 2, 1, 'C', 8);\n    Packet *p2 = IPV6BuildTestPacket(IPPROTO_ICMPV6, ip_id, 0, 1, 'A', 8);\n    Packet *p3 = IPV6BuildTestPacket(IPPROTO_ICMPV6, ip_id, 1, 0, 'B', 8);\n    if (p1 == NULL || p2 == NULL || p3 == NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p1, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p2, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    /* This should return a packet as MF=0. */\n    p = Defrag(NULL, NULL, p3, NULL);\n    if (p == NULL) {\n        goto end;\n    }\n\n    /* For IPv6 the expected length is just the length of the payload\n     * of 2 fragments, so 16. */\n    if (IPV6_GET_PLEN(p) != 16) {\n        goto end;\n    }\n\n    retval = 1;\nend:\n    if (p1 != NULL) {\n        SCFree(p1);\n    }\n    if (p2 != NULL) {\n        SCFree(p2);\n    }\n    if (p3 != NULL) {\n        SCFree(p3);\n    }\n    if (p != NULL) {\n        SCFree(p);\n    }\n    DefragDestroy();\n    return retval;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    Packet *p1 = IPV6BuildTestPacket(IPPROTO_ICMPV6, ip_id, 2, 1, 'C', 8);",
+      "    Packet *p2 = IPV6BuildTestPacket(IPPROTO_ICMPV6, ip_id, 0, 1, 'A', 8);",
+      "    Packet *p3 = IPV6BuildTestPacket(IPPROTO_ICMPV6, ip_id, 1, 0, 'B', 8);"
+    ],
+    "deleted": [
+      "    Packet *p1 = IPV6BuildTestPacket(ip_id, 2, 1, 'C', 8);",
+      "    Packet *p2 = IPV6BuildTestPacket(ip_id, 0, 1, 'A', 8);",
+      "    Packet *p3 = IPV6BuildTestPacket(ip_id, 1, 0, 'B', 8);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4510
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "IPV6DefragReverseSimpleTest(void)\n{\n    DefragContext *dc = NULL;\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    dc = DefragContextNew();\n    if (dc == NULL)\n        goto end;\n\n    p1 = IPV6BuildTestPacket(id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = IPV6BuildTestPacket(id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = IPV6BuildTestPacket(id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p3, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n    reassembled = Defrag(NULL, NULL, p1, NULL);\n    if (reassembled == NULL)\n        goto end;\n\n    /* 40 bytes in we should find 8 bytes of A. */\n    for (i = 40; i < 40 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A')\n            goto end;\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 48; i < 48 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B')\n            goto end;\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 56; i < 56 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\nend:\n    if (dc != NULL)\n        DefragContextDestroy(dc);\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "IPV6DefragReverseSimpleTest(void)\n{\n    DefragContext *dc = NULL;\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    dc = DefragContextNew();\n    if (dc == NULL)\n        goto end;\n\n    p1 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p3, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n    reassembled = Defrag(NULL, NULL, p1, NULL);\n    if (reassembled == NULL)\n        goto end;\n\n    /* 40 bytes in we should find 8 bytes of A. */\n    for (i = 40; i < 40 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A')\n            goto end;\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 48; i < 48 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B')\n            goto end;\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 56; i < 56 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\nend:\n    if (dc != NULL)\n        DefragContextDestroy(dc);\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p1 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 0, 1, 'A', 8);",
+      "    p2 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 1, 1, 'B', 8);",
+      "    p3 = IPV6BuildTestPacket(IPPROTO_ICMPV6, id, 2, 0, 'C', 3);"
+    ],
+    "deleted": [
+      "    p1 = IPV6BuildTestPacket(id, 0, 1, 'A', 8);",
+      "    p2 = IPV6BuildTestPacket(id, 1, 1, 'B', 8);",
+      "    p3 = IPV6BuildTestPacket(id, 2, 0, 'C', 3);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4511
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "static int DefragMfIpv4Test(void)\n{\n    int retval = 0;\n    int ip_id = 9;\n    Packet *p = NULL;\n\n    DefragInit();\n\n    Packet *p1 = BuildTestPacket(ip_id, 2, 1, 'C', 8);\n    Packet *p2 = BuildTestPacket(ip_id, 0, 1, 'A', 8);\n    Packet *p3 = BuildTestPacket(ip_id, 1, 0, 'B', 8);\n    if (p1 == NULL || p2 == NULL || p3 == NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p1, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p2, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    /* This should return a packet as MF=0. */\n    p = Defrag(NULL, NULL, p3, NULL);\n    if (p == NULL) {\n        goto end;\n    }\n\n    /* Expected IP length is 20 + 8 + 8 = 36 as only 2 of the\n     * fragments should be in the re-assembled packet. */\n    if (IPV4_GET_IPLEN(p) != 36) {\n        goto end;\n    }\n\n    retval = 1;\nend:\n    if (p1 != NULL) {\n        SCFree(p1);\n    }\n    if (p2 != NULL) {\n        SCFree(p2);\n    }\n    if (p3 != NULL) {\n        SCFree(p3);\n    }\n    if (p != NULL) {\n        SCFree(p);\n    }\n    DefragDestroy();\n    return retval;\n}",
+  "code_after_change": "static int DefragMfIpv4Test(void)\n{\n    int retval = 0;\n    int ip_id = 9;\n    Packet *p = NULL;\n\n    DefragInit();\n\n    Packet *p1 = BuildTestPacket(IPPROTO_ICMP, ip_id, 2, 1, 'C', 8);\n    Packet *p2 = BuildTestPacket(IPPROTO_ICMP, ip_id, 0, 1, 'A', 8);\n    Packet *p3 = BuildTestPacket(IPPROTO_ICMP, ip_id, 1, 0, 'B', 8);\n    if (p1 == NULL || p2 == NULL || p3 == NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p1, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    p = Defrag(NULL, NULL, p2, NULL);\n    if (p != NULL) {\n        goto end;\n    }\n\n    /* This should return a packet as MF=0. */\n    p = Defrag(NULL, NULL, p3, NULL);\n    if (p == NULL) {\n        goto end;\n    }\n\n    /* Expected IP length is 20 + 8 + 8 = 36 as only 2 of the\n     * fragments should be in the re-assembled packet. */\n    if (IPV4_GET_IPLEN(p) != 36) {\n        goto end;\n    }\n\n    retval = 1;\nend:\n    if (p1 != NULL) {\n        SCFree(p1);\n    }\n    if (p2 != NULL) {\n        SCFree(p2);\n    }\n    if (p3 != NULL) {\n        SCFree(p3);\n    }\n    if (p != NULL) {\n        SCFree(p);\n    }\n    DefragDestroy();\n    return retval;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    Packet *p1 = BuildTestPacket(IPPROTO_ICMP, ip_id, 2, 1, 'C', 8);",
+      "    Packet *p2 = BuildTestPacket(IPPROTO_ICMP, ip_id, 0, 1, 'A', 8);",
+      "    Packet *p3 = BuildTestPacket(IPPROTO_ICMP, ip_id, 1, 0, 'B', 8);"
+    ],
+    "deleted": [
+      "    Packet *p1 = BuildTestPacket(ip_id, 2, 1, 'C', 8);",
+      "    Packet *p2 = BuildTestPacket(ip_id, 0, 1, 'A', 8);",
+      "    Packet *p3 = BuildTestPacket(ip_id, 1, 0, 'B', 8);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4512
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragTimeoutTest(void)\n{\n    int i;\n    int ret = 0;\n\n    /* Setup a small numberr of trackers. */\n    if (ConfSet(\"defrag.trackers\", \"16\") != 1) {\n        printf(\"ConfSet failed: \");\n        goto end;\n    }\n\n    DefragInit();\n\n    /* Load in 16 packets. */\n    for (i = 0; i < 16; i++) {\n        Packet *p = BuildTestPacket(i, 0, 1, 'A' + i, 16);\n        if (p == NULL)\n            goto end;\n\n        Packet *tp = Defrag(NULL, NULL, p, NULL);\n\n        SCFree(p);\n\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n    }\n\n    /* Build a new packet but push the timestamp out by our timeout.\n     * This should force our previous fragments to be timed out. */\n    Packet *p = BuildTestPacket(99, 0, 1, 'A' + i, 16);\n    if (p == NULL)\n        goto end;\n\n    p->ts.tv_sec += (defrag_context->timeout + 1);\n    Packet *tp = Defrag(NULL, NULL, p, NULL);\n\n    if (tp != NULL) {\n        SCFree(tp);\n        goto end;\n    }\n\n    DefragTracker *tracker = DefragLookupTrackerFromHash(p);\n    if (tracker == NULL)\n        goto end;\n\n    if (tracker->id != 99)\n        goto end;\n\n    SCFree(p);\n\n    ret = 1;\nend:\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "DefragTimeoutTest(void)\n{\n    int i;\n    int ret = 0;\n\n    /* Setup a small numberr of trackers. */\n    if (ConfSet(\"defrag.trackers\", \"16\") != 1) {\n        printf(\"ConfSet failed: \");\n        goto end;\n    }\n\n    DefragInit();\n\n    /* Load in 16 packets. */\n    for (i = 0; i < 16; i++) {\n        Packet *p = BuildTestPacket(IPPROTO_ICMP,i, 0, 1, 'A' + i, 16);\n        if (p == NULL)\n            goto end;\n\n        Packet *tp = Defrag(NULL, NULL, p, NULL);\n\n        SCFree(p);\n\n        if (tp != NULL) {\n            SCFree(tp);\n            goto end;\n        }\n    }\n\n    /* Build a new packet but push the timestamp out by our timeout.\n     * This should force our previous fragments to be timed out. */\n    Packet *p = BuildTestPacket(IPPROTO_ICMP, 99, 0, 1, 'A' + i, 16);\n    if (p == NULL)\n        goto end;\n\n    p->ts.tv_sec += (defrag_context->timeout + 1);\n    Packet *tp = Defrag(NULL, NULL, p, NULL);\n\n    if (tp != NULL) {\n        SCFree(tp);\n        goto end;\n    }\n\n    DefragTracker *tracker = DefragLookupTrackerFromHash(p);\n    if (tracker == NULL)\n        goto end;\n\n    if (tracker->id != 99)\n        goto end;\n\n    SCFree(p);\n\n    ret = 1;\nend:\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "        Packet *p = BuildTestPacket(IPPROTO_ICMP,i, 0, 1, 'A' + i, 16);",
+      "    Packet *p = BuildTestPacket(IPPROTO_ICMP, 99, 0, 1, 'A' + i, 16);"
+    ],
+    "deleted": [
+      "        Packet *p = BuildTestPacket(i, 0, 1, 'A' + i, 16);",
+      "    Packet *p = BuildTestPacket(99, 0, 1, 'A' + i, 16);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4513
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "IPV6BuildTestPacket(uint32_t id, uint16_t off, int mf, const char content,\n    int content_len)\n{\n    Packet *p = NULL;\n    uint8_t *pcontent;\n    IPV6Hdr ip6h;\n\n    p = SCCalloc(1, sizeof(*p) + default_packet_size);\n    if (unlikely(p == NULL))\n        return NULL;\n\n    PACKET_INITIALIZE(p);\n\n    gettimeofday(&p->ts, NULL);\n\n    ip6h.s_ip6_nxt = 44;\n    ip6h.s_ip6_hlim = 2;\n\n    /* Source and dest address - very bogus addresses. */\n    ip6h.s_ip6_src[0] = 0x01010101;\n    ip6h.s_ip6_src[1] = 0x01010101;\n    ip6h.s_ip6_src[2] = 0x01010101;\n    ip6h.s_ip6_src[3] = 0x01010101;\n    ip6h.s_ip6_dst[0] = 0x02020202;\n    ip6h.s_ip6_dst[1] = 0x02020202;\n    ip6h.s_ip6_dst[2] = 0x02020202;\n    ip6h.s_ip6_dst[3] = 0x02020202;\n\n    /* copy content_len crap, we need full length */\n    PacketCopyData(p, (uint8_t *)&ip6h, sizeof(IPV6Hdr));\n\n    p->ip6h = (IPV6Hdr *)GET_PKT_DATA(p);\n    IPV6_SET_RAW_VER(p->ip6h, 6);\n    /* Fragmentation header. */\n    IPV6FragHdr *fh = (IPV6FragHdr *)(GET_PKT_DATA(p) + sizeof(IPV6Hdr));\n    fh->ip6fh_nxt = IPPROTO_ICMP;\n    fh->ip6fh_ident = htonl(id);\n    fh->ip6fh_offlg = htons((off << 3) | mf);\n\n    DecodeIPV6FragHeader(p, (uint8_t *)fh, 8, 8 + content_len, 0);\n\n    pcontent = SCCalloc(1, content_len);\n    if (unlikely(pcontent == NULL))\n        return NULL;\n    memset(pcontent, content, content_len);\n    PacketCopyDataOffset(p, sizeof(IPV6Hdr) + sizeof(IPV6FragHdr), pcontent, content_len);\n    SET_PKT_LEN(p, sizeof(IPV6Hdr) + sizeof(IPV6FragHdr) + content_len);\n    SCFree(pcontent);\n\n    p->ip6h->s_ip6_plen = htons(sizeof(IPV6FragHdr) + content_len);\n\n    SET_IPV6_SRC_ADDR(p, &p->src);\n    SET_IPV6_DST_ADDR(p, &p->dst);\n\n    /* Self test. */\n    if (IPV6_GET_VER(p) != 6)\n        goto error;\n    if (IPV6_GET_NH(p) != 44)\n        goto error;\n    if (IPV6_GET_PLEN(p) != sizeof(IPV6FragHdr) + content_len)\n        goto error;\n\n    return p;\nerror:\n    fprintf(stderr, \"Error building test packet.\\n\");\n    if (p != NULL)\n        SCFree(p);\n    return NULL;\n}",
+  "code_after_change": "IPV6BuildTestPacket(uint8_t proto, uint32_t id, uint16_t off, int mf,\n    const char content, int content_len)\n{\n    Packet *p = NULL;\n    uint8_t *pcontent;\n    IPV6Hdr ip6h;\n\n    p = SCCalloc(1, sizeof(*p) + default_packet_size);\n    if (unlikely(p == NULL))\n        return NULL;\n\n    PACKET_INITIALIZE(p);\n\n    gettimeofday(&p->ts, NULL);\n\n    ip6h.s_ip6_nxt = 44;\n    ip6h.s_ip6_hlim = 2;\n\n    /* Source and dest address - very bogus addresses. */\n    ip6h.s_ip6_src[0] = 0x01010101;\n    ip6h.s_ip6_src[1] = 0x01010101;\n    ip6h.s_ip6_src[2] = 0x01010101;\n    ip6h.s_ip6_src[3] = 0x01010101;\n    ip6h.s_ip6_dst[0] = 0x02020202;\n    ip6h.s_ip6_dst[1] = 0x02020202;\n    ip6h.s_ip6_dst[2] = 0x02020202;\n    ip6h.s_ip6_dst[3] = 0x02020202;\n\n    /* copy content_len crap, we need full length */\n    PacketCopyData(p, (uint8_t *)&ip6h, sizeof(IPV6Hdr));\n\n    p->ip6h = (IPV6Hdr *)GET_PKT_DATA(p);\n    IPV6_SET_RAW_VER(p->ip6h, 6);\n    /* Fragmentation header. */\n    IPV6FragHdr *fh = (IPV6FragHdr *)(GET_PKT_DATA(p) + sizeof(IPV6Hdr));\n    fh->ip6fh_nxt = proto;\n    fh->ip6fh_ident = htonl(id);\n    fh->ip6fh_offlg = htons((off << 3) | mf);\n\n    DecodeIPV6FragHeader(p, (uint8_t *)fh, 8, 8 + content_len, 0);\n\n    pcontent = SCCalloc(1, content_len);\n    if (unlikely(pcontent == NULL))\n        return NULL;\n    memset(pcontent, content, content_len);\n    PacketCopyDataOffset(p, sizeof(IPV6Hdr) + sizeof(IPV6FragHdr), pcontent, content_len);\n    SET_PKT_LEN(p, sizeof(IPV6Hdr) + sizeof(IPV6FragHdr) + content_len);\n    SCFree(pcontent);\n\n    p->ip6h->s_ip6_plen = htons(sizeof(IPV6FragHdr) + content_len);\n\n    SET_IPV6_SRC_ADDR(p, &p->src);\n    SET_IPV6_DST_ADDR(p, &p->dst);\n\n    /* Self test. */\n    if (IPV6_GET_VER(p) != 6)\n        goto error;\n    if (IPV6_GET_NH(p) != 44)\n        goto error;\n    if (IPV6_GET_PLEN(p) != sizeof(IPV6FragHdr) + content_len)\n        goto error;\n\n    return p;\nerror:\n    fprintf(stderr, \"Error building test packet.\\n\");\n    if (p != NULL)\n        SCFree(p);\n    return NULL;\n}",
+  "function_modified_lines": {
+    "added": [
+      "IPV6BuildTestPacket(uint8_t proto, uint32_t id, uint16_t off, int mf,",
+      "    const char content, int content_len)",
+      "    fh->ip6fh_nxt = proto;"
+    ],
+    "deleted": [
+      "IPV6BuildTestPacket(uint32_t id, uint16_t off, int mf, const char content,",
+      "    int content_len)",
+      "    fh->ip6fh_nxt = IPPROTO_ICMP;"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4514
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "DefragReverseSimpleTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = BuildTestPacket(id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p3, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n\n    reassembled = Defrag(NULL, NULL, p1, NULL);\n    if (reassembled == NULL)\n        goto end;\n\n    if (IPV4_GET_HLEN(reassembled) != 20)\n        goto end;\n    if (IPV4_GET_IPLEN(reassembled) != 39)\n        goto end;\n\n    /* 20 bytes in we should find 8 bytes of A. */\n    for (i = 20; i < 20 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A')\n            goto end;\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 28; i < 28 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B')\n            goto end;\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 36; i < 36 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "code_after_change": "DefragReverseSimpleTest(void)\n{\n    Packet *p1 = NULL, *p2 = NULL, *p3 = NULL;\n    Packet *reassembled = NULL;\n    int id = 12;\n    int i;\n    int ret = 0;\n\n    DefragInit();\n\n    p1 = BuildTestPacket(IPPROTO_ICMP, id, 0, 1, 'A', 8);\n    if (p1 == NULL)\n        goto end;\n    p2 = BuildTestPacket(IPPROTO_ICMP, id, 1, 1, 'B', 8);\n    if (p2 == NULL)\n        goto end;\n    p3 = BuildTestPacket(IPPROTO_ICMP, id, 2, 0, 'C', 3);\n    if (p3 == NULL)\n        goto end;\n\n    if (Defrag(NULL, NULL, p3, NULL) != NULL)\n        goto end;\n    if (Defrag(NULL, NULL, p2, NULL) != NULL)\n        goto end;\n\n    reassembled = Defrag(NULL, NULL, p1, NULL);\n    if (reassembled == NULL)\n        goto end;\n\n    if (IPV4_GET_HLEN(reassembled) != 20)\n        goto end;\n    if (IPV4_GET_IPLEN(reassembled) != 39)\n        goto end;\n\n    /* 20 bytes in we should find 8 bytes of A. */\n    for (i = 20; i < 20 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'A')\n            goto end;\n    }\n\n    /* 28 bytes in we should find 8 bytes of B. */\n    for (i = 28; i < 28 + 8; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'B')\n            goto end;\n    }\n\n    /* And 36 bytes in we should find 3 bytes of C. */\n    for (i = 36; i < 36 + 3; i++) {\n        if (GET_PKT_DATA(reassembled)[i] != 'C')\n            goto end;\n    }\n\n    ret = 1;\nend:\n    if (p1 != NULL)\n        SCFree(p1);\n    if (p2 != NULL)\n        SCFree(p2);\n    if (p3 != NULL)\n        SCFree(p3);\n    if (reassembled != NULL)\n        SCFree(reassembled);\n\n    DefragDestroy();\n    return ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    p1 = BuildTestPacket(IPPROTO_ICMP, id, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(IPPROTO_ICMP, id, 1, 1, 'B', 8);",
+      "    p3 = BuildTestPacket(IPPROTO_ICMP, id, 2, 0, 'C', 3);"
+    ],
+    "deleted": [
+      "    p1 = BuildTestPacket(id, 0, 1, 'A', 8);",
+      "    p2 = BuildTestPacket(id, 1, 1, 'B', 8);",
+      "    p3 = BuildTestPacket(id, 2, 0, 'C', 3);"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4515
+},
+{
+  "cve_id": "CVE-2017-7177",
+  "code_before_change": "BuildTestPacket(uint16_t id, uint16_t off, int mf, const char content,\n    int content_len)\n{\n    Packet *p = NULL;\n    int hlen = 20;\n    int ttl = 64;\n    uint8_t *pcontent;\n    IPV4Hdr ip4h;\n\n    p = SCCalloc(1, sizeof(*p) + default_packet_size);\n    if (unlikely(p == NULL))\n        return NULL;\n\n    PACKET_INITIALIZE(p);\n\n    gettimeofday(&p->ts, NULL);\n    //p->ip4h = (IPV4Hdr *)GET_PKT_DATA(p);\n    ip4h.ip_verhl = 4 << 4;\n    ip4h.ip_verhl |= hlen >> 2;\n    ip4h.ip_len = htons(hlen + content_len);\n    ip4h.ip_id = htons(id);\n    ip4h.ip_off = htons(off);\n    if (mf)\n        ip4h.ip_off = htons(IP_MF | off);\n    else\n        ip4h.ip_off = htons(off);\n    ip4h.ip_ttl = ttl;\n    ip4h.ip_proto = IPPROTO_ICMP;\n\n    ip4h.s_ip_src.s_addr = 0x01010101; /* 1.1.1.1 */\n    ip4h.s_ip_dst.s_addr = 0x02020202; /* 2.2.2.2 */\n\n    /* copy content_len crap, we need full length */\n    PacketCopyData(p, (uint8_t *)&ip4h, sizeof(ip4h));\n    p->ip4h = (IPV4Hdr *)GET_PKT_DATA(p);\n    SET_IPV4_SRC_ADDR(p, &p->src);\n    SET_IPV4_DST_ADDR(p, &p->dst);\n\n    pcontent = SCCalloc(1, content_len);\n    if (unlikely(pcontent == NULL))\n        return NULL;\n    memset(pcontent, content, content_len);\n    PacketCopyDataOffset(p, hlen, pcontent, content_len);\n    SET_PKT_LEN(p, hlen + content_len);\n    SCFree(pcontent);\n\n    p->ip4h->ip_csum = IPV4CalculateChecksum((uint16_t *)GET_PKT_DATA(p), hlen);\n\n    /* Self test. */\n    if (IPV4_GET_VER(p) != 4)\n        goto error;\n    if (IPV4_GET_HLEN(p) != hlen)\n        goto error;\n    if (IPV4_GET_IPLEN(p) != hlen + content_len)\n        goto error;\n    if (IPV4_GET_IPID(p) != id)\n        goto error;\n    if (IPV4_GET_IPOFFSET(p) != off)\n        goto error;\n    if (IPV4_GET_MF(p) != mf)\n        goto error;\n    if (IPV4_GET_IPTTL(p) != ttl)\n        goto error;\n    if (IPV4_GET_IPPROTO(p) != IPPROTO_ICMP)\n        goto error;\n\n    return p;\nerror:\n    if (p != NULL)\n        SCFree(p);\n    return NULL;\n}",
+  "code_after_change": "BuildTestPacket(uint8_t proto, uint16_t id, uint16_t off, int mf,\n    const char content, int content_len)\n{\n    Packet *p = NULL;\n    int hlen = 20;\n    int ttl = 64;\n    uint8_t *pcontent;\n    IPV4Hdr ip4h;\n\n    p = SCCalloc(1, sizeof(*p) + default_packet_size);\n    if (unlikely(p == NULL))\n        return NULL;\n\n    PACKET_INITIALIZE(p);\n\n    gettimeofday(&p->ts, NULL);\n    //p->ip4h = (IPV4Hdr *)GET_PKT_DATA(p);\n    ip4h.ip_verhl = 4 << 4;\n    ip4h.ip_verhl |= hlen >> 2;\n    ip4h.ip_len = htons(hlen + content_len);\n    ip4h.ip_id = htons(id);\n    ip4h.ip_off = htons(off);\n    if (mf)\n        ip4h.ip_off = htons(IP_MF | off);\n    else\n        ip4h.ip_off = htons(off);\n    ip4h.ip_ttl = ttl;\n    ip4h.ip_proto = proto;\n\n    ip4h.s_ip_src.s_addr = 0x01010101; /* 1.1.1.1 */\n    ip4h.s_ip_dst.s_addr = 0x02020202; /* 2.2.2.2 */\n\n    /* copy content_len crap, we need full length */\n    PacketCopyData(p, (uint8_t *)&ip4h, sizeof(ip4h));\n    p->ip4h = (IPV4Hdr *)GET_PKT_DATA(p);\n    SET_IPV4_SRC_ADDR(p, &p->src);\n    SET_IPV4_DST_ADDR(p, &p->dst);\n\n    pcontent = SCCalloc(1, content_len);\n    if (unlikely(pcontent == NULL))\n        return NULL;\n    memset(pcontent, content, content_len);\n    PacketCopyDataOffset(p, hlen, pcontent, content_len);\n    SET_PKT_LEN(p, hlen + content_len);\n    SCFree(pcontent);\n\n    p->ip4h->ip_csum = IPV4CalculateChecksum((uint16_t *)GET_PKT_DATA(p), hlen);\n\n    /* Self test. */\n    if (IPV4_GET_VER(p) != 4)\n        goto error;\n    if (IPV4_GET_HLEN(p) != hlen)\n        goto error;\n    if (IPV4_GET_IPLEN(p) != hlen + content_len)\n        goto error;\n    if (IPV4_GET_IPID(p) != id)\n        goto error;\n    if (IPV4_GET_IPOFFSET(p) != off)\n        goto error;\n    if (IPV4_GET_MF(p) != mf)\n        goto error;\n    if (IPV4_GET_IPTTL(p) != ttl)\n        goto error;\n    if (IPV4_GET_IPPROTO(p) != proto)\n        goto error;\n\n    return p;\nerror:\n    if (p != NULL)\n        SCFree(p);\n    return NULL;\n}",
+  "function_modified_lines": {
+    "added": [
+      "BuildTestPacket(uint8_t proto, uint16_t id, uint16_t off, int mf,",
+      "    const char content, int content_len)",
+      "    ip4h.ip_proto = proto;",
+      "    if (IPV4_GET_IPPROTO(p) != proto)"
+    ],
+    "deleted": [
+      "BuildTestPacket(uint16_t id, uint16_t off, int mf, const char content,",
+      "    int content_len)",
+      "    ip4h.ip_proto = IPPROTO_ICMP;",
+      "    if (IPV4_GET_IPPROTO(p) != IPPROTO_ICMP)"
+    ]
+  },
+  "cwe": [
+    "CWE-358"
+  ],
+  "cve_description": "Suricata before 3.2.1 has an IPv4 defragmentation evasion issue caused by lack of a check for the IP protocol during fragment matching.",
+  "id": 4516
+}
+]

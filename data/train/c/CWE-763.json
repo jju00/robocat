@@ -1,0 +1,1043 @@
+[
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_process_context_token(\n\t\t\t\tOM_uint32\t*minor_status,\n\t\t\t\tconst gss_ctx_id_t context_handle,\n\t\t\t\tconst gss_buffer_t token_buffer)\n{\n\tOM_uint32 ret;\n\tret = gss_process_context_token(minor_status,\n\t\t\t\t\tcontext_handle,\n\t\t\t\t\ttoken_buffer);\n\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_process_context_token(\n\t\t\t\tOM_uint32\t*minor_status,\n\t\t\t\tconst gss_ctx_id_t context_handle,\n\t\t\t\tconst gss_buffer_t token_buffer)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\t/* SPNEGO doesn't have its own context tokens. */\n\tif (!sc->opened)\n\t\treturn (GSS_S_DEFECTIVE_TOKEN);\n\n\tret = gss_process_context_token(minor_status,\n\t\t\t\t\tsc->ctx_handle,\n\t\t\t\t\ttoken_buffer);\n\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\t/* SPNEGO doesn't have its own context tokens. */",
+      "\tif (!sc->opened)",
+      "\t\treturn (GSS_S_DEFECTIVE_TOKEN);",
+      "\t\t\t\t\tsc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t\t\tcontext_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6235
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_export_sec_context(\n\t\t\t    OM_uint32\t  *minor_status,\n\t\t\t    gss_ctx_id_t *context_handle,\n\t\t\t    gss_buffer_t interprocess_token)\n{\n\tOM_uint32 ret;\n\tret = gss_export_sec_context(minor_status,\n\t\t\t\t    context_handle,\n\t\t\t\t    interprocess_token);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_export_sec_context(\n\t\t\t    OM_uint32\t  *minor_status,\n\t\t\t    gss_ctx_id_t *context_handle,\n\t\t\t    gss_buffer_t interprocess_token)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = *(spnego_gss_ctx_id_t *)context_handle;\n\n\t/* We don't currently support exporting partially established\n\t * contexts. */\n\tif (!sc->opened)\n\t\treturn GSS_S_UNAVAILABLE;\n\n\tret = gss_export_sec_context(minor_status,\n\t\t\t\t    &sc->ctx_handle,\n\t\t\t\t    interprocess_token);\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT) {\n\t\trelease_spnego_ctx(&sc);\n\t\t*context_handle = GSS_C_NO_CONTEXT;\n\t}\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = *(spnego_gss_ctx_id_t *)context_handle;",
+      "\t/* We don't currently support exporting partially established",
+      "\t * contexts. */",
+      "\tif (!sc->opened)",
+      "\t\treturn GSS_S_UNAVAILABLE;",
+      "\t\t\t\t    &sc->ctx_handle,",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT) {",
+      "\t\trelease_spnego_ctx(&sc);",
+      "\t\t*context_handle = GSS_C_NO_CONTEXT;",
+      "\t}"
+    ],
+    "deleted": [
+      "\t\t\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6236
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_set_sec_context_option(\n\t\tOM_uint32 *minor_status,\n\t\tgss_ctx_id_t *context_handle,\n\t\tconst gss_OID desired_object,\n\t\tconst gss_buffer_t value)\n{\n\tOM_uint32 ret;\n\tret = gss_set_sec_context_option(minor_status,\n\t\t\t    context_handle,\n\t\t\t    desired_object,\n\t\t\t    value);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_set_sec_context_option(\n\t\tOM_uint32 *minor_status,\n\t\tgss_ctx_id_t *context_handle,\n\t\tconst gss_OID desired_object,\n\t\tconst gss_buffer_t value)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)*context_handle;\n\n\t/* There are no SPNEGO-specific OIDs for this function, and we cannot\n\t * construct an empty SPNEGO context with it. */\n\tif (sc == NULL || sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_UNAVAILABLE);\n\n\tret = gss_set_sec_context_option(minor_status,\n\t\t\t    &sc->ctx_handle,\n\t\t\t    desired_object,\n\t\t\t    value);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)*context_handle;",
+      "\t/* There are no SPNEGO-specific OIDs for this function, and we cannot",
+      "\t * construct an empty SPNEGO context with it. */",
+      "\tif (sc == NULL || sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_UNAVAILABLE);",
+      "\t\t\t    &sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6237
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_wrap(\n\t\tOM_uint32 *minor_status,\n\t\tgss_ctx_id_t context_handle,\n\t\tint conf_req_flag,\n\t\tgss_qop_t qop_req,\n\t\tgss_buffer_t input_message_buffer,\n\t\tint *conf_state,\n\t\tgss_buffer_t output_message_buffer)\n{\n\tOM_uint32 ret;\n\tret = gss_wrap(minor_status,\n\t\t    context_handle,\n\t\t    conf_req_flag,\n\t\t    qop_req,\n\t\t    input_message_buffer,\n\t\t    conf_state,\n\t\t    output_message_buffer);\n\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_wrap(\n\t\tOM_uint32 *minor_status,\n\t\tgss_ctx_id_t context_handle,\n\t\tint conf_req_flag,\n\t\tgss_qop_t qop_req,\n\t\tgss_buffer_t input_message_buffer,\n\t\tint *conf_state,\n\t\tgss_buffer_t output_message_buffer)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_wrap(minor_status,\n\t\t    sc->ctx_handle,\n\t\t    conf_req_flag,\n\t\t    qop_req,\n\t\t    input_message_buffer,\n\t\t    conf_state,\n\t\t    output_message_buffer);\n\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t    sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6238
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_unwrap_iov(OM_uint32 *minor_status,\n\t\t      gss_ctx_id_t context_handle,\n\t\t      int *conf_state,\n\t\t      gss_qop_t *qop_state,\n\t\t      gss_iov_buffer_desc *iov,\n\t\t      int iov_count)\n{\n\tOM_uint32 ret;\n\tret = gss_unwrap_iov(minor_status,\n\t\t\t     context_handle,\n\t\t\t     conf_state,\n\t\t\t     qop_state,\n\t\t\t     iov,\n\t\t\t     iov_count);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_unwrap_iov(OM_uint32 *minor_status,\n\t\t      gss_ctx_id_t context_handle,\n\t\t      int *conf_state,\n\t\t      gss_qop_t *qop_state,\n\t\t      gss_iov_buffer_desc *iov,\n\t\t      int iov_count)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_unwrap_iov(minor_status,\n\t\t\t     sc->ctx_handle,\n\t\t\t     conf_state,\n\t\t\t     qop_state,\n\t\t\t     iov,\n\t\t\t     iov_count);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t     sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t     context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6239
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "create_spnego_ctx(void)\n{\n\tspnego_gss_ctx_id_t spnego_ctx = NULL;\n\tspnego_ctx = (spnego_gss_ctx_id_t)\n\t\tmalloc(sizeof (spnego_gss_ctx_id_rec));\n\n\tif (spnego_ctx == NULL) {\n\t\treturn (NULL);\n\t}\n\n\tspnego_ctx->magic_num = SPNEGO_MAGIC_ID;\n\tspnego_ctx->ctx_handle = GSS_C_NO_CONTEXT;\n\tspnego_ctx->mech_set = NULL;\n\tspnego_ctx->internal_mech = NULL;\n\tspnego_ctx->optionStr = NULL;\n\tspnego_ctx->DER_mechTypes.length = 0;\n\tspnego_ctx->DER_mechTypes.value = NULL;\n\tspnego_ctx->default_cred = GSS_C_NO_CREDENTIAL;\n\tspnego_ctx->mic_reqd = 0;\n\tspnego_ctx->mic_sent = 0;\n\tspnego_ctx->mic_rcvd = 0;\n\tspnego_ctx->mech_complete = 0;\n\tspnego_ctx->nego_done = 0;\n\tspnego_ctx->internal_name = GSS_C_NO_NAME;\n\tspnego_ctx->actual_mech = GSS_C_NO_OID;\n\n\tcheck_spnego_options(spnego_ctx);\n\n\treturn (spnego_ctx);\n}",
+  "code_after_change": "create_spnego_ctx(int initiate)\n{\n\tspnego_gss_ctx_id_t spnego_ctx = NULL;\n\tspnego_ctx = (spnego_gss_ctx_id_t)\n\t\tmalloc(sizeof (spnego_gss_ctx_id_rec));\n\n\tif (spnego_ctx == NULL) {\n\t\treturn (NULL);\n\t}\n\n\tspnego_ctx->magic_num = SPNEGO_MAGIC_ID;\n\tspnego_ctx->ctx_handle = GSS_C_NO_CONTEXT;\n\tspnego_ctx->mech_set = NULL;\n\tspnego_ctx->internal_mech = NULL;\n\tspnego_ctx->optionStr = NULL;\n\tspnego_ctx->DER_mechTypes.length = 0;\n\tspnego_ctx->DER_mechTypes.value = NULL;\n\tspnego_ctx->default_cred = GSS_C_NO_CREDENTIAL;\n\tspnego_ctx->mic_reqd = 0;\n\tspnego_ctx->mic_sent = 0;\n\tspnego_ctx->mic_rcvd = 0;\n\tspnego_ctx->mech_complete = 0;\n\tspnego_ctx->nego_done = 0;\n\tspnego_ctx->opened = 0;\n\tspnego_ctx->initiate = initiate;\n\tspnego_ctx->internal_name = GSS_C_NO_NAME;\n\tspnego_ctx->actual_mech = GSS_C_NO_OID;\n\n\tcheck_spnego_options(spnego_ctx);\n\n\treturn (spnego_ctx);\n}",
+  "function_modified_lines": {
+    "added": [
+      "create_spnego_ctx(int initiate)",
+      "\tspnego_ctx->opened = 0;",
+      "\tspnego_ctx->initiate = initiate;"
+    ],
+    "deleted": [
+      "create_spnego_ctx(void)"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6240
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "acc_ctx_new(OM_uint32 *minor_status,\n\t    gss_buffer_t buf,\n\t    gss_ctx_id_t *ctx,\n\t    spnego_gss_cred_id_t spcred,\n\t    gss_buffer_t *mechToken,\n\t    gss_buffer_t *mechListMIC,\n\t    OM_uint32 *negState,\n\t    send_token_flag *return_token)\n{\n\tOM_uint32 tmpmin, ret, req_flags;\n\tgss_OID_set supported_mechSet, mechTypes;\n\tgss_buffer_desc der_mechTypes;\n\tgss_OID mech_wanted;\n\tspnego_gss_ctx_id_t sc = NULL;\n\n\tret = GSS_S_DEFECTIVE_TOKEN;\n\tder_mechTypes.length = 0;\n\tder_mechTypes.value = NULL;\n\t*mechToken = *mechListMIC = GSS_C_NO_BUFFER;\n\tsupported_mechSet = mechTypes = GSS_C_NO_OID_SET;\n\t*return_token = ERROR_TOKEN_SEND;\n\t*negState = REJECT;\n\t*minor_status = 0;\n\n\tret = get_negTokenInit(minor_status, buf, &der_mechTypes,\n\t\t\t       &mechTypes, &req_flags,\n\t\t\t       mechToken, mechListMIC);\n\tif (ret != GSS_S_COMPLETE) {\n\t\tgoto cleanup;\n\t}\n\tret = get_negotiable_mechs(minor_status, spcred, GSS_C_ACCEPT,\n\t\t\t\t   &supported_mechSet);\n\tif (ret != GSS_S_COMPLETE) {\n\t\t*return_token = NO_TOKEN_SEND;\n\t\tgoto cleanup;\n\t}\n\t/*\n\t * Select the best match between the list of mechs\n\t * that the initiator requested and the list that\n\t * the acceptor will support.\n\t */\n\tmech_wanted = negotiate_mech(supported_mechSet, mechTypes, negState);\n\tif (*negState == REJECT) {\n\t\tret = GSS_S_BAD_MECH;\n\t\tgoto cleanup;\n\t}\n\tsc = (spnego_gss_ctx_id_t)*ctx;\n\tif (sc != NULL) {\n\t\tgss_release_buffer(&tmpmin, &sc->DER_mechTypes);\n\t\tassert(mech_wanted != GSS_C_NO_OID);\n\t} else\n\t\tsc = create_spnego_ctx();\n\tif (sc == NULL) {\n\t\tret = GSS_S_FAILURE;\n\t\t*return_token = NO_TOKEN_SEND;\n\t\tgoto cleanup;\n\t}\n\tsc->mech_set = mechTypes;\n\tmechTypes = GSS_C_NO_OID_SET;\n\tsc->internal_mech = mech_wanted;\n\tsc->DER_mechTypes = der_mechTypes;\n\tder_mechTypes.length = 0;\n\tder_mechTypes.value = NULL;\n\n\tif (*negState == REQUEST_MIC)\n\t\tsc->mic_reqd = 1;\n\n\t*return_token = INIT_TOKEN_SEND;\n\tsc->firstpass = 1;\n\t*ctx = (gss_ctx_id_t)sc;\n\tret = GSS_S_COMPLETE;\ncleanup:\n\tgss_release_oid_set(&tmpmin, &mechTypes);\n\tgss_release_oid_set(&tmpmin, &supported_mechSet);\n\tif (der_mechTypes.length != 0)\n\t\tgss_release_buffer(&tmpmin, &der_mechTypes);\n\n\treturn ret;\n}",
+  "code_after_change": "acc_ctx_new(OM_uint32 *minor_status,\n\t    gss_buffer_t buf,\n\t    gss_ctx_id_t *ctx,\n\t    spnego_gss_cred_id_t spcred,\n\t    gss_buffer_t *mechToken,\n\t    gss_buffer_t *mechListMIC,\n\t    OM_uint32 *negState,\n\t    send_token_flag *return_token)\n{\n\tOM_uint32 tmpmin, ret, req_flags;\n\tgss_OID_set supported_mechSet, mechTypes;\n\tgss_buffer_desc der_mechTypes;\n\tgss_OID mech_wanted;\n\tspnego_gss_ctx_id_t sc = NULL;\n\n\tret = GSS_S_DEFECTIVE_TOKEN;\n\tder_mechTypes.length = 0;\n\tder_mechTypes.value = NULL;\n\t*mechToken = *mechListMIC = GSS_C_NO_BUFFER;\n\tsupported_mechSet = mechTypes = GSS_C_NO_OID_SET;\n\t*return_token = ERROR_TOKEN_SEND;\n\t*negState = REJECT;\n\t*minor_status = 0;\n\n\tret = get_negTokenInit(minor_status, buf, &der_mechTypes,\n\t\t\t       &mechTypes, &req_flags,\n\t\t\t       mechToken, mechListMIC);\n\tif (ret != GSS_S_COMPLETE) {\n\t\tgoto cleanup;\n\t}\n\tret = get_negotiable_mechs(minor_status, spcred, GSS_C_ACCEPT,\n\t\t\t\t   &supported_mechSet);\n\tif (ret != GSS_S_COMPLETE) {\n\t\t*return_token = NO_TOKEN_SEND;\n\t\tgoto cleanup;\n\t}\n\t/*\n\t * Select the best match between the list of mechs\n\t * that the initiator requested and the list that\n\t * the acceptor will support.\n\t */\n\tmech_wanted = negotiate_mech(supported_mechSet, mechTypes, negState);\n\tif (*negState == REJECT) {\n\t\tret = GSS_S_BAD_MECH;\n\t\tgoto cleanup;\n\t}\n\tsc = (spnego_gss_ctx_id_t)*ctx;\n\tif (sc != NULL) {\n\t\tgss_release_buffer(&tmpmin, &sc->DER_mechTypes);\n\t\tassert(mech_wanted != GSS_C_NO_OID);\n\t} else\n\t\tsc = create_spnego_ctx(0);\n\tif (sc == NULL) {\n\t\tret = GSS_S_FAILURE;\n\t\t*return_token = NO_TOKEN_SEND;\n\t\tgoto cleanup;\n\t}\n\tsc->mech_set = mechTypes;\n\tmechTypes = GSS_C_NO_OID_SET;\n\tsc->internal_mech = mech_wanted;\n\tsc->DER_mechTypes = der_mechTypes;\n\tder_mechTypes.length = 0;\n\tder_mechTypes.value = NULL;\n\n\tif (*negState == REQUEST_MIC)\n\t\tsc->mic_reqd = 1;\n\n\t*return_token = INIT_TOKEN_SEND;\n\tsc->firstpass = 1;\n\t*ctx = (gss_ctx_id_t)sc;\n\tret = GSS_S_COMPLETE;\ncleanup:\n\tgss_release_oid_set(&tmpmin, &mechTypes);\n\tgss_release_oid_set(&tmpmin, &supported_mechSet);\n\tif (der_mechTypes.length != 0)\n\t\tgss_release_buffer(&tmpmin, &der_mechTypes);\n\n\treturn ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tsc = create_spnego_ctx(0);"
+    ],
+    "deleted": [
+      "\t\tsc = create_spnego_ctx();"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6241
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_pseudo_random(OM_uint32 *minor_status,\n\t\t\t gss_ctx_id_t context,\n\t\t\t int prf_key,\n\t\t\t const gss_buffer_t prf_in,\n\t\t\t ssize_t desired_output_len,\n\t\t\t gss_buffer_t prf_out)\n{\n\tOM_uint32 ret;\n\tret = gss_pseudo_random(minor_status,\n\t\t\t\tcontext,\n\t\t\t\tprf_key,\n\t\t\t\tprf_in,\n\t\t\t\tdesired_output_len,\n\t\t\t\tprf_out);\n        return (ret);\n}",
+  "code_after_change": "spnego_gss_pseudo_random(OM_uint32 *minor_status,\n\t\t\t gss_ctx_id_t context,\n\t\t\t int prf_key,\n\t\t\t const gss_buffer_t prf_in,\n\t\t\t ssize_t desired_output_len,\n\t\t\t gss_buffer_t prf_out)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_pseudo_random(minor_status,\n\t\t\t\tsc->ctx_handle,\n\t\t\t\tprf_key,\n\t\t\t\tprf_in,\n\t\t\t\tdesired_output_len,\n\t\t\t\tprf_out);\n        return (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t\tsc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t\tcontext,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6242
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_wrap_aead(OM_uint32 *minor_status,\n\t\t     gss_ctx_id_t context_handle,\n\t\t     int conf_req_flag,\n\t\t     gss_qop_t qop_req,\n\t\t     gss_buffer_t input_assoc_buffer,\n\t\t     gss_buffer_t input_payload_buffer,\n\t\t     int *conf_state,\n\t\t     gss_buffer_t output_message_buffer)\n{\n\tOM_uint32 ret;\n\tret = gss_wrap_aead(minor_status,\n\t\t\t    context_handle,\n\t\t\t    conf_req_flag,\n\t\t\t    qop_req,\n\t\t\t    input_assoc_buffer,\n\t\t\t    input_payload_buffer,\n\t\t\t    conf_state,\n\t\t\t    output_message_buffer);\n\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_wrap_aead(OM_uint32 *minor_status,\n\t\t     gss_ctx_id_t context_handle,\n\t\t     int conf_req_flag,\n\t\t     gss_qop_t qop_req,\n\t\t     gss_buffer_t input_assoc_buffer,\n\t\t     gss_buffer_t input_payload_buffer,\n\t\t     int *conf_state,\n\t\t     gss_buffer_t output_message_buffer)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_wrap_aead(minor_status,\n\t\t\t    sc->ctx_handle,\n\t\t\t    conf_req_flag,\n\t\t\t    qop_req,\n\t\t\t    input_assoc_buffer,\n\t\t\t    input_payload_buffer,\n\t\t\t    conf_state,\n\t\t\t    output_message_buffer);\n\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t    sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6243
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_inquire_sec_context_by_oid(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tconst gss_OID desired_object,\n\t\tgss_buffer_set_t *data_set)\n{\n\tOM_uint32 ret;\n\tret = gss_inquire_sec_context_by_oid(minor_status,\n\t\t\t    context_handle,\n\t\t\t    desired_object,\n\t\t\t    data_set);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_inquire_sec_context_by_oid(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tconst gss_OID desired_object,\n\t\tgss_buffer_set_t *data_set)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\t/* There are no SPNEGO-specific OIDs for this function. */\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_UNAVAILABLE);\n\n\tret = gss_inquire_sec_context_by_oid(minor_status,\n\t\t\t    sc->ctx_handle,\n\t\t\t    desired_object,\n\t\t\t    data_set);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\t/* There are no SPNEGO-specific OIDs for this function. */",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_UNAVAILABLE);",
+      "\t\t\t    sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6244
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_get_mic_iov_length(OM_uint32 *minor_status,\n\t\t\t      gss_ctx_id_t context_handle, gss_qop_t qop_req,\n\t\t\t      gss_iov_buffer_desc *iov, int iov_count)\n{\n    return gss_get_mic_iov_length(minor_status, context_handle, qop_req, iov,\n\t\t\t\t  iov_count);\n}",
+  "code_after_change": "spnego_gss_get_mic_iov_length(OM_uint32 *minor_status,\n\t\t\t      gss_ctx_id_t context_handle, gss_qop_t qop_req,\n\t\t\t      gss_iov_buffer_desc *iov, int iov_count)\n{\n    spnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n    if (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t    return (GSS_S_NO_CONTEXT);\n\n    return gss_get_mic_iov_length(minor_status, sc->ctx_handle, qop_req, iov,\n\t\t\t\t  iov_count);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    spnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "    if (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t    return (GSS_S_NO_CONTEXT);",
+      "    return gss_get_mic_iov_length(minor_status, sc->ctx_handle, qop_req, iov,"
+    ],
+    "deleted": [
+      "    return gss_get_mic_iov_length(minor_status, context_handle, qop_req, iov,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6245
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_get_mic_iov(OM_uint32 *minor_status, gss_ctx_id_t context_handle,\n\t\t       gss_qop_t qop_req, gss_iov_buffer_desc *iov,\n\t\t       int iov_count)\n{\n    return gss_get_mic_iov(minor_status, context_handle, qop_req, iov,\n\t\t\t   iov_count);\n}",
+  "code_after_change": "spnego_gss_get_mic_iov(OM_uint32 *minor_status, gss_ctx_id_t context_handle,\n\t\t       gss_qop_t qop_req, gss_iov_buffer_desc *iov,\n\t\t       int iov_count)\n{\n    spnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n    if (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t    return (GSS_S_NO_CONTEXT);\n\n    return gss_get_mic_iov(minor_status, sc->ctx_handle, qop_req, iov,\n\t\t\t   iov_count);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    spnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "    if (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t    return (GSS_S_NO_CONTEXT);",
+      "    return gss_get_mic_iov(minor_status, sc->ctx_handle, qop_req, iov,"
+    ],
+    "deleted": [
+      "    return gss_get_mic_iov(minor_status, context_handle, qop_req, iov,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6246
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_unwrap_aead(OM_uint32 *minor_status,\n\t\t       gss_ctx_id_t context_handle,\n\t\t       gss_buffer_t input_message_buffer,\n\t\t       gss_buffer_t input_assoc_buffer,\n\t\t       gss_buffer_t output_payload_buffer,\n\t\t       int *conf_state,\n\t\t       gss_qop_t *qop_state)\n{\n\tOM_uint32 ret;\n\tret = gss_unwrap_aead(minor_status,\n\t\t\t      context_handle,\n\t\t\t      input_message_buffer,\n\t\t\t      input_assoc_buffer,\n\t\t\t      output_payload_buffer,\n\t\t\t      conf_state,\n\t\t\t      qop_state);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_unwrap_aead(OM_uint32 *minor_status,\n\t\t       gss_ctx_id_t context_handle,\n\t\t       gss_buffer_t input_message_buffer,\n\t\t       gss_buffer_t input_assoc_buffer,\n\t\t       gss_buffer_t output_payload_buffer,\n\t\t       int *conf_state,\n\t\t       gss_qop_t *qop_state)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_unwrap_aead(minor_status,\n\t\t\t      sc->ctx_handle,\n\t\t\t      input_message_buffer,\n\t\t\t      input_assoc_buffer,\n\t\t\t      output_payload_buffer,\n\t\t\t      conf_state,\n\t\t\t      qop_state);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t      sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t      context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6247
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_unwrap(\n\t\tOM_uint32 *minor_status,\n\t\tgss_ctx_id_t context_handle,\n\t\tgss_buffer_t input_message_buffer,\n\t\tgss_buffer_t output_message_buffer,\n\t\tint *conf_state,\n\t\tgss_qop_t *qop_state)\n{\n\tOM_uint32 ret;\n\tret = gss_unwrap(minor_status,\n\t\t\tcontext_handle,\n\t\t\tinput_message_buffer,\n\t\t\toutput_message_buffer,\n\t\t\tconf_state,\n\t\t\tqop_state);\n\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_unwrap(\n\t\tOM_uint32 *minor_status,\n\t\tgss_ctx_id_t context_handle,\n\t\tgss_buffer_t input_message_buffer,\n\t\tgss_buffer_t output_message_buffer,\n\t\tint *conf_state,\n\t\tgss_qop_t *qop_state)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_unwrap(minor_status,\n\t\t\tsc->ctx_handle,\n\t\t\tinput_message_buffer,\n\t\t\toutput_message_buffer,\n\t\t\tconf_state,\n\t\t\tqop_state);\n\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\tsc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\tcontext_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6248
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_init_sec_context(\n\t\t\tOM_uint32 *minor_status,\n\t\t\tgss_cred_id_t claimant_cred_handle,\n\t\t\tgss_ctx_id_t *context_handle,\n\t\t\tgss_name_t target_name,\n\t\t\tgss_OID mech_type,\n\t\t\tOM_uint32 req_flags,\n\t\t\tOM_uint32 time_req,\n\t\t\tgss_channel_bindings_t input_chan_bindings,\n\t\t\tgss_buffer_t input_token,\n\t\t\tgss_OID *actual_mech,\n\t\t\tgss_buffer_t output_token,\n\t\t\tOM_uint32 *ret_flags,\n\t\t\tOM_uint32 *time_rec)\n{\n\tsend_token_flag send_token = NO_TOKEN_SEND;\n\tOM_uint32 tmpmin, ret, negState;\n\tgss_buffer_t mechtok_in, mechListMIC_in, mechListMIC_out;\n\tgss_buffer_desc mechtok_out = GSS_C_EMPTY_BUFFER;\n\tspnego_gss_cred_id_t spcred = NULL;\n\tspnego_gss_ctx_id_t spnego_ctx = NULL;\n\n\tdsyslog(\"Entering init_sec_context\\n\");\n\n\tmechtok_in = mechListMIC_out = mechListMIC_in = GSS_C_NO_BUFFER;\n\tnegState = REJECT;\n\n\t/*\n\t * This function works in three steps:\n\t *\n\t *   1. Perform mechanism negotiation.\n\t *   2. Invoke the negotiated or optimistic mech's gss_init_sec_context\n\t *      function and examine the results.\n\t *   3. Process or generate MICs if necessary.\n\t *\n\t * The three steps share responsibility for determining when the\n\t * exchange is complete.  If the selected mech completed in a previous\n\t * call and no MIC exchange is expected, then step 1 will decide.  If\n\t * the selected mech completes in this call and no MIC exchange is\n\t * expected, then step 2 will decide.  If a MIC exchange is expected,\n\t * then step 3 will decide.  If an error occurs in any step, the\n\t * exchange will be aborted, possibly with an error token.\n\t *\n\t * negState determines the state of the negotiation, and is\n\t * communicated to the acceptor if a continuing token is sent.\n\t * send_token is used to indicate what type of token, if any, should be\n\t * generated.\n\t */\n\n\t/* Validate arguments. */\n\tif (minor_status != NULL)\n\t\t*minor_status = 0;\n\tif (output_token != GSS_C_NO_BUFFER) {\n\t\toutput_token->length = 0;\n\t\toutput_token->value = NULL;\n\t}\n\tif (minor_status == NULL ||\n\t    output_token == GSS_C_NO_BUFFER ||\n\t    context_handle == NULL)\n\t\treturn GSS_S_CALL_INACCESSIBLE_WRITE;\n\n\tif (actual_mech != NULL)\n\t\t*actual_mech = GSS_C_NO_OID;\n\n\t/* Step 1: perform mechanism negotiation. */\n\tspcred = (spnego_gss_cred_id_t)claimant_cred_handle;\n\tif (*context_handle == GSS_C_NO_CONTEXT) {\n\t\tret = init_ctx_new(minor_status, spcred,\n\t\t\t\t   context_handle, &send_token);\n\t\tif (ret != GSS_S_CONTINUE_NEEDED) {\n\t\t\tgoto cleanup;\n\t\t}\n\t} else {\n\t\tret = init_ctx_cont(minor_status, context_handle,\n\t\t\t\t    input_token, &mechtok_in,\n\t\t\t\t    &mechListMIC_in, &negState, &send_token);\n\t\tif (HARD_ERROR(ret)) {\n\t\t\tgoto cleanup;\n\t\t}\n\t}\n\n\t/* Step 2: invoke the selected or optimistic mechanism's\n\t * gss_init_sec_context function, if it didn't complete previously. */\n\tspnego_ctx = (spnego_gss_ctx_id_t)*context_handle;\n\tif (!spnego_ctx->mech_complete) {\n\t\tret = init_ctx_call_init(\n\t\t\tminor_status, spnego_ctx, spcred,\n\t\t\ttarget_name, req_flags,\n\t\t\ttime_req, mechtok_in,\n\t\t\tactual_mech, &mechtok_out,\n\t\t\tret_flags, time_rec,\n\t\t\t&negState, &send_token);\n\n\t\t/* Give the mechanism a chance to force a mechlistMIC. */\n\t\tif (!HARD_ERROR(ret) && mech_requires_mechlistMIC(spnego_ctx))\n\t\t\tspnego_ctx->mic_reqd = 1;\n\t}\n\n\t/* Step 3: process or generate the MIC, if the negotiated mech is\n\t * complete and supports MICs. */\n\tif (!HARD_ERROR(ret) && spnego_ctx->mech_complete &&\n\t    (spnego_ctx->ctx_flags & GSS_C_INTEG_FLAG)) {\n\n\t\tret = handle_mic(minor_status,\n\t\t\t\t mechListMIC_in,\n\t\t\t\t (mechtok_out.length != 0),\n\t\t\t\t spnego_ctx, &mechListMIC_out,\n\t\t\t\t &negState, &send_token);\n\t}\ncleanup:\n\tif (send_token == INIT_TOKEN_SEND) {\n\t\tif (make_spnego_tokenInit_msg(spnego_ctx,\n\t\t\t\t\t      0,\n\t\t\t\t\t      mechListMIC_out,\n\t\t\t\t\t      req_flags,\n\t\t\t\t\t      &mechtok_out, send_token,\n\t\t\t\t\t      output_token) < 0) {\n\t\t\tret = GSS_S_FAILURE;\n\t\t}\n\t} else if (send_token != NO_TOKEN_SEND) {\n\t\tif (make_spnego_tokenTarg_msg(negState, GSS_C_NO_OID,\n\t\t\t\t\t      &mechtok_out, mechListMIC_out,\n\t\t\t\t\t      send_token,\n\t\t\t\t\t      output_token) < 0) {\n\t\t\tret = GSS_S_FAILURE;\n\t\t}\n\t}\n\tgss_release_buffer(&tmpmin, &mechtok_out);\n\tif (ret == GSS_S_COMPLETE) {\n\t\t/*\n\t\t * Now, switch the output context to refer to the\n\t\t * negotiated mechanism's context.\n\t\t */\n\t\t*context_handle = (gss_ctx_id_t)spnego_ctx->ctx_handle;\n\t\tif (actual_mech != NULL)\n\t\t\t*actual_mech = spnego_ctx->actual_mech;\n\t\tif (ret_flags != NULL)\n\t\t\t*ret_flags = spnego_ctx->ctx_flags;\n\t\trelease_spnego_ctx(&spnego_ctx);\n\t} else if (ret != GSS_S_CONTINUE_NEEDED) {\n\t\tif (spnego_ctx != NULL) {\n\t\t\tgss_delete_sec_context(&tmpmin,\n\t\t\t\t\t       &spnego_ctx->ctx_handle,\n\t\t\t\t\t       GSS_C_NO_BUFFER);\n\t\t\trelease_spnego_ctx(&spnego_ctx);\n\t\t}\n\t\t*context_handle = GSS_C_NO_CONTEXT;\n\t}\n\tif (mechtok_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechtok_in);\n\t\tfree(mechtok_in);\n\t}\n\tif (mechListMIC_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechListMIC_in);\n\t\tfree(mechListMIC_in);\n\t}\n\tif (mechListMIC_out != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechListMIC_out);\n\t\tfree(mechListMIC_out);\n\t}\n\treturn ret;\n} /* init_sec_context */",
+  "code_after_change": "spnego_gss_init_sec_context(\n\t\t\tOM_uint32 *minor_status,\n\t\t\tgss_cred_id_t claimant_cred_handle,\n\t\t\tgss_ctx_id_t *context_handle,\n\t\t\tgss_name_t target_name,\n\t\t\tgss_OID mech_type,\n\t\t\tOM_uint32 req_flags,\n\t\t\tOM_uint32 time_req,\n\t\t\tgss_channel_bindings_t input_chan_bindings,\n\t\t\tgss_buffer_t input_token,\n\t\t\tgss_OID *actual_mech,\n\t\t\tgss_buffer_t output_token,\n\t\t\tOM_uint32 *ret_flags,\n\t\t\tOM_uint32 *time_rec)\n{\n\tsend_token_flag send_token = NO_TOKEN_SEND;\n\tOM_uint32 tmpmin, ret, negState;\n\tgss_buffer_t mechtok_in, mechListMIC_in, mechListMIC_out;\n\tgss_buffer_desc mechtok_out = GSS_C_EMPTY_BUFFER;\n\tspnego_gss_cred_id_t spcred = NULL;\n\tspnego_gss_ctx_id_t spnego_ctx = NULL;\n\n\tdsyslog(\"Entering init_sec_context\\n\");\n\n\tmechtok_in = mechListMIC_out = mechListMIC_in = GSS_C_NO_BUFFER;\n\tnegState = REJECT;\n\n\t/*\n\t * This function works in three steps:\n\t *\n\t *   1. Perform mechanism negotiation.\n\t *   2. Invoke the negotiated or optimistic mech's gss_init_sec_context\n\t *      function and examine the results.\n\t *   3. Process or generate MICs if necessary.\n\t *\n\t * The three steps share responsibility for determining when the\n\t * exchange is complete.  If the selected mech completed in a previous\n\t * call and no MIC exchange is expected, then step 1 will decide.  If\n\t * the selected mech completes in this call and no MIC exchange is\n\t * expected, then step 2 will decide.  If a MIC exchange is expected,\n\t * then step 3 will decide.  If an error occurs in any step, the\n\t * exchange will be aborted, possibly with an error token.\n\t *\n\t * negState determines the state of the negotiation, and is\n\t * communicated to the acceptor if a continuing token is sent.\n\t * send_token is used to indicate what type of token, if any, should be\n\t * generated.\n\t */\n\n\t/* Validate arguments. */\n\tif (minor_status != NULL)\n\t\t*minor_status = 0;\n\tif (output_token != GSS_C_NO_BUFFER) {\n\t\toutput_token->length = 0;\n\t\toutput_token->value = NULL;\n\t}\n\tif (minor_status == NULL ||\n\t    output_token == GSS_C_NO_BUFFER ||\n\t    context_handle == NULL)\n\t\treturn GSS_S_CALL_INACCESSIBLE_WRITE;\n\n\tif (actual_mech != NULL)\n\t\t*actual_mech = GSS_C_NO_OID;\n\n\t/* Step 1: perform mechanism negotiation. */\n\tspcred = (spnego_gss_cred_id_t)claimant_cred_handle;\n\tif (*context_handle == GSS_C_NO_CONTEXT) {\n\t\tret = init_ctx_new(minor_status, spcred,\n\t\t\t\t   context_handle, &send_token);\n\t\tif (ret != GSS_S_CONTINUE_NEEDED) {\n\t\t\tgoto cleanup;\n\t\t}\n\t} else {\n\t\tret = init_ctx_cont(minor_status, context_handle,\n\t\t\t\t    input_token, &mechtok_in,\n\t\t\t\t    &mechListMIC_in, &negState, &send_token);\n\t\tif (HARD_ERROR(ret)) {\n\t\t\tgoto cleanup;\n\t\t}\n\t}\n\n\t/* Step 2: invoke the selected or optimistic mechanism's\n\t * gss_init_sec_context function, if it didn't complete previously. */\n\tspnego_ctx = (spnego_gss_ctx_id_t)*context_handle;\n\tif (!spnego_ctx->mech_complete) {\n\t\tret = init_ctx_call_init(\n\t\t\tminor_status, spnego_ctx, spcred,\n\t\t\ttarget_name, req_flags,\n\t\t\ttime_req, mechtok_in,\n\t\t\tactual_mech, &mechtok_out,\n\t\t\tret_flags, time_rec,\n\t\t\t&negState, &send_token);\n\n\t\t/* Give the mechanism a chance to force a mechlistMIC. */\n\t\tif (!HARD_ERROR(ret) && mech_requires_mechlistMIC(spnego_ctx))\n\t\t\tspnego_ctx->mic_reqd = 1;\n\t}\n\n\t/* Step 3: process or generate the MIC, if the negotiated mech is\n\t * complete and supports MICs. */\n\tif (!HARD_ERROR(ret) && spnego_ctx->mech_complete &&\n\t    (spnego_ctx->ctx_flags & GSS_C_INTEG_FLAG)) {\n\n\t\tret = handle_mic(minor_status,\n\t\t\t\t mechListMIC_in,\n\t\t\t\t (mechtok_out.length != 0),\n\t\t\t\t spnego_ctx, &mechListMIC_out,\n\t\t\t\t &negState, &send_token);\n\t}\ncleanup:\n\tif (send_token == INIT_TOKEN_SEND) {\n\t\tif (make_spnego_tokenInit_msg(spnego_ctx,\n\t\t\t\t\t      0,\n\t\t\t\t\t      mechListMIC_out,\n\t\t\t\t\t      req_flags,\n\t\t\t\t\t      &mechtok_out, send_token,\n\t\t\t\t\t      output_token) < 0) {\n\t\t\tret = GSS_S_FAILURE;\n\t\t}\n\t} else if (send_token != NO_TOKEN_SEND) {\n\t\tif (make_spnego_tokenTarg_msg(negState, GSS_C_NO_OID,\n\t\t\t\t\t      &mechtok_out, mechListMIC_out,\n\t\t\t\t\t      send_token,\n\t\t\t\t\t      output_token) < 0) {\n\t\t\tret = GSS_S_FAILURE;\n\t\t}\n\t}\n\tgss_release_buffer(&tmpmin, &mechtok_out);\n\tif (ret == GSS_S_COMPLETE) {\n\t\tspnego_ctx->opened = 1;\n\t\tif (actual_mech != NULL)\n\t\t\t*actual_mech = spnego_ctx->actual_mech;\n\t\tif (ret_flags != NULL)\n\t\t\t*ret_flags = spnego_ctx->ctx_flags;\n\t} else if (ret != GSS_S_CONTINUE_NEEDED) {\n\t\tif (spnego_ctx != NULL) {\n\t\t\tgss_delete_sec_context(&tmpmin,\n\t\t\t\t\t       &spnego_ctx->ctx_handle,\n\t\t\t\t\t       GSS_C_NO_BUFFER);\n\t\t\trelease_spnego_ctx(&spnego_ctx);\n\t\t}\n\t\t*context_handle = GSS_C_NO_CONTEXT;\n\t}\n\tif (mechtok_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechtok_in);\n\t\tfree(mechtok_in);\n\t}\n\tif (mechListMIC_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechListMIC_in);\n\t\tfree(mechListMIC_in);\n\t}\n\tif (mechListMIC_out != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechListMIC_out);\n\t\tfree(mechListMIC_out);\n\t}\n\treturn ret;\n} /* init_sec_context */",
+  "function_modified_lines": {
+    "added": [
+      "\t\tspnego_ctx->opened = 1;"
+    ],
+    "deleted": [
+      "\t\t/*",
+      "\t\t * Now, switch the output context to refer to the",
+      "\t\t * negotiated mechanism's context.",
+      "\t\t */",
+      "\t\t*context_handle = (gss_ctx_id_t)spnego_ctx->ctx_handle;",
+      "\t\trelease_spnego_ctx(&spnego_ctx);"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6249
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_context_time(\n\t\t\tOM_uint32\t*minor_status,\n\t\t\tconst gss_ctx_id_t context_handle,\n\t\t\tOM_uint32\t*time_rec)\n{\n\tOM_uint32 ret;\n\tret = gss_context_time(minor_status,\n\t\t\t    context_handle,\n\t\t\t    time_rec);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_context_time(\n\t\t\tOM_uint32\t*minor_status,\n\t\t\tconst gss_ctx_id_t context_handle,\n\t\t\tOM_uint32\t*time_rec)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_context_time(minor_status,\n\t\t\t    sc->ctx_handle,\n\t\t\t    time_rec);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t    sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6250
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_wrap_iov(OM_uint32 *minor_status,\n\t\t    gss_ctx_id_t context_handle,\n\t\t    int conf_req_flag,\n\t\t    gss_qop_t qop_req,\n\t\t    int *conf_state,\n\t\t    gss_iov_buffer_desc *iov,\n\t\t    int iov_count)\n{\n\tOM_uint32 ret;\n\tret = gss_wrap_iov(minor_status,\n\t\t\t   context_handle,\n\t\t\t   conf_req_flag,\n\t\t\t   qop_req,\n\t\t\t   conf_state,\n\t\t\t   iov,\n\t\t\t   iov_count);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_wrap_iov(OM_uint32 *minor_status,\n\t\t    gss_ctx_id_t context_handle,\n\t\t    int conf_req_flag,\n\t\t    gss_qop_t qop_req,\n\t\t    int *conf_state,\n\t\t    gss_iov_buffer_desc *iov,\n\t\t    int iov_count)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_wrap_iov(minor_status,\n\t\t\t   sc->ctx_handle,\n\t\t\t   conf_req_flag,\n\t\t\t   qop_req,\n\t\t\t   conf_state,\n\t\t\t   iov,\n\t\t\t   iov_count);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t   sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t   context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6251
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_accept_sec_context(\n\t\t\t    OM_uint32 *minor_status,\n\t\t\t    gss_ctx_id_t *context_handle,\n\t\t\t    gss_cred_id_t verifier_cred_handle,\n\t\t\t    gss_buffer_t input_token,\n\t\t\t    gss_channel_bindings_t input_chan_bindings,\n\t\t\t    gss_name_t *src_name,\n\t\t\t    gss_OID *mech_type,\n\t\t\t    gss_buffer_t output_token,\n\t\t\t    OM_uint32 *ret_flags,\n\t\t\t    OM_uint32 *time_rec,\n\t\t\t    gss_cred_id_t *delegated_cred_handle)\n{\n\tOM_uint32 ret, tmpmin, negState;\n\tsend_token_flag return_token;\n\tgss_buffer_t mechtok_in, mic_in, mic_out;\n\tgss_buffer_desc mechtok_out = GSS_C_EMPTY_BUFFER;\n\tspnego_gss_ctx_id_t sc = NULL;\n\tspnego_gss_cred_id_t spcred = NULL;\n\tint sendTokenInit = 0, tmpret;\n\n\tmechtok_in = mic_in = mic_out = GSS_C_NO_BUFFER;\n\n\t/*\n\t * This function works in three steps:\n\t *\n\t *   1. Perform mechanism negotiation.\n\t *   2. Invoke the negotiated mech's gss_accept_sec_context function\n\t *      and examine the results.\n\t *   3. Process or generate MICs if necessary.\n\t *\n\t * Step one determines whether the negotiation requires a MIC exchange,\n\t * while steps two and three share responsibility for determining when\n\t * the exchange is complete.  If the selected mech completes in this\n\t * call and no MIC exchange is expected, then step 2 will decide.  If a\n\t * MIC exchange is expected, then step 3 will decide.  If an error\n\t * occurs in any step, the exchange will be aborted, possibly with an\n\t * error token.\n\t *\n\t * negState determines the state of the negotiation, and is\n\t * communicated to the acceptor if a continuing token is sent.\n\t * return_token is used to indicate what type of token, if any, should\n\t * be generated.\n\t */\n\n\t/* Validate arguments. */\n\tif (minor_status != NULL)\n\t\t*minor_status = 0;\n\tif (output_token != GSS_C_NO_BUFFER) {\n\t\toutput_token->length = 0;\n\t\toutput_token->value = NULL;\n\t}\n\n\tif (minor_status == NULL ||\n\t    output_token == GSS_C_NO_BUFFER ||\n\t    context_handle == NULL)\n\t\treturn GSS_S_CALL_INACCESSIBLE_WRITE;\n\n\tif (input_token == GSS_C_NO_BUFFER)\n\t\treturn GSS_S_CALL_INACCESSIBLE_READ;\n\n\t/* Step 1: Perform mechanism negotiation. */\n\tsc = (spnego_gss_ctx_id_t)*context_handle;\n\tspcred = (spnego_gss_cred_id_t)verifier_cred_handle;\n\tif (sc == NULL || sc->internal_mech == GSS_C_NO_OID) {\n\t\t/* Process an initial token or request for NegHints. */\n\t\tif (src_name != NULL)\n\t\t\t*src_name = GSS_C_NO_NAME;\n\t\tif (mech_type != NULL)\n\t\t\t*mech_type = GSS_C_NO_OID;\n\t\tif (time_rec != NULL)\n\t\t\t*time_rec = 0;\n\t\tif (ret_flags != NULL)\n\t\t\t*ret_flags = 0;\n\t\tif (delegated_cred_handle != NULL)\n\t\t\t*delegated_cred_handle = GSS_C_NO_CREDENTIAL;\n\t\tif (input_token->length == 0) {\n\t\t\tret = acc_ctx_hints(minor_status,\n\t\t\t\t\t    context_handle, spcred,\n\t\t\t\t\t    &mic_out,\n\t\t\t\t\t    &negState,\n\t\t\t\t\t    &return_token);\n\t\t\tif (ret != GSS_S_COMPLETE)\n\t\t\t\tgoto cleanup;\n\t\t\tsendTokenInit = 1;\n\t\t\tret = GSS_S_CONTINUE_NEEDED;\n\t\t} else {\n\t\t\t/* Can set negState to REQUEST_MIC */\n\t\t\tret = acc_ctx_new(minor_status, input_token,\n\t\t\t\t\t  context_handle, spcred,\n\t\t\t\t\t  &mechtok_in, &mic_in,\n\t\t\t\t\t  &negState, &return_token);\n\t\t\tif (ret != GSS_S_COMPLETE)\n\t\t\t\tgoto cleanup;\n\t\t\tret = GSS_S_CONTINUE_NEEDED;\n\t\t}\n\t} else {\n\t\t/* Process a response token.  Can set negState to\n\t\t * ACCEPT_INCOMPLETE. */\n\t\tret = acc_ctx_cont(minor_status, input_token,\n\t\t\t\t   context_handle, &mechtok_in,\n\t\t\t\t   &mic_in, &negState, &return_token);\n\t\tif (ret != GSS_S_COMPLETE)\n\t\t\tgoto cleanup;\n\t\tret = GSS_S_CONTINUE_NEEDED;\n\t}\n\n\t/* Step 2: invoke the negotiated mechanism's gss_accept_sec_context\n\t * function. */\n\tsc = (spnego_gss_ctx_id_t)*context_handle;\n\t/*\n\t * Handle mechtok_in and mic_in only if they are\n\t * present in input_token.  If neither is present, whether\n\t * this is an error depends on whether this is the first\n\t * round-trip.  RET is set to a default value according to\n\t * whether it is the first round-trip.\n\t */\n\tif (negState != REQUEST_MIC && mechtok_in != GSS_C_NO_BUFFER) {\n\t\tret = acc_ctx_call_acc(minor_status, sc, spcred,\n\t\t\t\t       mechtok_in, mech_type, &mechtok_out,\n\t\t\t\t       ret_flags, time_rec,\n\t\t\t\t       delegated_cred_handle,\n\t\t\t\t       &negState, &return_token);\n\t}\n\n\t/* Step 3: process or generate the MIC, if the negotiated mech is\n\t * complete and supports MICs. */\n\tif (!HARD_ERROR(ret) && sc->mech_complete &&\n\t    (sc->ctx_flags & GSS_C_INTEG_FLAG)) {\n\n\t\tret = handle_mic(minor_status, mic_in,\n\t\t\t\t (mechtok_out.length != 0),\n\t\t\t\t sc, &mic_out,\n\t\t\t\t &negState, &return_token);\n\t}\ncleanup:\n\tif (return_token == INIT_TOKEN_SEND && sendTokenInit) {\n\t\tassert(sc != NULL);\n\t\ttmpret = make_spnego_tokenInit_msg(sc, 1, mic_out, 0,\n\t\t\t\t\t\t   GSS_C_NO_BUFFER,\n\t\t\t\t\t\t   return_token, output_token);\n\t\tif (tmpret < 0)\n\t\t\tret = GSS_S_FAILURE;\n\t} else if (return_token != NO_TOKEN_SEND &&\n\t\t   return_token != CHECK_MIC) {\n\t\ttmpret = make_spnego_tokenTarg_msg(negState,\n\t\t\t\t\t\t   sc ? sc->internal_mech :\n\t\t\t\t\t\t   GSS_C_NO_OID,\n\t\t\t\t\t\t   &mechtok_out, mic_out,\n\t\t\t\t\t\t   return_token,\n\t\t\t\t\t\t   output_token);\n\t\tif (tmpret < 0)\n\t\t\tret = GSS_S_FAILURE;\n\t}\n\tif (ret == GSS_S_COMPLETE) {\n\t\t*context_handle = (gss_ctx_id_t)sc->ctx_handle;\n\t\tif (sc->internal_name != GSS_C_NO_NAME &&\n\t\t    src_name != NULL) {\n\t\t\t*src_name = sc->internal_name;\n\t\t\tsc->internal_name = GSS_C_NO_NAME;\n\t\t}\n\t\trelease_spnego_ctx(&sc);\n\t} else if (ret != GSS_S_CONTINUE_NEEDED) {\n\t\tif (sc != NULL) {\n\t\t\tgss_delete_sec_context(&tmpmin, &sc->ctx_handle,\n\t\t\t\t\t       GSS_C_NO_BUFFER);\n\t\t\trelease_spnego_ctx(&sc);\n\t\t}\n\t\t*context_handle = GSS_C_NO_CONTEXT;\n\t}\n\tgss_release_buffer(&tmpmin, &mechtok_out);\n\tif (mechtok_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechtok_in);\n\t\tfree(mechtok_in);\n\t}\n\tif (mic_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mic_in);\n\t\tfree(mic_in);\n\t}\n\tif (mic_out != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mic_out);\n\t\tfree(mic_out);\n\t}\n\treturn ret;\n}",
+  "code_after_change": "spnego_gss_accept_sec_context(\n\t\t\t    OM_uint32 *minor_status,\n\t\t\t    gss_ctx_id_t *context_handle,\n\t\t\t    gss_cred_id_t verifier_cred_handle,\n\t\t\t    gss_buffer_t input_token,\n\t\t\t    gss_channel_bindings_t input_chan_bindings,\n\t\t\t    gss_name_t *src_name,\n\t\t\t    gss_OID *mech_type,\n\t\t\t    gss_buffer_t output_token,\n\t\t\t    OM_uint32 *ret_flags,\n\t\t\t    OM_uint32 *time_rec,\n\t\t\t    gss_cred_id_t *delegated_cred_handle)\n{\n\tOM_uint32 ret, tmpmin, negState;\n\tsend_token_flag return_token;\n\tgss_buffer_t mechtok_in, mic_in, mic_out;\n\tgss_buffer_desc mechtok_out = GSS_C_EMPTY_BUFFER;\n\tspnego_gss_ctx_id_t sc = NULL;\n\tspnego_gss_cred_id_t spcred = NULL;\n\tint sendTokenInit = 0, tmpret;\n\n\tmechtok_in = mic_in = mic_out = GSS_C_NO_BUFFER;\n\n\t/*\n\t * This function works in three steps:\n\t *\n\t *   1. Perform mechanism negotiation.\n\t *   2. Invoke the negotiated mech's gss_accept_sec_context function\n\t *      and examine the results.\n\t *   3. Process or generate MICs if necessary.\n\t *\n\t * Step one determines whether the negotiation requires a MIC exchange,\n\t * while steps two and three share responsibility for determining when\n\t * the exchange is complete.  If the selected mech completes in this\n\t * call and no MIC exchange is expected, then step 2 will decide.  If a\n\t * MIC exchange is expected, then step 3 will decide.  If an error\n\t * occurs in any step, the exchange will be aborted, possibly with an\n\t * error token.\n\t *\n\t * negState determines the state of the negotiation, and is\n\t * communicated to the acceptor if a continuing token is sent.\n\t * return_token is used to indicate what type of token, if any, should\n\t * be generated.\n\t */\n\n\t/* Validate arguments. */\n\tif (minor_status != NULL)\n\t\t*minor_status = 0;\n\tif (output_token != GSS_C_NO_BUFFER) {\n\t\toutput_token->length = 0;\n\t\toutput_token->value = NULL;\n\t}\n\n\tif (minor_status == NULL ||\n\t    output_token == GSS_C_NO_BUFFER ||\n\t    context_handle == NULL)\n\t\treturn GSS_S_CALL_INACCESSIBLE_WRITE;\n\n\tif (input_token == GSS_C_NO_BUFFER)\n\t\treturn GSS_S_CALL_INACCESSIBLE_READ;\n\n\t/* Step 1: Perform mechanism negotiation. */\n\tsc = (spnego_gss_ctx_id_t)*context_handle;\n\tspcred = (spnego_gss_cred_id_t)verifier_cred_handle;\n\tif (sc == NULL || sc->internal_mech == GSS_C_NO_OID) {\n\t\t/* Process an initial token or request for NegHints. */\n\t\tif (src_name != NULL)\n\t\t\t*src_name = GSS_C_NO_NAME;\n\t\tif (mech_type != NULL)\n\t\t\t*mech_type = GSS_C_NO_OID;\n\t\tif (time_rec != NULL)\n\t\t\t*time_rec = 0;\n\t\tif (ret_flags != NULL)\n\t\t\t*ret_flags = 0;\n\t\tif (delegated_cred_handle != NULL)\n\t\t\t*delegated_cred_handle = GSS_C_NO_CREDENTIAL;\n\t\tif (input_token->length == 0) {\n\t\t\tret = acc_ctx_hints(minor_status,\n\t\t\t\t\t    context_handle, spcred,\n\t\t\t\t\t    &mic_out,\n\t\t\t\t\t    &negState,\n\t\t\t\t\t    &return_token);\n\t\t\tif (ret != GSS_S_COMPLETE)\n\t\t\t\tgoto cleanup;\n\t\t\tsendTokenInit = 1;\n\t\t\tret = GSS_S_CONTINUE_NEEDED;\n\t\t} else {\n\t\t\t/* Can set negState to REQUEST_MIC */\n\t\t\tret = acc_ctx_new(minor_status, input_token,\n\t\t\t\t\t  context_handle, spcred,\n\t\t\t\t\t  &mechtok_in, &mic_in,\n\t\t\t\t\t  &negState, &return_token);\n\t\t\tif (ret != GSS_S_COMPLETE)\n\t\t\t\tgoto cleanup;\n\t\t\tret = GSS_S_CONTINUE_NEEDED;\n\t\t}\n\t} else {\n\t\t/* Process a response token.  Can set negState to\n\t\t * ACCEPT_INCOMPLETE. */\n\t\tret = acc_ctx_cont(minor_status, input_token,\n\t\t\t\t   context_handle, &mechtok_in,\n\t\t\t\t   &mic_in, &negState, &return_token);\n\t\tif (ret != GSS_S_COMPLETE)\n\t\t\tgoto cleanup;\n\t\tret = GSS_S_CONTINUE_NEEDED;\n\t}\n\n\t/* Step 2: invoke the negotiated mechanism's gss_accept_sec_context\n\t * function. */\n\tsc = (spnego_gss_ctx_id_t)*context_handle;\n\t/*\n\t * Handle mechtok_in and mic_in only if they are\n\t * present in input_token.  If neither is present, whether\n\t * this is an error depends on whether this is the first\n\t * round-trip.  RET is set to a default value according to\n\t * whether it is the first round-trip.\n\t */\n\tif (negState != REQUEST_MIC && mechtok_in != GSS_C_NO_BUFFER) {\n\t\tret = acc_ctx_call_acc(minor_status, sc, spcred,\n\t\t\t\t       mechtok_in, mech_type, &mechtok_out,\n\t\t\t\t       ret_flags, time_rec,\n\t\t\t\t       delegated_cred_handle,\n\t\t\t\t       &negState, &return_token);\n\t}\n\n\t/* Step 3: process or generate the MIC, if the negotiated mech is\n\t * complete and supports MICs. */\n\tif (!HARD_ERROR(ret) && sc->mech_complete &&\n\t    (sc->ctx_flags & GSS_C_INTEG_FLAG)) {\n\n\t\tret = handle_mic(minor_status, mic_in,\n\t\t\t\t (mechtok_out.length != 0),\n\t\t\t\t sc, &mic_out,\n\t\t\t\t &negState, &return_token);\n\t}\ncleanup:\n\tif (return_token == INIT_TOKEN_SEND && sendTokenInit) {\n\t\tassert(sc != NULL);\n\t\ttmpret = make_spnego_tokenInit_msg(sc, 1, mic_out, 0,\n\t\t\t\t\t\t   GSS_C_NO_BUFFER,\n\t\t\t\t\t\t   return_token, output_token);\n\t\tif (tmpret < 0)\n\t\t\tret = GSS_S_FAILURE;\n\t} else if (return_token != NO_TOKEN_SEND &&\n\t\t   return_token != CHECK_MIC) {\n\t\ttmpret = make_spnego_tokenTarg_msg(negState,\n\t\t\t\t\t\t   sc ? sc->internal_mech :\n\t\t\t\t\t\t   GSS_C_NO_OID,\n\t\t\t\t\t\t   &mechtok_out, mic_out,\n\t\t\t\t\t\t   return_token,\n\t\t\t\t\t\t   output_token);\n\t\tif (tmpret < 0)\n\t\t\tret = GSS_S_FAILURE;\n\t}\n\tif (ret == GSS_S_COMPLETE) {\n\t\tsc->opened = 1;\n\t\tif (sc->internal_name != GSS_C_NO_NAME &&\n\t\t    src_name != NULL) {\n\t\t\t*src_name = sc->internal_name;\n\t\t\tsc->internal_name = GSS_C_NO_NAME;\n\t\t}\n\t} else if (ret != GSS_S_CONTINUE_NEEDED) {\n\t\tif (sc != NULL) {\n\t\t\tgss_delete_sec_context(&tmpmin, &sc->ctx_handle,\n\t\t\t\t\t       GSS_C_NO_BUFFER);\n\t\t\trelease_spnego_ctx(&sc);\n\t\t}\n\t\t*context_handle = GSS_C_NO_CONTEXT;\n\t}\n\tgss_release_buffer(&tmpmin, &mechtok_out);\n\tif (mechtok_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mechtok_in);\n\t\tfree(mechtok_in);\n\t}\n\tif (mic_in != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mic_in);\n\t\tfree(mic_in);\n\t}\n\tif (mic_out != GSS_C_NO_BUFFER) {\n\t\tgss_release_buffer(&tmpmin, mic_out);\n\t\tfree(mic_out);\n\t}\n\treturn ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tsc->opened = 1;"
+    ],
+    "deleted": [
+      "\t\t*context_handle = (gss_ctx_id_t)sc->ctx_handle;",
+      "\t\trelease_spnego_ctx(&sc);"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6252
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_import_sec_context(\n\tOM_uint32\t\t*minor_status,\n\tconst gss_buffer_t\tinterprocess_token,\n\tgss_ctx_id_t\t\t*context_handle)\n{\n\tOM_uint32 ret;\n\tret = gss_import_sec_context(minor_status,\n\t\t\t\t    interprocess_token,\n\t\t\t\t    context_handle);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_import_sec_context(\n\tOM_uint32\t\t*minor_status,\n\tconst gss_buffer_t\tinterprocess_token,\n\tgss_ctx_id_t\t\t*context_handle)\n{\n\t/*\n\t * Until we implement partial context exports, there are no SPNEGO\n\t * exported context tokens, only tokens for underlying mechs.  So just\n\t * return an error for now.\n\t */\n\treturn GSS_S_UNAVAILABLE;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t/*",
+      "\t * Until we implement partial context exports, there are no SPNEGO",
+      "\t * exported context tokens, only tokens for underlying mechs.  So just",
+      "\t * return an error for now.",
+      "\t */",
+      "\treturn GSS_S_UNAVAILABLE;"
+    ],
+    "deleted": [
+      "\tOM_uint32 ret;",
+      "\tret = gss_import_sec_context(minor_status,",
+      "\t\t\t\t    interprocess_token,",
+      "\t\t\t\t    context_handle);",
+      "\treturn (ret);"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6253
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "init_ctx_new(OM_uint32 *minor_status,\n\t     spnego_gss_cred_id_t spcred,\n\t     gss_ctx_id_t *ctx,\n\t     send_token_flag *tokflag)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = NULL;\n\n\tsc = create_spnego_ctx();\n\tif (sc == NULL)\n\t\treturn GSS_S_FAILURE;\n\n\t/* determine negotiation mech set */\n\tret = get_negotiable_mechs(minor_status, spcred, GSS_C_INITIATE,\n\t\t\t\t   &sc->mech_set);\n\tif (ret != GSS_S_COMPLETE)\n\t\tgoto cleanup;\n\n\t/* Set an initial internal mech to make the first context token. */\n\tsc->internal_mech = &sc->mech_set->elements[0];\n\n\tif (put_mech_set(sc->mech_set, &sc->DER_mechTypes) < 0) {\n\t\tret = GSS_S_FAILURE;\n\t\tgoto cleanup;\n\t}\n\t/*\n\t * The actual context is not yet determined, set the output\n\t * context handle to refer to the spnego context itself.\n\t */\n\tsc->ctx_handle = GSS_C_NO_CONTEXT;\n\t*ctx = (gss_ctx_id_t)sc;\n\tsc = NULL;\n\t*tokflag = INIT_TOKEN_SEND;\n\tret = GSS_S_CONTINUE_NEEDED;\n\ncleanup:\n\trelease_spnego_ctx(&sc);\n\treturn ret;\n}",
+  "code_after_change": "init_ctx_new(OM_uint32 *minor_status,\n\t     spnego_gss_cred_id_t spcred,\n\t     gss_ctx_id_t *ctx,\n\t     send_token_flag *tokflag)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = NULL;\n\n\tsc = create_spnego_ctx(1);\n\tif (sc == NULL)\n\t\treturn GSS_S_FAILURE;\n\n\t/* determine negotiation mech set */\n\tret = get_negotiable_mechs(minor_status, spcred, GSS_C_INITIATE,\n\t\t\t\t   &sc->mech_set);\n\tif (ret != GSS_S_COMPLETE)\n\t\tgoto cleanup;\n\n\t/* Set an initial internal mech to make the first context token. */\n\tsc->internal_mech = &sc->mech_set->elements[0];\n\n\tif (put_mech_set(sc->mech_set, &sc->DER_mechTypes) < 0) {\n\t\tret = GSS_S_FAILURE;\n\t\tgoto cleanup;\n\t}\n\n\tsc->ctx_handle = GSS_C_NO_CONTEXT;\n\t*ctx = (gss_ctx_id_t)sc;\n\tsc = NULL;\n\t*tokflag = INIT_TOKEN_SEND;\n\tret = GSS_S_CONTINUE_NEEDED;\n\ncleanup:\n\trelease_spnego_ctx(&sc);\n\treturn ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tsc = create_spnego_ctx(1);"
+    ],
+    "deleted": [
+      "\tsc = create_spnego_ctx();",
+      "\t/*",
+      "\t * The actual context is not yet determined, set the output",
+      "\t * context handle to refer to the spnego context itself.",
+      "\t */"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6254
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_wrap_size_limit(\n\tOM_uint32\t*minor_status,\n\tconst gss_ctx_id_t context_handle,\n\tint\t\tconf_req_flag,\n\tgss_qop_t\tqop_req,\n\tOM_uint32\treq_output_size,\n\tOM_uint32\t*max_input_size)\n{\n\tOM_uint32 ret;\n\tret = gss_wrap_size_limit(minor_status,\n\t\t\t\tcontext_handle,\n\t\t\t\tconf_req_flag,\n\t\t\t\tqop_req,\n\t\t\t\treq_output_size,\n\t\t\t\tmax_input_size);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_wrap_size_limit(\n\tOM_uint32\t*minor_status,\n\tconst gss_ctx_id_t context_handle,\n\tint\t\tconf_req_flag,\n\tgss_qop_t\tqop_req,\n\tOM_uint32\treq_output_size,\n\tOM_uint32\t*max_input_size)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_wrap_size_limit(minor_status,\n\t\t\t\tsc->ctx_handle,\n\t\t\t\tconf_req_flag,\n\t\t\t\tqop_req,\n\t\t\t\treq_output_size,\n\t\t\t\tmax_input_size);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t\tsc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t\tcontext_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6255
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_complete_auth_token(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tgss_buffer_t input_message_buffer)\n{\n\tOM_uint32 ret;\n\tret = gss_complete_auth_token(minor_status,\n\t\t\t\t      context_handle,\n\t\t\t\t      input_message_buffer);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_complete_auth_token(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tgss_buffer_t input_message_buffer)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_UNAVAILABLE);\n\n\tret = gss_complete_auth_token(minor_status,\n\t\t\t\t      sc->ctx_handle,\n\t\t\t\t      input_message_buffer);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_UNAVAILABLE);",
+      "\t\t\t\t      sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t\t      context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6256
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_get_mic(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tgss_qop_t  qop_req,\n\t\tconst gss_buffer_t message_buffer,\n\t\tgss_buffer_t message_token)\n{\n\tOM_uint32 ret;\n\tret = gss_get_mic(minor_status,\n\t\t    context_handle,\n\t\t    qop_req,\n\t\t    message_buffer,\n\t\t    message_token);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_get_mic(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tgss_qop_t  qop_req,\n\t\tconst gss_buffer_t message_buffer,\n\t\tgss_buffer_t message_token)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_get_mic(minor_status,\n\t\t    sc->ctx_handle,\n\t\t    qop_req,\n\t\t    message_buffer,\n\t\t    message_token);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t    sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6257
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_verify_mic_iov(OM_uint32 *minor_status, gss_ctx_id_t context_handle,\n\t\t\t  gss_qop_t *qop_state, gss_iov_buffer_desc *iov,\n\t\t\t  int iov_count)\n{\n    return gss_verify_mic_iov(minor_status, context_handle, qop_state, iov,\n\t\t\t      iov_count);\n}",
+  "code_after_change": "spnego_gss_verify_mic_iov(OM_uint32 *minor_status, gss_ctx_id_t context_handle,\n\t\t\t  gss_qop_t *qop_state, gss_iov_buffer_desc *iov,\n\t\t\t  int iov_count)\n{\n    spnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n    if (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t    return (GSS_S_NO_CONTEXT);\n\n    return gss_verify_mic_iov(minor_status, sc->ctx_handle, qop_state, iov,\n\t\t\t      iov_count);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    spnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "    if (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t    return (GSS_S_NO_CONTEXT);",
+      "    return gss_verify_mic_iov(minor_status, sc->ctx_handle, qop_state, iov,"
+    ],
+    "deleted": [
+      "    return gss_verify_mic_iov(minor_status, context_handle, qop_state, iov,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6258
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_verify_mic(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tconst gss_buffer_t msg_buffer,\n\t\tconst gss_buffer_t token_buffer,\n\t\tgss_qop_t *qop_state)\n{\n\tOM_uint32 ret;\n\tret = gss_verify_mic(minor_status,\n\t\t\t    context_handle,\n\t\t\t    msg_buffer,\n\t\t\t    token_buffer,\n\t\t\t    qop_state);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_verify_mic(\n\t\tOM_uint32 *minor_status,\n\t\tconst gss_ctx_id_t context_handle,\n\t\tconst gss_buffer_t msg_buffer,\n\t\tconst gss_buffer_t token_buffer,\n\t\tgss_qop_t *qop_state)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_verify_mic(minor_status,\n\t\t\t    sc->ctx_handle,\n\t\t\t    msg_buffer,\n\t\t\t    token_buffer,\n\t\t\t    qop_state);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t    sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t    context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6259
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "acc_ctx_hints(OM_uint32 *minor_status,\n\t      gss_ctx_id_t *ctx,\n\t      spnego_gss_cred_id_t spcred,\n\t      gss_buffer_t *mechListMIC,\n\t      OM_uint32 *negState,\n\t      send_token_flag *return_token)\n{\n\tOM_uint32 tmpmin, ret;\n\tgss_OID_set supported_mechSet;\n\tspnego_gss_ctx_id_t sc = NULL;\n\n\t*mechListMIC = GSS_C_NO_BUFFER;\n\tsupported_mechSet = GSS_C_NO_OID_SET;\n\t*return_token = NO_TOKEN_SEND;\n\t*negState = REJECT;\n\t*minor_status = 0;\n\n\t/* A hint request must be the first token received. */\n\tif (*ctx != GSS_C_NO_CONTEXT)\n\t    return GSS_S_DEFECTIVE_TOKEN;\n\n\tret = get_negotiable_mechs(minor_status, spcred, GSS_C_ACCEPT,\n\t\t\t\t   &supported_mechSet);\n\tif (ret != GSS_S_COMPLETE)\n\t\tgoto cleanup;\n\n\tret = make_NegHints(minor_status, mechListMIC);\n\tif (ret != GSS_S_COMPLETE)\n\t\tgoto cleanup;\n\n\tsc = create_spnego_ctx();\n\tif (sc == NULL) {\n\t\tret = GSS_S_FAILURE;\n\t\tgoto cleanup;\n\t}\n\tif (put_mech_set(supported_mechSet, &sc->DER_mechTypes) < 0) {\n\t\tret = GSS_S_FAILURE;\n\t\tgoto cleanup;\n\t}\n\tsc->internal_mech = GSS_C_NO_OID;\n\n\t*negState = ACCEPT_INCOMPLETE;\n\t*return_token = INIT_TOKEN_SEND;\n\tsc->firstpass = 1;\n\t*ctx = (gss_ctx_id_t)sc;\n\tsc = NULL;\n\tret = GSS_S_COMPLETE;\n\ncleanup:\n\trelease_spnego_ctx(&sc);\n\tgss_release_oid_set(&tmpmin, &supported_mechSet);\n\n\treturn ret;\n}",
+  "code_after_change": "acc_ctx_hints(OM_uint32 *minor_status,\n\t      gss_ctx_id_t *ctx,\n\t      spnego_gss_cred_id_t spcred,\n\t      gss_buffer_t *mechListMIC,\n\t      OM_uint32 *negState,\n\t      send_token_flag *return_token)\n{\n\tOM_uint32 tmpmin, ret;\n\tgss_OID_set supported_mechSet;\n\tspnego_gss_ctx_id_t sc = NULL;\n\n\t*mechListMIC = GSS_C_NO_BUFFER;\n\tsupported_mechSet = GSS_C_NO_OID_SET;\n\t*return_token = NO_TOKEN_SEND;\n\t*negState = REJECT;\n\t*minor_status = 0;\n\n\t/* A hint request must be the first token received. */\n\tif (*ctx != GSS_C_NO_CONTEXT)\n\t    return GSS_S_DEFECTIVE_TOKEN;\n\n\tret = get_negotiable_mechs(minor_status, spcred, GSS_C_ACCEPT,\n\t\t\t\t   &supported_mechSet);\n\tif (ret != GSS_S_COMPLETE)\n\t\tgoto cleanup;\n\n\tret = make_NegHints(minor_status, mechListMIC);\n\tif (ret != GSS_S_COMPLETE)\n\t\tgoto cleanup;\n\n\tsc = create_spnego_ctx(0);\n\tif (sc == NULL) {\n\t\tret = GSS_S_FAILURE;\n\t\tgoto cleanup;\n\t}\n\tif (put_mech_set(supported_mechSet, &sc->DER_mechTypes) < 0) {\n\t\tret = GSS_S_FAILURE;\n\t\tgoto cleanup;\n\t}\n\tsc->internal_mech = GSS_C_NO_OID;\n\n\t*negState = ACCEPT_INCOMPLETE;\n\t*return_token = INIT_TOKEN_SEND;\n\tsc->firstpass = 1;\n\t*ctx = (gss_ctx_id_t)sc;\n\tsc = NULL;\n\tret = GSS_S_COMPLETE;\n\ncleanup:\n\trelease_spnego_ctx(&sc);\n\tgss_release_oid_set(&tmpmin, &supported_mechSet);\n\n\treturn ret;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tsc = create_spnego_ctx(0);"
+    ],
+    "deleted": [
+      "\tsc = create_spnego_ctx();"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6260
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_inquire_context(\n\t\t\tOM_uint32\t*minor_status,\n\t\t\tconst gss_ctx_id_t context_handle,\n\t\t\tgss_name_t\t*src_name,\n\t\t\tgss_name_t\t*targ_name,\n\t\t\tOM_uint32\t*lifetime_rec,\n\t\t\tgss_OID\t\t*mech_type,\n\t\t\tOM_uint32\t*ctx_flags,\n\t\t\tint\t\t*locally_initiated,\n\t\t\tint\t\t*opened)\n{\n\tOM_uint32 ret = GSS_S_COMPLETE;\n\n\tret = gss_inquire_context(minor_status,\n\t\t\t\tcontext_handle,\n\t\t\t\tsrc_name,\n\t\t\t\ttarg_name,\n\t\t\t\tlifetime_rec,\n\t\t\t\tmech_type,\n\t\t\t\tctx_flags,\n\t\t\t\tlocally_initiated,\n\t\t\t\topened);\n\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_inquire_context(\n\t\t\tOM_uint32\t*minor_status,\n\t\t\tconst gss_ctx_id_t context_handle,\n\t\t\tgss_name_t\t*src_name,\n\t\t\tgss_name_t\t*targ_name,\n\t\t\tOM_uint32\t*lifetime_rec,\n\t\t\tgss_OID\t\t*mech_type,\n\t\t\tOM_uint32\t*ctx_flags,\n\t\t\tint\t\t*locally_initiated,\n\t\t\tint\t\t*opened)\n{\n\tOM_uint32 ret = GSS_S_COMPLETE;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (src_name != NULL)\n\t\t*src_name = GSS_C_NO_NAME;\n\tif (targ_name != NULL)\n\t\t*targ_name = GSS_C_NO_NAME;\n\tif (lifetime_rec != NULL)\n\t\t*lifetime_rec = 0;\n\tif (mech_type != NULL)\n\t\t*mech_type = (gss_OID)gss_mech_spnego;\n\tif (ctx_flags != NULL)\n\t\t*ctx_flags = 0;\n\tif (locally_initiated != NULL)\n\t\t*locally_initiated = sc->initiate;\n\tif (opened != NULL)\n\t\t*opened = sc->opened;\n\n\tif (sc->ctx_handle != GSS_C_NO_CONTEXT) {\n\t\tret = gss_inquire_context(minor_status, sc->ctx_handle,\n\t\t\t\t\t  src_name, targ_name, lifetime_rec,\n\t\t\t\t\t  mech_type, ctx_flags, NULL, NULL);\n\t}\n\n\tif (!sc->opened) {\n\t\t/*\n\t\t * We are still doing SPNEGO negotiation, so report SPNEGO as\n\t\t * the OID.  After negotiation is complete we will report the\n\t\t * underlying mechanism OID.\n\t\t */\n\t\tif (mech_type != NULL)\n\t\t\t*mech_type = (gss_OID)gss_mech_spnego;\n\n\t\t/*\n\t\t * Remove flags we don't support with partially-established\n\t\t * contexts.  (Change this to keep GSS_C_TRANS_FLAG if we add\n\t\t * support for exporting partial SPNEGO contexts.)\n\t\t */\n\t\tif (ctx_flags != NULL) {\n\t\t\t*ctx_flags &= ~GSS_C_PROT_READY_FLAG;\n\t\t\t*ctx_flags &= ~GSS_C_TRANS_FLAG;\n\t\t}\n\t}\n\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (src_name != NULL)",
+      "\t\t*src_name = GSS_C_NO_NAME;",
+      "\tif (targ_name != NULL)",
+      "\t\t*targ_name = GSS_C_NO_NAME;",
+      "\tif (lifetime_rec != NULL)",
+      "\t\t*lifetime_rec = 0;",
+      "\tif (mech_type != NULL)",
+      "\t\t*mech_type = (gss_OID)gss_mech_spnego;",
+      "\tif (ctx_flags != NULL)",
+      "\t\t*ctx_flags = 0;",
+      "\tif (locally_initiated != NULL)",
+      "\t\t*locally_initiated = sc->initiate;",
+      "\tif (opened != NULL)",
+      "\t\t*opened = sc->opened;",
+      "\tif (sc->ctx_handle != GSS_C_NO_CONTEXT) {",
+      "\t\tret = gss_inquire_context(minor_status, sc->ctx_handle,",
+      "\t\t\t\t\t  src_name, targ_name, lifetime_rec,",
+      "\t\t\t\t\t  mech_type, ctx_flags, NULL, NULL);",
+      "\t}",
+      "\tif (!sc->opened) {",
+      "\t\t/*",
+      "\t\t * We are still doing SPNEGO negotiation, so report SPNEGO as",
+      "\t\t * the OID.  After negotiation is complete we will report the",
+      "\t\t * underlying mechanism OID.",
+      "\t\t */",
+      "\t\tif (mech_type != NULL)",
+      "\t\t\t*mech_type = (gss_OID)gss_mech_spnego;",
+      "\t\t/*",
+      "\t\t * Remove flags we don't support with partially-established",
+      "\t\t * contexts.  (Change this to keep GSS_C_TRANS_FLAG if we add",
+      "\t\t * support for exporting partial SPNEGO contexts.)",
+      "\t\t */",
+      "\t\tif (ctx_flags != NULL) {",
+      "\t\t\t*ctx_flags &= ~GSS_C_PROT_READY_FLAG;",
+      "\t\t\t*ctx_flags &= ~GSS_C_TRANS_FLAG;",
+      "\t\t}",
+      "\t}"
+    ],
+    "deleted": [
+      "\tret = gss_inquire_context(minor_status,",
+      "\t\t\t\tcontext_handle,",
+      "\t\t\t\tsrc_name,",
+      "\t\t\t\ttarg_name,",
+      "\t\t\t\tlifetime_rec,",
+      "\t\t\t\tmech_type,",
+      "\t\t\t\tctx_flags,",
+      "\t\t\t\tlocally_initiated,",
+      "\t\t\t\topened);"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6261
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_delete_sec_context(\n\t\t\t    OM_uint32 *minor_status,\n\t\t\t    gss_ctx_id_t *context_handle,\n\t\t\t    gss_buffer_t output_token)\n{\n\tOM_uint32 ret = GSS_S_COMPLETE;\n\tspnego_gss_ctx_id_t *ctx =\n\t\t    (spnego_gss_ctx_id_t *)context_handle;\n\n\t*minor_status = 0;\n\n\tif (context_handle == NULL)\n\t\treturn (GSS_S_FAILURE);\n\n\tif (*ctx == NULL)\n\t\treturn (GSS_S_COMPLETE);\n\n\t/*\n\t * If this is still an SPNEGO mech, release it locally.\n\t */\n\tif ((*ctx)->magic_num == SPNEGO_MAGIC_ID) {\n\t\t(void) gss_delete_sec_context(minor_status,\n\t\t\t\t    &(*ctx)->ctx_handle,\n\t\t\t\t    output_token);\n\t\t(void) release_spnego_ctx(ctx);\n\t} else {\n\t\tret = gss_delete_sec_context(minor_status,\n\t\t\t\t    context_handle,\n\t\t\t\t    output_token);\n\t}\n\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_delete_sec_context(\n\t\t\t    OM_uint32 *minor_status,\n\t\t\t    gss_ctx_id_t *context_handle,\n\t\t\t    gss_buffer_t output_token)\n{\n\tOM_uint32 ret = GSS_S_COMPLETE;\n\tspnego_gss_ctx_id_t *ctx =\n\t\t    (spnego_gss_ctx_id_t *)context_handle;\n\n\t*minor_status = 0;\n\n\tif (context_handle == NULL)\n\t\treturn (GSS_S_FAILURE);\n\n\tif (*ctx == NULL)\n\t\treturn (GSS_S_COMPLETE);\n\n\t(void) gss_delete_sec_context(minor_status, &(*ctx)->ctx_handle,\n\t\t\t\t      output_token);\n\t(void) release_spnego_ctx(ctx);\n\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t(void) gss_delete_sec_context(minor_status, &(*ctx)->ctx_handle,",
+      "\t\t\t\t      output_token);",
+      "\t(void) release_spnego_ctx(ctx);"
+    ],
+    "deleted": [
+      "\t/*",
+      "\t * If this is still an SPNEGO mech, release it locally.",
+      "\t */",
+      "\tif ((*ctx)->magic_num == SPNEGO_MAGIC_ID) {",
+      "\t\t(void) gss_delete_sec_context(minor_status,",
+      "\t\t\t\t    &(*ctx)->ctx_handle,",
+      "\t\t\t\t    output_token);",
+      "\t\t(void) release_spnego_ctx(ctx);",
+      "\t} else {",
+      "\t\tret = gss_delete_sec_context(minor_status,",
+      "\t\t\t\t    context_handle,",
+      "\t\t\t\t    output_token);",
+      "\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6262
+},
+{
+  "cve_id": "CVE-2015-2695",
+  "code_before_change": "spnego_gss_wrap_iov_length(OM_uint32 *minor_status,\n\t\t\t   gss_ctx_id_t context_handle,\n\t\t\t   int conf_req_flag,\n\t\t\t   gss_qop_t qop_req,\n\t\t\t   int *conf_state,\n\t\t\t   gss_iov_buffer_desc *iov,\n\t\t\t   int iov_count)\n{\n\tOM_uint32 ret;\n\tret = gss_wrap_iov_length(minor_status,\n\t\t\t\t  context_handle,\n\t\t\t\t  conf_req_flag,\n\t\t\t\t  qop_req,\n\t\t\t\t  conf_state,\n\t\t\t\t  iov,\n\t\t\t\t  iov_count);\n\treturn (ret);\n}",
+  "code_after_change": "spnego_gss_wrap_iov_length(OM_uint32 *minor_status,\n\t\t\t   gss_ctx_id_t context_handle,\n\t\t\t   int conf_req_flag,\n\t\t\t   gss_qop_t qop_req,\n\t\t\t   int *conf_state,\n\t\t\t   gss_iov_buffer_desc *iov,\n\t\t\t   int iov_count)\n{\n\tOM_uint32 ret;\n\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;\n\n\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)\n\t\treturn (GSS_S_NO_CONTEXT);\n\n\tret = gss_wrap_iov_length(minor_status,\n\t\t\t\t  sc->ctx_handle,\n\t\t\t\t  conf_req_flag,\n\t\t\t\t  qop_req,\n\t\t\t\t  conf_state,\n\t\t\t\t  iov,\n\t\t\t\t  iov_count);\n\treturn (ret);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tspnego_gss_ctx_id_t sc = (spnego_gss_ctx_id_t)context_handle;",
+      "\tif (sc->ctx_handle == GSS_C_NO_CONTEXT)",
+      "\t\treturn (GSS_S_NO_CONTEXT);",
+      "\t\t\t\t  sc->ctx_handle,"
+    ],
+    "deleted": [
+      "\t\t\t\t  context_handle,"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lib/gssapi/spnego/spnego_mech.c in MIT Kerberos 5 (aka krb5) before 1.14 relies on an inappropriate context handle, which allows remote attackers to cause a denial of service (incorrect pointer read and process crash) via a crafted SPNEGO packet that is mishandled during a gss_inquire_context call.",
+  "id": 6263
+},
+{
+  "cve_id": "CVE-2017-18075",
+  "code_before_change": "static void pcrypt_free(struct crypto_instance *inst)\n{\n\tstruct pcrypt_instance_ctx *ctx = crypto_instance_ctx(inst);\n\n\tcrypto_drop_aead(&ctx->spawn);\n\tkfree(inst);\n}",
+  "code_after_change": "static void pcrypt_free(struct aead_instance *inst)\n{\n\tstruct pcrypt_instance_ctx *ctx = aead_instance_ctx(inst);\n\n\tcrypto_drop_aead(&ctx->spawn);\n\tkfree(inst);\n}",
+  "function_modified_lines": {
+    "added": [
+      "static void pcrypt_free(struct aead_instance *inst)",
+      "{",
+      "\tstruct pcrypt_instance_ctx *ctx = aead_instance_ctx(inst);",
+      "\tcrypto_drop_aead(&ctx->spawn);",
+      "\tkfree(inst);",
+      "}"
+    ],
+    "deleted": [
+      "static void pcrypt_free(struct crypto_instance *inst)",
+      "{",
+      "\tstruct pcrypt_instance_ctx *ctx = crypto_instance_ctx(inst);",
+      "\tcrypto_drop_aead(&ctx->spawn);",
+      "\tkfree(inst);",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "crypto/pcrypt.c in the Linux kernel before 4.14.13 mishandles freeing instances, allowing a local user able to access the AF_ALG-based AEAD interface (CONFIG_CRYPTO_USER_API_AEAD) and pcrypt (CONFIG_CRYPTO_PCRYPT) to cause a denial of service (kfree of an incorrect pointer) or possibly have unspecified other impact by executing a crafted sequence of system calls.",
+  "id": 6264
+},
+{
+  "cve_id": "CVE-2020-24371",
+  "code_before_change": "static GCObject **correctgraylist (GCObject **p) {\n  GCObject *curr;\n  while ((curr = *p) != NULL) {\n    switch (curr->tt) {\n      case LUA_VTABLE: case LUA_VUSERDATA: {\n        GCObject **next = getgclist(curr);\n        if (getage(curr) == G_TOUCHED1) {  /* touched in this cycle? */\n          lua_assert(isgray(curr));\n          gray2black(curr);  /* make it black, for next barrier */\n          changeage(curr, G_TOUCHED1, G_TOUCHED2);\n          p = next;  /* go to next element */\n        }\n        else {  /* not touched in this cycle */\n          if (!iswhite(curr)) {  /* not white? */\n            lua_assert(isold(curr));\n            if (getage(curr) == G_TOUCHED2)  /* advance from G_TOUCHED2... */\n              changeage(curr, G_TOUCHED2, G_OLD);  /* ... to G_OLD */\n            gray2black(curr);  /* make it black */\n          }\n          /* else, object is white: just remove it from this list */\n          *p = *next;  /* remove 'curr' from gray list */\n        }\n        break;\n      }\n      case LUA_VTHREAD: {\n        lua_State *th = gco2th(curr);\n        lua_assert(!isblack(th));\n        if (iswhite(th))  /* new object? */\n          *p = th->gclist;  /* remove from gray list */\n        else  /* old threads remain gray */\n          p = &th->gclist;  /* go to next element */\n        break;\n      }\n      default: lua_assert(0);  /* nothing more could be gray here */\n    }\n  }\n  return p;\n}",
+  "code_after_change": "static GCObject **correctgraylist (GCObject **p) {\n  GCObject *curr;\n  while ((curr = *p) != NULL) {\n    switch (curr->tt) {\n      case LUA_VTABLE: case LUA_VUSERDATA: {\n        GCObject **next = getgclist(curr);\n        if (getage(curr) == G_TOUCHED1) {  /* touched in this cycle? */\n          lua_assert(isgray(curr));\n          gray2black(curr);  /* make it black, for next barrier */\n          changeage(curr, G_TOUCHED1, G_TOUCHED2);\n          p = next;  /* keep it in the list and go to next element */\n        }\n        else {  /* everything else is removed */\n          /* white objects are simply removed */\n          if (!iswhite(curr)) {  /* not white? */\n            lua_assert(isold(curr));\n            if (getage(curr) == G_TOUCHED2)  /* advance from G_TOUCHED2... */\n              changeage(curr, G_TOUCHED2, G_OLD);  /* ... to G_OLD */\n            gray2black(curr);  /* make it black */\n          }\n          *p = *next;  /* remove 'curr' from gray list */\n        }\n        break;\n      }\n      case LUA_VTHREAD: {\n        lua_State *th = gco2th(curr);\n        lua_assert(!isblack(th));\n        if (iswhite(th))  /* new object? */\n          *p = th->gclist;  /* remove from gray list */\n        else  /* old threads remain gray */\n          p = &th->gclist;  /* go to next element */\n        break;\n      }\n      default: lua_assert(0);  /* nothing more could be gray here */\n    }\n  }\n  return p;\n}",
+  "function_modified_lines": {
+    "added": [
+      "          p = next;  /* keep it in the list and go to next element */",
+      "        else {  /* everything else is removed */",
+      "          /* white objects are simply removed */"
+    ],
+    "deleted": [
+      "          p = next;  /* go to next element */",
+      "        else {  /* not touched in this cycle */",
+      "          /* else, object is white: just remove it from this list */"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lgc.c in Lua 5.4.0 mishandles the interaction between barriers and the sweep phase, leading to a memory access violation involving collectgarbage.",
+  "id": 6265
+},
+{
+  "cve_id": "CVE-2020-24371",
+  "code_before_change": "void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {\n  global_State *g = G(L);\n  lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o));\n  if (keepinvariant(g)) {  /* must keep invariant? */\n    reallymarkobject(g, v);  /* restore invariant */\n    if (isold(o)) {\n      lua_assert(!isold(v));  /* white object could not be old */\n      setage(v, G_OLD0);  /* restore generational invariant */\n    }\n  }\n  else {  /* sweep phase */\n    lua_assert(issweepphase(g));\n    makewhite(g, o);  /* mark main obj. as white to avoid other barriers */\n  }\n}",
+  "code_after_change": "void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {\n  global_State *g = G(L);\n  lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o));\n  if (keepinvariant(g)) {  /* must keep invariant? */\n    reallymarkobject(g, v);  /* restore invariant */\n    if (isold(o)) {\n      lua_assert(!isold(v));  /* white object could not be old */\n      setage(v, G_OLD0);  /* restore generational invariant */\n    }\n  }\n  else {  /* sweep phase */\n    lua_assert(issweepphase(g));\n    if (g->gckind == KGC_INC)  /* incremental mode? */\n      makewhite(g, o);  /* mark 'o' as white to avoid other barriers */\n  }\n}",
+  "function_modified_lines": {
+    "added": [
+      "    if (g->gckind == KGC_INC)  /* incremental mode? */",
+      "      makewhite(g, o);  /* mark 'o' as white to avoid other barriers */"
+    ],
+    "deleted": [
+      "    makewhite(g, o);  /* mark main obj. as white to avoid other barriers */"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "lgc.c in Lua 5.4.0 mishandles the interaction between barriers and the sweep phase, leading to a memory access violation involving collectgarbage.",
+  "id": 6266
+},
+{
+  "cve_id": "CVE-2020-28941",
+  "code_before_change": "static int spk_ttyio_ldisc_open(struct tty_struct *tty)\n{\n\tstruct spk_ldisc_data *ldisc_data;\n\n\tif (!tty->ops->write)\n\t\treturn -EOPNOTSUPP;\n\tspeakup_tty = tty;\n\n\tldisc_data = kmalloc(sizeof(*ldisc_data), GFP_KERNEL);\n\tif (!ldisc_data)\n\t\treturn -ENOMEM;\n\n\tinit_completion(&ldisc_data->completion);\n\tldisc_data->buf_free = true;\n\tspeakup_tty->disc_data = ldisc_data;\n\n\treturn 0;\n}",
+  "code_after_change": "static int spk_ttyio_ldisc_open(struct tty_struct *tty)\n{\n\tstruct spk_ldisc_data *ldisc_data;\n\n\tif (!tty->ops->write)\n\t\treturn -EOPNOTSUPP;\n\n\tmutex_lock(&speakup_tty_mutex);\n\tif (speakup_tty) {\n\t\tmutex_unlock(&speakup_tty_mutex);\n\t\treturn -EBUSY;\n\t}\n\tspeakup_tty = tty;\n\n\tldisc_data = kmalloc(sizeof(*ldisc_data), GFP_KERNEL);\n\tif (!ldisc_data) {\n\t\tspeakup_tty = NULL;\n\t\tmutex_unlock(&speakup_tty_mutex);\n\t\treturn -ENOMEM;\n\t}\n\n\tinit_completion(&ldisc_data->completion);\n\tldisc_data->buf_free = true;\n\tspeakup_tty->disc_data = ldisc_data;\n\tmutex_unlock(&speakup_tty_mutex);\n\n\treturn 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tmutex_lock(&speakup_tty_mutex);",
+      "\tif (speakup_tty) {",
+      "\t\tmutex_unlock(&speakup_tty_mutex);",
+      "\t\treturn -EBUSY;",
+      "\t}",
+      "\tif (!ldisc_data) {",
+      "\t\tspeakup_tty = NULL;",
+      "\t\tmutex_unlock(&speakup_tty_mutex);",
+      "\t}",
+      "\tmutex_unlock(&speakup_tty_mutex);"
+    ],
+    "deleted": [
+      "\tif (!ldisc_data)"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "An issue was discovered in drivers/accessibility/speakup/spk_ttyio.c in the Linux kernel through 5.9.9. Local attackers on systems with the speakup driver could cause a local denial of service attack, aka CID-d41227544427. This occurs because of an invalid free when the line discipline is used more than once.",
+  "id": 6267
+},
+{
+  "cve_id": "CVE-2022-24958",
+  "code_before_change": "dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)\n{\n\tstruct dev_data\t\t*dev = fd->private_data;\n\tssize_t\t\t\tvalue, length = len;\n\tunsigned\t\ttotal;\n\tu32\t\t\ttag;\n\tchar\t\t\t*kbuf;\n\n\tspin_lock_irq(&dev->lock);\n\tif (dev->state > STATE_DEV_OPENED) {\n\t\tvalue = ep0_write(fd, buf, len, ptr);\n\t\tspin_unlock_irq(&dev->lock);\n\t\treturn value;\n\t}\n\tspin_unlock_irq(&dev->lock);\n\n\tif ((len < (USB_DT_CONFIG_SIZE + USB_DT_DEVICE_SIZE + 4)) ||\n\t    (len > PAGE_SIZE * 4))\n\t\treturn -EINVAL;\n\n\t/* we might need to change message format someday */\n\tif (copy_from_user (&tag, buf, 4))\n\t\treturn -EFAULT;\n\tif (tag != 0)\n\t\treturn -EINVAL;\n\tbuf += 4;\n\tlength -= 4;\n\n\tkbuf = memdup_user(buf, length);\n\tif (IS_ERR(kbuf))\n\t\treturn PTR_ERR(kbuf);\n\n\tspin_lock_irq (&dev->lock);\n\tvalue = -EINVAL;\n\tif (dev->buf) {\n\t\tkfree(kbuf);\n\t\tgoto fail;\n\t}\n\tdev->buf = kbuf;\n\n\t/* full or low speed config */\n\tdev->config = (void *) kbuf;\n\ttotal = le16_to_cpu(dev->config->wTotalLength);\n\tif (!is_valid_config(dev->config, total) ||\n\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tkbuf += total;\n\tlength -= total;\n\n\t/* optional high speed config */\n\tif (kbuf [1] == USB_DT_CONFIG) {\n\t\tdev->hs_config = (void *) kbuf;\n\t\ttotal = le16_to_cpu(dev->hs_config->wTotalLength);\n\t\tif (!is_valid_config(dev->hs_config, total) ||\n\t\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\t\tgoto fail;\n\t\tkbuf += total;\n\t\tlength -= total;\n\t} else {\n\t\tdev->hs_config = NULL;\n\t}\n\n\t/* could support multiple configs, using another encoding! */\n\n\t/* device descriptor (tweaked for paranoia) */\n\tif (length != USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tdev->dev = (void *)kbuf;\n\tif (dev->dev->bLength != USB_DT_DEVICE_SIZE\n\t\t\t|| dev->dev->bDescriptorType != USB_DT_DEVICE\n\t\t\t|| dev->dev->bNumConfigurations != 1)\n\t\tgoto fail;\n\tdev->dev->bcdUSB = cpu_to_le16 (0x0200);\n\n\t/* triggers gadgetfs_bind(); then we can enumerate. */\n\tspin_unlock_irq (&dev->lock);\n\tif (dev->hs_config)\n\t\tgadgetfs_driver.max_speed = USB_SPEED_HIGH;\n\telse\n\t\tgadgetfs_driver.max_speed = USB_SPEED_FULL;\n\n\tvalue = usb_gadget_probe_driver(&gadgetfs_driver);\n\tif (value != 0) {\n\t\tkfree (dev->buf);\n\t\tdev->buf = NULL;\n\t} else {\n\t\t/* at this point \"good\" hardware has for the first time\n\t\t * let the USB the host see us.  alternatively, if users\n\t\t * unplug/replug that will clear all the error state.\n\t\t *\n\t\t * note:  everything running before here was guaranteed\n\t\t * to choke driver model style diagnostics.  from here\n\t\t * on, they can work ... except in cleanup paths that\n\t\t * kick in after the ep0 descriptor is closed.\n\t\t */\n\t\tvalue = len;\n\t\tdev->gadget_registered = true;\n\t}\n\treturn value;\n\nfail:\n\tspin_unlock_irq (&dev->lock);\n\tpr_debug (\"%s: %s fail %zd, %p\\n\", shortname, __func__, value, dev);\n\tkfree (dev->buf);\n\tdev->buf = NULL;\n\treturn value;\n}",
+  "code_after_change": "dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)\n{\n\tstruct dev_data\t\t*dev = fd->private_data;\n\tssize_t\t\t\tvalue, length = len;\n\tunsigned\t\ttotal;\n\tu32\t\t\ttag;\n\tchar\t\t\t*kbuf;\n\n\tspin_lock_irq(&dev->lock);\n\tif (dev->state > STATE_DEV_OPENED) {\n\t\tvalue = ep0_write(fd, buf, len, ptr);\n\t\tspin_unlock_irq(&dev->lock);\n\t\treturn value;\n\t}\n\tspin_unlock_irq(&dev->lock);\n\n\tif ((len < (USB_DT_CONFIG_SIZE + USB_DT_DEVICE_SIZE + 4)) ||\n\t    (len > PAGE_SIZE * 4))\n\t\treturn -EINVAL;\n\n\t/* we might need to change message format someday */\n\tif (copy_from_user (&tag, buf, 4))\n\t\treturn -EFAULT;\n\tif (tag != 0)\n\t\treturn -EINVAL;\n\tbuf += 4;\n\tlength -= 4;\n\n\tkbuf = memdup_user(buf, length);\n\tif (IS_ERR(kbuf))\n\t\treturn PTR_ERR(kbuf);\n\n\tspin_lock_irq (&dev->lock);\n\tvalue = -EINVAL;\n\tif (dev->buf) {\n\t\tspin_unlock_irq(&dev->lock);\n\t\tkfree(kbuf);\n\t\treturn value;\n\t}\n\tdev->buf = kbuf;\n\n\t/* full or low speed config */\n\tdev->config = (void *) kbuf;\n\ttotal = le16_to_cpu(dev->config->wTotalLength);\n\tif (!is_valid_config(dev->config, total) ||\n\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tkbuf += total;\n\tlength -= total;\n\n\t/* optional high speed config */\n\tif (kbuf [1] == USB_DT_CONFIG) {\n\t\tdev->hs_config = (void *) kbuf;\n\t\ttotal = le16_to_cpu(dev->hs_config->wTotalLength);\n\t\tif (!is_valid_config(dev->hs_config, total) ||\n\t\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\t\tgoto fail;\n\t\tkbuf += total;\n\t\tlength -= total;\n\t} else {\n\t\tdev->hs_config = NULL;\n\t}\n\n\t/* could support multiple configs, using another encoding! */\n\n\t/* device descriptor (tweaked for paranoia) */\n\tif (length != USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tdev->dev = (void *)kbuf;\n\tif (dev->dev->bLength != USB_DT_DEVICE_SIZE\n\t\t\t|| dev->dev->bDescriptorType != USB_DT_DEVICE\n\t\t\t|| dev->dev->bNumConfigurations != 1)\n\t\tgoto fail;\n\tdev->dev->bcdUSB = cpu_to_le16 (0x0200);\n\n\t/* triggers gadgetfs_bind(); then we can enumerate. */\n\tspin_unlock_irq (&dev->lock);\n\tif (dev->hs_config)\n\t\tgadgetfs_driver.max_speed = USB_SPEED_HIGH;\n\telse\n\t\tgadgetfs_driver.max_speed = USB_SPEED_FULL;\n\n\tvalue = usb_gadget_probe_driver(&gadgetfs_driver);\n\tif (value != 0) {\n\t\tkfree (dev->buf);\n\t\tdev->buf = NULL;\n\t} else {\n\t\t/* at this point \"good\" hardware has for the first time\n\t\t * let the USB the host see us.  alternatively, if users\n\t\t * unplug/replug that will clear all the error state.\n\t\t *\n\t\t * note:  everything running before here was guaranteed\n\t\t * to choke driver model style diagnostics.  from here\n\t\t * on, they can work ... except in cleanup paths that\n\t\t * kick in after the ep0 descriptor is closed.\n\t\t */\n\t\tvalue = len;\n\t\tdev->gadget_registered = true;\n\t}\n\treturn value;\n\nfail:\n\tspin_unlock_irq (&dev->lock);\n\tpr_debug (\"%s: %s fail %zd, %p\\n\", shortname, __func__, value, dev);\n\tkfree (dev->buf);\n\tdev->buf = NULL;\n\treturn value;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tspin_unlock_irq(&dev->lock);",
+      "\t\treturn value;"
+    ],
+    "deleted": [
+      "\t\tgoto fail;"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "drivers/usb/gadget/legacy/inode.c in the Linux kernel through 5.16.8 mishandles dev->buf release.",
+  "id": 6268
+},
+{
+  "cve_id": "CVE-2022-24958",
+  "code_before_change": "dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)\n{\n\tstruct dev_data\t\t*dev = fd->private_data;\n\tssize_t\t\t\tvalue, length = len;\n\tunsigned\t\ttotal;\n\tu32\t\t\ttag;\n\tchar\t\t\t*kbuf;\n\n\tspin_lock_irq(&dev->lock);\n\tif (dev->state > STATE_DEV_OPENED) {\n\t\tvalue = ep0_write(fd, buf, len, ptr);\n\t\tspin_unlock_irq(&dev->lock);\n\t\treturn value;\n\t}\n\tspin_unlock_irq(&dev->lock);\n\n\tif ((len < (USB_DT_CONFIG_SIZE + USB_DT_DEVICE_SIZE + 4)) ||\n\t    (len > PAGE_SIZE * 4))\n\t\treturn -EINVAL;\n\n\t/* we might need to change message format someday */\n\tif (copy_from_user (&tag, buf, 4))\n\t\treturn -EFAULT;\n\tif (tag != 0)\n\t\treturn -EINVAL;\n\tbuf += 4;\n\tlength -= 4;\n\n\tkbuf = memdup_user(buf, length);\n\tif (IS_ERR(kbuf))\n\t\treturn PTR_ERR(kbuf);\n\n\tspin_lock_irq (&dev->lock);\n\tvalue = -EINVAL;\n\tif (dev->buf) {\n\t\tspin_unlock_irq(&dev->lock);\n\t\tkfree(kbuf);\n\t\treturn value;\n\t}\n\tdev->buf = kbuf;\n\n\t/* full or low speed config */\n\tdev->config = (void *) kbuf;\n\ttotal = le16_to_cpu(dev->config->wTotalLength);\n\tif (!is_valid_config(dev->config, total) ||\n\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tkbuf += total;\n\tlength -= total;\n\n\t/* optional high speed config */\n\tif (kbuf [1] == USB_DT_CONFIG) {\n\t\tdev->hs_config = (void *) kbuf;\n\t\ttotal = le16_to_cpu(dev->hs_config->wTotalLength);\n\t\tif (!is_valid_config(dev->hs_config, total) ||\n\t\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\t\tgoto fail;\n\t\tkbuf += total;\n\t\tlength -= total;\n\t} else {\n\t\tdev->hs_config = NULL;\n\t}\n\n\t/* could support multiple configs, using another encoding! */\n\n\t/* device descriptor (tweaked for paranoia) */\n\tif (length != USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tdev->dev = (void *)kbuf;\n\tif (dev->dev->bLength != USB_DT_DEVICE_SIZE\n\t\t\t|| dev->dev->bDescriptorType != USB_DT_DEVICE\n\t\t\t|| dev->dev->bNumConfigurations != 1)\n\t\tgoto fail;\n\tdev->dev->bcdUSB = cpu_to_le16 (0x0200);\n\n\t/* triggers gadgetfs_bind(); then we can enumerate. */\n\tspin_unlock_irq (&dev->lock);\n\tif (dev->hs_config)\n\t\tgadgetfs_driver.max_speed = USB_SPEED_HIGH;\n\telse\n\t\tgadgetfs_driver.max_speed = USB_SPEED_FULL;\n\n\tvalue = usb_gadget_probe_driver(&gadgetfs_driver);\n\tif (value != 0) {\n\t\tkfree (dev->buf);\n\t\tdev->buf = NULL;\n\t} else {\n\t\t/* at this point \"good\" hardware has for the first time\n\t\t * let the USB the host see us.  alternatively, if users\n\t\t * unplug/replug that will clear all the error state.\n\t\t *\n\t\t * note:  everything running before here was guaranteed\n\t\t * to choke driver model style diagnostics.  from here\n\t\t * on, they can work ... except in cleanup paths that\n\t\t * kick in after the ep0 descriptor is closed.\n\t\t */\n\t\tvalue = len;\n\t\tdev->gadget_registered = true;\n\t}\n\treturn value;\n\nfail:\n\tspin_unlock_irq (&dev->lock);\n\tpr_debug (\"%s: %s fail %zd, %p\\n\", shortname, __func__, value, dev);\n\tkfree (dev->buf);\n\tdev->buf = NULL;\n\treturn value;\n}",
+  "code_after_change": "dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)\n{\n\tstruct dev_data\t\t*dev = fd->private_data;\n\tssize_t\t\t\tvalue, length = len;\n\tunsigned\t\ttotal;\n\tu32\t\t\ttag;\n\tchar\t\t\t*kbuf;\n\n\tspin_lock_irq(&dev->lock);\n\tif (dev->state > STATE_DEV_OPENED) {\n\t\tvalue = ep0_write(fd, buf, len, ptr);\n\t\tspin_unlock_irq(&dev->lock);\n\t\treturn value;\n\t}\n\tspin_unlock_irq(&dev->lock);\n\n\tif ((len < (USB_DT_CONFIG_SIZE + USB_DT_DEVICE_SIZE + 4)) ||\n\t    (len > PAGE_SIZE * 4))\n\t\treturn -EINVAL;\n\n\t/* we might need to change message format someday */\n\tif (copy_from_user (&tag, buf, 4))\n\t\treturn -EFAULT;\n\tif (tag != 0)\n\t\treturn -EINVAL;\n\tbuf += 4;\n\tlength -= 4;\n\n\tkbuf = memdup_user(buf, length);\n\tif (IS_ERR(kbuf))\n\t\treturn PTR_ERR(kbuf);\n\n\tspin_lock_irq (&dev->lock);\n\tvalue = -EINVAL;\n\tif (dev->buf) {\n\t\tspin_unlock_irq(&dev->lock);\n\t\tkfree(kbuf);\n\t\treturn value;\n\t}\n\tdev->buf = kbuf;\n\n\t/* full or low speed config */\n\tdev->config = (void *) kbuf;\n\ttotal = le16_to_cpu(dev->config->wTotalLength);\n\tif (!is_valid_config(dev->config, total) ||\n\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tkbuf += total;\n\tlength -= total;\n\n\t/* optional high speed config */\n\tif (kbuf [1] == USB_DT_CONFIG) {\n\t\tdev->hs_config = (void *) kbuf;\n\t\ttotal = le16_to_cpu(dev->hs_config->wTotalLength);\n\t\tif (!is_valid_config(dev->hs_config, total) ||\n\t\t\t\ttotal > length - USB_DT_DEVICE_SIZE)\n\t\t\tgoto fail;\n\t\tkbuf += total;\n\t\tlength -= total;\n\t} else {\n\t\tdev->hs_config = NULL;\n\t}\n\n\t/* could support multiple configs, using another encoding! */\n\n\t/* device descriptor (tweaked for paranoia) */\n\tif (length != USB_DT_DEVICE_SIZE)\n\t\tgoto fail;\n\tdev->dev = (void *)kbuf;\n\tif (dev->dev->bLength != USB_DT_DEVICE_SIZE\n\t\t\t|| dev->dev->bDescriptorType != USB_DT_DEVICE\n\t\t\t|| dev->dev->bNumConfigurations != 1)\n\t\tgoto fail;\n\tdev->dev->bcdUSB = cpu_to_le16 (0x0200);\n\n\t/* triggers gadgetfs_bind(); then we can enumerate. */\n\tspin_unlock_irq (&dev->lock);\n\tif (dev->hs_config)\n\t\tgadgetfs_driver.max_speed = USB_SPEED_HIGH;\n\telse\n\t\tgadgetfs_driver.max_speed = USB_SPEED_FULL;\n\n\tvalue = usb_gadget_probe_driver(&gadgetfs_driver);\n\tif (value != 0) {\n\t\tspin_lock_irq(&dev->lock);\n\t\tgoto fail;\n\t} else {\n\t\t/* at this point \"good\" hardware has for the first time\n\t\t * let the USB the host see us.  alternatively, if users\n\t\t * unplug/replug that will clear all the error state.\n\t\t *\n\t\t * note:  everything running before here was guaranteed\n\t\t * to choke driver model style diagnostics.  from here\n\t\t * on, they can work ... except in cleanup paths that\n\t\t * kick in after the ep0 descriptor is closed.\n\t\t */\n\t\tvalue = len;\n\t\tdev->gadget_registered = true;\n\t}\n\treturn value;\n\nfail:\n\tdev->config = NULL;\n\tdev->hs_config = NULL;\n\tdev->dev = NULL;\n\tspin_unlock_irq (&dev->lock);\n\tpr_debug (\"%s: %s fail %zd, %p\\n\", shortname, __func__, value, dev);\n\tkfree (dev->buf);\n\tdev->buf = NULL;\n\treturn value;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tspin_lock_irq(&dev->lock);",
+      "\t\tgoto fail;",
+      "\tdev->config = NULL;",
+      "\tdev->hs_config = NULL;",
+      "\tdev->dev = NULL;"
+    ],
+    "deleted": [
+      "\t\tkfree (dev->buf);",
+      "\t\tdev->buf = NULL;"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "drivers/usb/gadget/legacy/inode.c in the Linux kernel through 5.16.8 mishandles dev->buf release.",
+  "id": 6269
+},
+{
+  "cve_id": "CVE-2022-37451",
+  "code_before_change": "pam_converse (int num_msg, PAM_CONVERSE_ARG2_TYPE **msg,\n  struct pam_response **resp, void *appdata_ptr)\n{\nint sep = 0;\nstruct pam_response *reply;\n\n/* It seems that PAM frees reply[] */\n\nif (  pam_arg_ended\n   || !(reply = malloc(sizeof(struct pam_response) * num_msg)))\n  return PAM_CONV_ERR;\n\nfor (int i = 0; i < num_msg; i++)\n  {\n  uschar *arg;\n  switch (msg[i]->msg_style)\n    {\n    case PAM_PROMPT_ECHO_ON:\n    case PAM_PROMPT_ECHO_OFF:\n      if (!(arg = string_nextinlist(&pam_args, &sep, NULL, 0)))\n\t{\n\targ = US\"\";\n\tpam_arg_ended = TRUE;\n\t}\n      reply[i].resp = CS string_copy_malloc(arg); /* PAM frees resp */\n      reply[i].resp_retcode = PAM_SUCCESS;\n      break;\n\n    case PAM_TEXT_INFO:    /* Just acknowledge messages */\n    case PAM_ERROR_MSG:\n      reply[i].resp_retcode = PAM_SUCCESS;\n      reply[i].resp = NULL;\n      break;\n\n    default:  /* Must be an error of some sort... */\n      free(reply);\n      pam_conv_had_error = TRUE;\n      return PAM_CONV_ERR;\n    }\n  }\n\n*resp = reply;\nreturn PAM_SUCCESS;\n}",
+  "code_after_change": "pam_converse (int num_msg, PAM_CONVERSE_ARG2_TYPE **msg,\n  struct pam_response **resp, void *appdata_ptr)\n{\nint sep = 0;\nstruct pam_response *reply;\n\n/* It seems that PAM frees reply[] */\n\nif (  pam_arg_ended\n   || !(reply = malloc(sizeof(struct pam_response) * num_msg)))\n  return PAM_CONV_ERR;\n\nfor (int i = 0; i < num_msg; i++)\n  {\n  uschar *arg;\n  switch (msg[i]->msg_style)\n    {\n    case PAM_PROMPT_ECHO_ON:\n    case PAM_PROMPT_ECHO_OFF:\n      if (!(arg = string_nextinlist(&pam_args, &sep, NULL, 0)))\n\t{\n\targ = US\"\";\n\tpam_arg_ended = TRUE;\n\t}\n      reply[i].resp = strdup(CCS arg); /* Use libc malloc, PAM frees resp directly*/\n      reply[i].resp_retcode = PAM_SUCCESS;\n      break;\n\n    case PAM_TEXT_INFO:    /* Just acknowledge messages */\n    case PAM_ERROR_MSG:\n      reply[i].resp_retcode = PAM_SUCCESS;\n      reply[i].resp = NULL;\n      break;\n\n    default:  /* Must be an error of some sort... */\n      free(reply);\n      pam_conv_had_error = TRUE;\n      return PAM_CONV_ERR;\n    }\n  }\n\n*resp = reply;\nreturn PAM_SUCCESS;\n}",
+  "function_modified_lines": {
+    "added": [
+      "      reply[i].resp = strdup(CCS arg); /* Use libc malloc, PAM frees resp directly*/"
+    ],
+    "deleted": [
+      "      reply[i].resp = CS string_copy_malloc(arg); /* PAM frees resp */"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "Exim before 4.96 has an invalid free in pam_converse in auths/call_pam.c because store_free is not used after store_malloc.",
+  "id": 6270
+},
+{
+  "cve_id": "CVE-2023-0459",
+  "code_before_change": "raw_copy_from_user(void *to, const void __user *from, unsigned long n)\n{\n\tif (__builtin_constant_p(n)) {\n\t\tunsigned long ret;\n\n\t\tswitch (n) {\n\t\tcase 1:\n\t\t\tret = 0;\n\t\t\t__uaccess_begin_nospec();\n\t\t\t__get_user_asm_nozero(*(u8 *)to, from, ret,\n\t\t\t\t\t      \"b\", \"b\", \"=q\", 1);\n\t\t\t__uaccess_end();\n\t\t\treturn ret;\n\t\tcase 2:\n\t\t\tret = 0;\n\t\t\t__uaccess_begin_nospec();\n\t\t\t__get_user_asm_nozero(*(u16 *)to, from, ret,\n\t\t\t\t\t      \"w\", \"w\", \"=r\", 2);\n\t\t\t__uaccess_end();\n\t\t\treturn ret;\n\t\tcase 4:\n\t\t\tret = 0;\n\t\t\t__uaccess_begin_nospec();\n\t\t\t__get_user_asm_nozero(*(u32 *)to, from, ret,\n\t\t\t\t\t      \"l\", \"k\", \"=r\", 4);\n\t\t\t__uaccess_end();\n\t\t\treturn ret;\n\t\t}\n\t}\n\treturn __copy_user_ll(to, (__force const void *)from, n);\n}",
+  "code_after_change": "raw_copy_from_user(void *to, const void __user *from, unsigned long n)\n{\n\treturn __copy_user_ll(to, (__force const void *)from, n);\n}\n\nstatic __always_inline unsigned long\n__copy_from_user_inatomic_nocache(void *to, const void __user *from,\n\t\t\t\t  unsigned long n)\n{\n       return __copy_from_user_ll_nocache_nozero(to, from, n);\n}\n\n#endif /* _ASM_X86_UACCESS_32_H */",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "\tif (__builtin_constant_p(n)) {",
+      "\t\tunsigned long ret;",
+      "\t\tswitch (n) {",
+      "\t\tcase 1:",
+      "\t\t\tret = 0;",
+      "\t\t\t__uaccess_begin_nospec();",
+      "\t\t\t__get_user_asm_nozero(*(u8 *)to, from, ret,",
+      "\t\t\t\t\t      \"b\", \"b\", \"=q\", 1);",
+      "\t\t\t__uaccess_end();",
+      "\t\t\treturn ret;",
+      "\t\tcase 2:",
+      "\t\t\tret = 0;",
+      "\t\t\t__uaccess_begin_nospec();",
+      "\t\t\t__get_user_asm_nozero(*(u16 *)to, from, ret,",
+      "\t\t\t\t\t      \"w\", \"w\", \"=r\", 2);",
+      "\t\t\t__uaccess_end();",
+      "\t\t\treturn ret;",
+      "\t\tcase 4:",
+      "\t\t\tret = 0;",
+      "\t\t\t__uaccess_begin_nospec();",
+      "\t\t\t__get_user_asm_nozero(*(u32 *)to, from, ret,",
+      "\t\t\t\t\t      \"l\", \"k\", \"=r\", 4);",
+      "\t\t\t__uaccess_end();",
+      "\t\t\treturn ret;",
+      "\t\t}",
+      "\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "Copy_from_user on 64-bit versions of the Linux kernel does not implement the __uaccess_begin_nospec allowing a user to bypass the \"access_ok\" check and pass a kernel pointer to copy_from_user(). This would allow an attacker to leak information. We recommend upgrading beyond commit 74e19ef0ff8061ef55957c3abd71614ef0f42f47",
+  "id": 6271
+},
+{
+  "cve_id": "CVE-2023-0459",
+  "code_before_change": "raw_copy_to_user(void __user *dst, const void *src, unsigned long size)\n{\n\tint ret = 0;\n\n\tif (!__builtin_constant_p(size))\n\t\treturn copy_user_generic((__force void *)dst, src, size);\n\tswitch (size) {\n\tcase 1:\n\t\t__uaccess_begin();\n\t\t__put_user_asm(*(u8 *)src, (u8 __user *)dst,\n\t\t\t      ret, \"b\", \"b\", \"iq\", 1);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 2:\n\t\t__uaccess_begin();\n\t\t__put_user_asm(*(u16 *)src, (u16 __user *)dst,\n\t\t\t      ret, \"w\", \"w\", \"ir\", 2);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 4:\n\t\t__uaccess_begin();\n\t\t__put_user_asm(*(u32 *)src, (u32 __user *)dst,\n\t\t\t      ret, \"l\", \"k\", \"ir\", 4);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 8:\n\t\t__uaccess_begin();\n\t\t__put_user_asm(*(u64 *)src, (u64 __user *)dst,\n\t\t\t      ret, \"q\", \"\", \"er\", 8);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 10:\n\t\t__uaccess_begin();\n\t\t__put_user_asm(*(u64 *)src, (u64 __user *)dst,\n\t\t\t       ret, \"q\", \"\", \"er\", 10);\n\t\tif (likely(!ret)) {\n\t\t\tasm(\"\":::\"memory\");\n\t\t\t__put_user_asm(4[(u16 *)src], 4 + (u16 __user *)dst,\n\t\t\t\t       ret, \"w\", \"w\", \"ir\", 2);\n\t\t}\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 16:\n\t\t__uaccess_begin();\n\t\t__put_user_asm(*(u64 *)src, (u64 __user *)dst,\n\t\t\t       ret, \"q\", \"\", \"er\", 16);\n\t\tif (likely(!ret)) {\n\t\t\tasm(\"\":::\"memory\");\n\t\t\t__put_user_asm(1[(u64 *)src], 1 + (u64 __user *)dst,\n\t\t\t\t       ret, \"q\", \"\", \"er\", 8);\n\t\t}\n\t\t__uaccess_end();\n\t\treturn ret;\n\tdefault:\n\t\treturn copy_user_generic((__force void *)dst, src, size);\n\t}\n}",
+  "code_after_change": "raw_copy_to_user(void __user *dst, const void *src, unsigned long size)\n{\n\treturn copy_user_generic((__force void *)dst, src, size);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn copy_user_generic((__force void *)dst, src, size);"
+    ],
+    "deleted": [
+      "\tint ret = 0;",
+      "\tif (!__builtin_constant_p(size))",
+      "\t\treturn copy_user_generic((__force void *)dst, src, size);",
+      "\tswitch (size) {",
+      "\tcase 1:",
+      "\t\t__uaccess_begin();",
+      "\t\t__put_user_asm(*(u8 *)src, (u8 __user *)dst,",
+      "\t\t\t      ret, \"b\", \"b\", \"iq\", 1);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 2:",
+      "\t\t__uaccess_begin();",
+      "\t\t__put_user_asm(*(u16 *)src, (u16 __user *)dst,",
+      "\t\t\t      ret, \"w\", \"w\", \"ir\", 2);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 4:",
+      "\t\t__uaccess_begin();",
+      "\t\t__put_user_asm(*(u32 *)src, (u32 __user *)dst,",
+      "\t\t\t      ret, \"l\", \"k\", \"ir\", 4);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 8:",
+      "\t\t__uaccess_begin();",
+      "\t\t__put_user_asm(*(u64 *)src, (u64 __user *)dst,",
+      "\t\t\t      ret, \"q\", \"\", \"er\", 8);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 10:",
+      "\t\t__uaccess_begin();",
+      "\t\t__put_user_asm(*(u64 *)src, (u64 __user *)dst,",
+      "\t\t\t       ret, \"q\", \"\", \"er\", 10);",
+      "\t\tif (likely(!ret)) {",
+      "\t\t\tasm(\"\":::\"memory\");",
+      "\t\t\t__put_user_asm(4[(u16 *)src], 4 + (u16 __user *)dst,",
+      "\t\t\t\t       ret, \"w\", \"w\", \"ir\", 2);",
+      "\t\t}",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 16:",
+      "\t\t__uaccess_begin();",
+      "\t\t__put_user_asm(*(u64 *)src, (u64 __user *)dst,",
+      "\t\t\t       ret, \"q\", \"\", \"er\", 16);",
+      "\t\tif (likely(!ret)) {",
+      "\t\t\tasm(\"\":::\"memory\");",
+      "\t\t\t__put_user_asm(1[(u64 *)src], 1 + (u64 __user *)dst,",
+      "\t\t\t\t       ret, \"q\", \"\", \"er\", 8);",
+      "\t\t}",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tdefault:",
+      "\t\treturn copy_user_generic((__force void *)dst, src, size);",
+      "\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "Copy_from_user on 64-bit versions of the Linux kernel does not implement the __uaccess_begin_nospec allowing a user to bypass the \"access_ok\" check and pass a kernel pointer to copy_from_user(). This would allow an attacker to leak information. We recommend upgrading beyond commit 74e19ef0ff8061ef55957c3abd71614ef0f42f47",
+  "id": 6272
+},
+{
+  "cve_id": "CVE-2023-0459",
+  "code_before_change": "raw_copy_from_user(void *dst, const void __user *src, unsigned long size)\n{\n\tint ret = 0;\n\n\tif (!__builtin_constant_p(size))\n\t\treturn copy_user_generic(dst, (__force void *)src, size);\n\tswitch (size) {\n\tcase 1:\n\t\t__uaccess_begin_nospec();\n\t\t__get_user_asm_nozero(*(u8 *)dst, (u8 __user *)src,\n\t\t\t      ret, \"b\", \"b\", \"=q\", 1);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 2:\n\t\t__uaccess_begin_nospec();\n\t\t__get_user_asm_nozero(*(u16 *)dst, (u16 __user *)src,\n\t\t\t      ret, \"w\", \"w\", \"=r\", 2);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 4:\n\t\t__uaccess_begin_nospec();\n\t\t__get_user_asm_nozero(*(u32 *)dst, (u32 __user *)src,\n\t\t\t      ret, \"l\", \"k\", \"=r\", 4);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 8:\n\t\t__uaccess_begin_nospec();\n\t\t__get_user_asm_nozero(*(u64 *)dst, (u64 __user *)src,\n\t\t\t      ret, \"q\", \"\", \"=r\", 8);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 10:\n\t\t__uaccess_begin_nospec();\n\t\t__get_user_asm_nozero(*(u64 *)dst, (u64 __user *)src,\n\t\t\t       ret, \"q\", \"\", \"=r\", 10);\n\t\tif (likely(!ret))\n\t\t\t__get_user_asm_nozero(*(u16 *)(8 + (char *)dst),\n\t\t\t\t       (u16 __user *)(8 + (char __user *)src),\n\t\t\t\t       ret, \"w\", \"w\", \"=r\", 2);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tcase 16:\n\t\t__uaccess_begin_nospec();\n\t\t__get_user_asm_nozero(*(u64 *)dst, (u64 __user *)src,\n\t\t\t       ret, \"q\", \"\", \"=r\", 16);\n\t\tif (likely(!ret))\n\t\t\t__get_user_asm_nozero(*(u64 *)(8 + (char *)dst),\n\t\t\t\t       (u64 __user *)(8 + (char __user *)src),\n\t\t\t\t       ret, \"q\", \"\", \"=r\", 8);\n\t\t__uaccess_end();\n\t\treturn ret;\n\tdefault:\n\t\treturn copy_user_generic(dst, (__force void *)src, size);\n\t}\n}",
+  "code_after_change": "raw_copy_from_user(void *dst, const void __user *src, unsigned long size)\n{\n\treturn copy_user_generic(dst, (__force void *)src, size);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn copy_user_generic(dst, (__force void *)src, size);"
+    ],
+    "deleted": [
+      "\tint ret = 0;",
+      "\tif (!__builtin_constant_p(size))",
+      "\t\treturn copy_user_generic(dst, (__force void *)src, size);",
+      "\tswitch (size) {",
+      "\tcase 1:",
+      "\t\t__uaccess_begin_nospec();",
+      "\t\t__get_user_asm_nozero(*(u8 *)dst, (u8 __user *)src,",
+      "\t\t\t      ret, \"b\", \"b\", \"=q\", 1);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 2:",
+      "\t\t__uaccess_begin_nospec();",
+      "\t\t__get_user_asm_nozero(*(u16 *)dst, (u16 __user *)src,",
+      "\t\t\t      ret, \"w\", \"w\", \"=r\", 2);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 4:",
+      "\t\t__uaccess_begin_nospec();",
+      "\t\t__get_user_asm_nozero(*(u32 *)dst, (u32 __user *)src,",
+      "\t\t\t      ret, \"l\", \"k\", \"=r\", 4);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 8:",
+      "\t\t__uaccess_begin_nospec();",
+      "\t\t__get_user_asm_nozero(*(u64 *)dst, (u64 __user *)src,",
+      "\t\t\t      ret, \"q\", \"\", \"=r\", 8);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 10:",
+      "\t\t__uaccess_begin_nospec();",
+      "\t\t__get_user_asm_nozero(*(u64 *)dst, (u64 __user *)src,",
+      "\t\t\t       ret, \"q\", \"\", \"=r\", 10);",
+      "\t\tif (likely(!ret))",
+      "\t\t\t__get_user_asm_nozero(*(u16 *)(8 + (char *)dst),",
+      "\t\t\t\t       (u16 __user *)(8 + (char __user *)src),",
+      "\t\t\t\t       ret, \"w\", \"w\", \"=r\", 2);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tcase 16:",
+      "\t\t__uaccess_begin_nospec();",
+      "\t\t__get_user_asm_nozero(*(u64 *)dst, (u64 __user *)src,",
+      "\t\t\t       ret, \"q\", \"\", \"=r\", 16);",
+      "\t\tif (likely(!ret))",
+      "\t\t\t__get_user_asm_nozero(*(u64 *)(8 + (char *)dst),",
+      "\t\t\t\t       (u64 __user *)(8 + (char __user *)src),",
+      "\t\t\t\t       ret, \"q\", \"\", \"=r\", 8);",
+      "\t\t__uaccess_end();",
+      "\t\treturn ret;",
+      "\tdefault:",
+      "\t\treturn copy_user_generic(dst, (__force void *)src, size);",
+      "\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "Copy_from_user on 64-bit versions of the Linux kernel does not implement the __uaccess_begin_nospec allowing a user to bypass the \"access_ok\" check and pass a kernel pointer to copy_from_user(). This would allow an attacker to leak information. We recommend upgrading beyond commit 74e19ef0ff8061ef55957c3abd71614ef0f42f47",
+  "id": 6273
+},
+{
+  "cve_id": "CVE-2023-0459",
+  "code_before_change": "static u64 ___bpf_prog_run(u64 *regs, const struct bpf_insn *insn)\n{\n#define BPF_INSN_2_LBL(x, y)    [BPF_##x | BPF_##y] = &&x##_##y\n#define BPF_INSN_3_LBL(x, y, z) [BPF_##x | BPF_##y | BPF_##z] = &&x##_##y##_##z\n\tstatic const void * const jumptable[256] __annotate_jump_table = {\n\t\t[0 ... 255] = &&default_label,\n\t\t/* Now overwrite non-defaults ... */\n\t\tBPF_INSN_MAP(BPF_INSN_2_LBL, BPF_INSN_3_LBL),\n\t\t/* Non-UAPI available opcodes. */\n\t\t[BPF_JMP | BPF_CALL_ARGS] = &&JMP_CALL_ARGS,\n\t\t[BPF_JMP | BPF_TAIL_CALL] = &&JMP_TAIL_CALL,\n\t\t[BPF_ST  | BPF_NOSPEC] = &&ST_NOSPEC,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_B] = &&LDX_PROBE_MEM_B,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_H] = &&LDX_PROBE_MEM_H,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_W] = &&LDX_PROBE_MEM_W,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_DW] = &&LDX_PROBE_MEM_DW,\n\t};\n#undef BPF_INSN_3_LBL\n#undef BPF_INSN_2_LBL\n\tu32 tail_call_cnt = 0;\n\n#define CONT\t ({ insn++; goto select_insn; })\n#define CONT_JMP ({ insn++; goto select_insn; })\n\nselect_insn:\n\tgoto *jumptable[insn->code];\n\n\t/* Explicitly mask the register-based shift amounts with 63 or 31\n\t * to avoid undefined behavior. Normally this won't affect the\n\t * generated code, for example, in case of native 64 bit archs such\n\t * as x86-64 or arm64, the compiler is optimizing the AND away for\n\t * the interpreter. In case of JITs, each of the JIT backends compiles\n\t * the BPF shift operations to machine instructions which produce\n\t * implementation-defined results in such a case; the resulting\n\t * contents of the register may be arbitrary, but program behaviour\n\t * as a whole remains defined. In other words, in case of JIT backends,\n\t * the AND must /not/ be added to the emitted LSH/RSH/ARSH translation.\n\t */\n\t/* ALU (shifts) */\n#define SHT(OPCODE, OP)\t\t\t\t\t\\\n\tALU64_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = DST OP (SRC & 63);\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = (u32) DST OP ((u32) SRC & 31);\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU64_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = DST OP IMM;\t\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = (u32) DST OP (u32) IMM;\t\t\\\n\t\tCONT;\n\t/* ALU (rest) */\n#define ALU(OPCODE, OP)\t\t\t\t\t\\\n\tALU64_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = DST OP SRC;\t\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = (u32) DST OP (u32) SRC;\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU64_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = DST OP IMM;\t\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = (u32) DST OP (u32) IMM;\t\t\\\n\t\tCONT;\n\tALU(ADD,  +)\n\tALU(SUB,  -)\n\tALU(AND,  &)\n\tALU(OR,   |)\n\tALU(XOR,  ^)\n\tALU(MUL,  *)\n\tSHT(LSH, <<)\n\tSHT(RSH, >>)\n#undef SHT\n#undef ALU\n\tALU_NEG:\n\t\tDST = (u32) -DST;\n\t\tCONT;\n\tALU64_NEG:\n\t\tDST = -DST;\n\t\tCONT;\n\tALU_MOV_X:\n\t\tDST = (u32) SRC;\n\t\tCONT;\n\tALU_MOV_K:\n\t\tDST = (u32) IMM;\n\t\tCONT;\n\tALU64_MOV_X:\n\t\tDST = SRC;\n\t\tCONT;\n\tALU64_MOV_K:\n\t\tDST = IMM;\n\t\tCONT;\n\tLD_IMM_DW:\n\t\tDST = (u64) (u32) insn[0].imm | ((u64) (u32) insn[1].imm) << 32;\n\t\tinsn++;\n\t\tCONT;\n\tALU_ARSH_X:\n\t\tDST = (u64) (u32) (((s32) DST) >> (SRC & 31));\n\t\tCONT;\n\tALU_ARSH_K:\n\t\tDST = (u64) (u32) (((s32) DST) >> IMM);\n\t\tCONT;\n\tALU64_ARSH_X:\n\t\t(*(s64 *) &DST) >>= (SRC & 63);\n\t\tCONT;\n\tALU64_ARSH_K:\n\t\t(*(s64 *) &DST) >>= IMM;\n\t\tCONT;\n\tALU64_MOD_X:\n\t\tdiv64_u64_rem(DST, SRC, &AX);\n\t\tDST = AX;\n\t\tCONT;\n\tALU_MOD_X:\n\t\tAX = (u32) DST;\n\t\tDST = do_div(AX, (u32) SRC);\n\t\tCONT;\n\tALU64_MOD_K:\n\t\tdiv64_u64_rem(DST, IMM, &AX);\n\t\tDST = AX;\n\t\tCONT;\n\tALU_MOD_K:\n\t\tAX = (u32) DST;\n\t\tDST = do_div(AX, (u32) IMM);\n\t\tCONT;\n\tALU64_DIV_X:\n\t\tDST = div64_u64(DST, SRC);\n\t\tCONT;\n\tALU_DIV_X:\n\t\tAX = (u32) DST;\n\t\tdo_div(AX, (u32) SRC);\n\t\tDST = (u32) AX;\n\t\tCONT;\n\tALU64_DIV_K:\n\t\tDST = div64_u64(DST, IMM);\n\t\tCONT;\n\tALU_DIV_K:\n\t\tAX = (u32) DST;\n\t\tdo_div(AX, (u32) IMM);\n\t\tDST = (u32) AX;\n\t\tCONT;\n\tALU_END_TO_BE:\n\t\tswitch (IMM) {\n\t\tcase 16:\n\t\t\tDST = (__force u16) cpu_to_be16(DST);\n\t\t\tbreak;\n\t\tcase 32:\n\t\t\tDST = (__force u32) cpu_to_be32(DST);\n\t\t\tbreak;\n\t\tcase 64:\n\t\t\tDST = (__force u64) cpu_to_be64(DST);\n\t\t\tbreak;\n\t\t}\n\t\tCONT;\n\tALU_END_TO_LE:\n\t\tswitch (IMM) {\n\t\tcase 16:\n\t\t\tDST = (__force u16) cpu_to_le16(DST);\n\t\t\tbreak;\n\t\tcase 32:\n\t\t\tDST = (__force u32) cpu_to_le32(DST);\n\t\t\tbreak;\n\t\tcase 64:\n\t\t\tDST = (__force u64) cpu_to_le64(DST);\n\t\t\tbreak;\n\t\t}\n\t\tCONT;\n\n\t/* CALL */\n\tJMP_CALL:\n\t\t/* Function call scratches BPF_R1-BPF_R5 registers,\n\t\t * preserves BPF_R6-BPF_R9, and stores return value\n\t\t * into BPF_R0.\n\t\t */\n\t\tBPF_R0 = (__bpf_call_base + insn->imm)(BPF_R1, BPF_R2, BPF_R3,\n\t\t\t\t\t\t       BPF_R4, BPF_R5);\n\t\tCONT;\n\n\tJMP_CALL_ARGS:\n\t\tBPF_R0 = (__bpf_call_base_args + insn->imm)(BPF_R1, BPF_R2,\n\t\t\t\t\t\t\t    BPF_R3, BPF_R4,\n\t\t\t\t\t\t\t    BPF_R5,\n\t\t\t\t\t\t\t    insn + insn->off + 1);\n\t\tCONT;\n\n\tJMP_TAIL_CALL: {\n\t\tstruct bpf_map *map = (struct bpf_map *) (unsigned long) BPF_R2;\n\t\tstruct bpf_array *array = container_of(map, struct bpf_array, map);\n\t\tstruct bpf_prog *prog;\n\t\tu32 index = BPF_R3;\n\n\t\tif (unlikely(index >= array->map.max_entries))\n\t\t\tgoto out;\n\n\t\tif (unlikely(tail_call_cnt >= MAX_TAIL_CALL_CNT))\n\t\t\tgoto out;\n\n\t\ttail_call_cnt++;\n\n\t\tprog = READ_ONCE(array->ptrs[index]);\n\t\tif (!prog)\n\t\t\tgoto out;\n\n\t\t/* ARG1 at this point is guaranteed to point to CTX from\n\t\t * the verifier side due to the fact that the tail call is\n\t\t * handled like a helper, that is, bpf_tail_call_proto,\n\t\t * where arg1_type is ARG_PTR_TO_CTX.\n\t\t */\n\t\tinsn = prog->insnsi;\n\t\tgoto select_insn;\nout:\n\t\tCONT;\n\t}\n\tJMP_JA:\n\t\tinsn += insn->off;\n\t\tCONT;\n\tJMP_EXIT:\n\t\treturn BPF_R0;\n\t/* JMP */\n#define COND_JMP(SIGN, OPCODE, CMP_OP)\t\t\t\t\\\n\tJMP_##OPCODE##_X:\t\t\t\t\t\\\n\t\tif ((SIGN##64) DST CMP_OP (SIGN##64) SRC) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\t\t\t\t\t\t\\\n\tJMP32_##OPCODE##_X:\t\t\t\t\t\\\n\t\tif ((SIGN##32) DST CMP_OP (SIGN##32) SRC) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\t\t\t\t\t\t\\\n\tJMP_##OPCODE##_K:\t\t\t\t\t\\\n\t\tif ((SIGN##64) DST CMP_OP (SIGN##64) IMM) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\t\t\t\t\t\t\\\n\tJMP32_##OPCODE##_K:\t\t\t\t\t\\\n\t\tif ((SIGN##32) DST CMP_OP (SIGN##32) IMM) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\n\tCOND_JMP(u, JEQ, ==)\n\tCOND_JMP(u, JNE, !=)\n\tCOND_JMP(u, JGT, >)\n\tCOND_JMP(u, JLT, <)\n\tCOND_JMP(u, JGE, >=)\n\tCOND_JMP(u, JLE, <=)\n\tCOND_JMP(u, JSET, &)\n\tCOND_JMP(s, JSGT, >)\n\tCOND_JMP(s, JSLT, <)\n\tCOND_JMP(s, JSGE, >=)\n\tCOND_JMP(s, JSLE, <=)\n#undef COND_JMP\n\t/* ST, STX and LDX*/\n\tST_NOSPEC:\n\t\t/* Speculation barrier for mitigating Speculative Store Bypass.\n\t\t * In case of arm64, we rely on the firmware mitigation as\n\t\t * controlled via the ssbd kernel parameter. Whenever the\n\t\t * mitigation is enabled, it works for all of the kernel code\n\t\t * with no need to provide any additional instructions here.\n\t\t * In case of x86, we use 'lfence' insn for mitigation. We\n\t\t * reuse preexisting logic from Spectre v1 mitigation that\n\t\t * happens to produce the required code on x86 for v4 as well.\n\t\t */\n#ifdef CONFIG_X86\n\t\tbarrier_nospec();\n#endif\n\t\tCONT;\n#define LDST(SIZEOP, SIZE)\t\t\t\t\t\t\\\n\tSTX_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\t*(SIZE *)(unsigned long) (DST + insn->off) = SRC;\t\\\n\t\tCONT;\t\t\t\t\t\t\t\\\n\tST_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\t*(SIZE *)(unsigned long) (DST + insn->off) = IMM;\t\\\n\t\tCONT;\t\t\t\t\t\t\t\\\n\tLDX_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\tDST = *(SIZE *)(unsigned long) (SRC + insn->off);\t\\\n\t\tCONT;\t\t\t\t\t\t\t\\\n\tLDX_PROBE_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\tbpf_probe_read_kernel(&DST, sizeof(SIZE),\t\t\\\n\t\t\t\t      (const void *)(long) (SRC + insn->off));\t\\\n\t\tDST = *((SIZE *)&DST);\t\t\t\t\t\\\n\t\tCONT;\n\n\tLDST(B,   u8)\n\tLDST(H,  u16)\n\tLDST(W,  u32)\n\tLDST(DW, u64)\n#undef LDST\n\n#define ATOMIC_ALU_OP(BOP, KOP)\t\t\t\t\t\t\\\n\t\tcase BOP:\t\t\t\t\t\t\\\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\t\t\\\n\t\t\t\tatomic_##KOP((u32) SRC, (atomic_t *)(unsigned long) \\\n\t\t\t\t\t     (DST + insn->off));\t\\\n\t\t\telse\t\t\t\t\t\t\\\n\t\t\t\tatomic64_##KOP((u64) SRC, (atomic64_t *)(unsigned long) \\\n\t\t\t\t\t       (DST + insn->off));\t\\\n\t\t\tbreak;\t\t\t\t\t\t\\\n\t\tcase BOP | BPF_FETCH:\t\t\t\t\t\\\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\t\t\\\n\t\t\t\tSRC = (u32) atomic_fetch_##KOP(\t\t\\\n\t\t\t\t\t(u32) SRC,\t\t\t\\\n\t\t\t\t\t(atomic_t *)(unsigned long) (DST + insn->off)); \\\n\t\t\telse\t\t\t\t\t\t\\\n\t\t\t\tSRC = (u64) atomic64_fetch_##KOP(\t\\\n\t\t\t\t\t(u64) SRC,\t\t\t\\\n\t\t\t\t\t(atomic64_t *)(unsigned long) (DST + insn->off)); \\\n\t\t\tbreak;\n\n\tSTX_ATOMIC_DW:\n\tSTX_ATOMIC_W:\n\t\tswitch (IMM) {\n\t\tATOMIC_ALU_OP(BPF_ADD, add)\n\t\tATOMIC_ALU_OP(BPF_AND, and)\n\t\tATOMIC_ALU_OP(BPF_OR, or)\n\t\tATOMIC_ALU_OP(BPF_XOR, xor)\n#undef ATOMIC_ALU_OP\n\n\t\tcase BPF_XCHG:\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\n\t\t\t\tSRC = (u32) atomic_xchg(\n\t\t\t\t\t(atomic_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u32) SRC);\n\t\t\telse\n\t\t\t\tSRC = (u64) atomic64_xchg(\n\t\t\t\t\t(atomic64_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u64) SRC);\n\t\t\tbreak;\n\t\tcase BPF_CMPXCHG:\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\n\t\t\t\tBPF_R0 = (u32) atomic_cmpxchg(\n\t\t\t\t\t(atomic_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u32) BPF_R0, (u32) SRC);\n\t\t\telse\n\t\t\t\tBPF_R0 = (u64) atomic64_cmpxchg(\n\t\t\t\t\t(atomic64_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u64) BPF_R0, (u64) SRC);\n\t\t\tbreak;\n\n\t\tdefault:\n\t\t\tgoto default_label;\n\t\t}\n\t\tCONT;\n\n\tdefault_label:\n\t\t/* If we ever reach this, we have a bug somewhere. Die hard here\n\t\t * instead of just returning 0; we could be somewhere in a subprog,\n\t\t * so execution could continue otherwise which we do /not/ want.\n\t\t *\n\t\t * Note, verifier whitelists all opcodes in bpf_opcode_in_insntable().\n\t\t */\n\t\tpr_warn(\"BPF interpreter: unknown opcode %02x (imm: 0x%x)\\n\",\n\t\t\tinsn->code, insn->imm);\n\t\tBUG_ON(1);\n\t\treturn 0;\n}",
+  "code_after_change": "static u64 ___bpf_prog_run(u64 *regs, const struct bpf_insn *insn)\n{\n#define BPF_INSN_2_LBL(x, y)    [BPF_##x | BPF_##y] = &&x##_##y\n#define BPF_INSN_3_LBL(x, y, z) [BPF_##x | BPF_##y | BPF_##z] = &&x##_##y##_##z\n\tstatic const void * const jumptable[256] __annotate_jump_table = {\n\t\t[0 ... 255] = &&default_label,\n\t\t/* Now overwrite non-defaults ... */\n\t\tBPF_INSN_MAP(BPF_INSN_2_LBL, BPF_INSN_3_LBL),\n\t\t/* Non-UAPI available opcodes. */\n\t\t[BPF_JMP | BPF_CALL_ARGS] = &&JMP_CALL_ARGS,\n\t\t[BPF_JMP | BPF_TAIL_CALL] = &&JMP_TAIL_CALL,\n\t\t[BPF_ST  | BPF_NOSPEC] = &&ST_NOSPEC,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_B] = &&LDX_PROBE_MEM_B,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_H] = &&LDX_PROBE_MEM_H,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_W] = &&LDX_PROBE_MEM_W,\n\t\t[BPF_LDX | BPF_PROBE_MEM | BPF_DW] = &&LDX_PROBE_MEM_DW,\n\t};\n#undef BPF_INSN_3_LBL\n#undef BPF_INSN_2_LBL\n\tu32 tail_call_cnt = 0;\n\n#define CONT\t ({ insn++; goto select_insn; })\n#define CONT_JMP ({ insn++; goto select_insn; })\n\nselect_insn:\n\tgoto *jumptable[insn->code];\n\n\t/* Explicitly mask the register-based shift amounts with 63 or 31\n\t * to avoid undefined behavior. Normally this won't affect the\n\t * generated code, for example, in case of native 64 bit archs such\n\t * as x86-64 or arm64, the compiler is optimizing the AND away for\n\t * the interpreter. In case of JITs, each of the JIT backends compiles\n\t * the BPF shift operations to machine instructions which produce\n\t * implementation-defined results in such a case; the resulting\n\t * contents of the register may be arbitrary, but program behaviour\n\t * as a whole remains defined. In other words, in case of JIT backends,\n\t * the AND must /not/ be added to the emitted LSH/RSH/ARSH translation.\n\t */\n\t/* ALU (shifts) */\n#define SHT(OPCODE, OP)\t\t\t\t\t\\\n\tALU64_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = DST OP (SRC & 63);\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = (u32) DST OP ((u32) SRC & 31);\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU64_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = DST OP IMM;\t\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = (u32) DST OP (u32) IMM;\t\t\\\n\t\tCONT;\n\t/* ALU (rest) */\n#define ALU(OPCODE, OP)\t\t\t\t\t\\\n\tALU64_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = DST OP SRC;\t\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_X:\t\t\t\t\\\n\t\tDST = (u32) DST OP (u32) SRC;\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU64_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = DST OP IMM;\t\t\t\\\n\t\tCONT;\t\t\t\t\t\\\n\tALU_##OPCODE##_K:\t\t\t\t\\\n\t\tDST = (u32) DST OP (u32) IMM;\t\t\\\n\t\tCONT;\n\tALU(ADD,  +)\n\tALU(SUB,  -)\n\tALU(AND,  &)\n\tALU(OR,   |)\n\tALU(XOR,  ^)\n\tALU(MUL,  *)\n\tSHT(LSH, <<)\n\tSHT(RSH, >>)\n#undef SHT\n#undef ALU\n\tALU_NEG:\n\t\tDST = (u32) -DST;\n\t\tCONT;\n\tALU64_NEG:\n\t\tDST = -DST;\n\t\tCONT;\n\tALU_MOV_X:\n\t\tDST = (u32) SRC;\n\t\tCONT;\n\tALU_MOV_K:\n\t\tDST = (u32) IMM;\n\t\tCONT;\n\tALU64_MOV_X:\n\t\tDST = SRC;\n\t\tCONT;\n\tALU64_MOV_K:\n\t\tDST = IMM;\n\t\tCONT;\n\tLD_IMM_DW:\n\t\tDST = (u64) (u32) insn[0].imm | ((u64) (u32) insn[1].imm) << 32;\n\t\tinsn++;\n\t\tCONT;\n\tALU_ARSH_X:\n\t\tDST = (u64) (u32) (((s32) DST) >> (SRC & 31));\n\t\tCONT;\n\tALU_ARSH_K:\n\t\tDST = (u64) (u32) (((s32) DST) >> IMM);\n\t\tCONT;\n\tALU64_ARSH_X:\n\t\t(*(s64 *) &DST) >>= (SRC & 63);\n\t\tCONT;\n\tALU64_ARSH_K:\n\t\t(*(s64 *) &DST) >>= IMM;\n\t\tCONT;\n\tALU64_MOD_X:\n\t\tdiv64_u64_rem(DST, SRC, &AX);\n\t\tDST = AX;\n\t\tCONT;\n\tALU_MOD_X:\n\t\tAX = (u32) DST;\n\t\tDST = do_div(AX, (u32) SRC);\n\t\tCONT;\n\tALU64_MOD_K:\n\t\tdiv64_u64_rem(DST, IMM, &AX);\n\t\tDST = AX;\n\t\tCONT;\n\tALU_MOD_K:\n\t\tAX = (u32) DST;\n\t\tDST = do_div(AX, (u32) IMM);\n\t\tCONT;\n\tALU64_DIV_X:\n\t\tDST = div64_u64(DST, SRC);\n\t\tCONT;\n\tALU_DIV_X:\n\t\tAX = (u32) DST;\n\t\tdo_div(AX, (u32) SRC);\n\t\tDST = (u32) AX;\n\t\tCONT;\n\tALU64_DIV_K:\n\t\tDST = div64_u64(DST, IMM);\n\t\tCONT;\n\tALU_DIV_K:\n\t\tAX = (u32) DST;\n\t\tdo_div(AX, (u32) IMM);\n\t\tDST = (u32) AX;\n\t\tCONT;\n\tALU_END_TO_BE:\n\t\tswitch (IMM) {\n\t\tcase 16:\n\t\t\tDST = (__force u16) cpu_to_be16(DST);\n\t\t\tbreak;\n\t\tcase 32:\n\t\t\tDST = (__force u32) cpu_to_be32(DST);\n\t\t\tbreak;\n\t\tcase 64:\n\t\t\tDST = (__force u64) cpu_to_be64(DST);\n\t\t\tbreak;\n\t\t}\n\t\tCONT;\n\tALU_END_TO_LE:\n\t\tswitch (IMM) {\n\t\tcase 16:\n\t\t\tDST = (__force u16) cpu_to_le16(DST);\n\t\t\tbreak;\n\t\tcase 32:\n\t\t\tDST = (__force u32) cpu_to_le32(DST);\n\t\t\tbreak;\n\t\tcase 64:\n\t\t\tDST = (__force u64) cpu_to_le64(DST);\n\t\t\tbreak;\n\t\t}\n\t\tCONT;\n\n\t/* CALL */\n\tJMP_CALL:\n\t\t/* Function call scratches BPF_R1-BPF_R5 registers,\n\t\t * preserves BPF_R6-BPF_R9, and stores return value\n\t\t * into BPF_R0.\n\t\t */\n\t\tBPF_R0 = (__bpf_call_base + insn->imm)(BPF_R1, BPF_R2, BPF_R3,\n\t\t\t\t\t\t       BPF_R4, BPF_R5);\n\t\tCONT;\n\n\tJMP_CALL_ARGS:\n\t\tBPF_R0 = (__bpf_call_base_args + insn->imm)(BPF_R1, BPF_R2,\n\t\t\t\t\t\t\t    BPF_R3, BPF_R4,\n\t\t\t\t\t\t\t    BPF_R5,\n\t\t\t\t\t\t\t    insn + insn->off + 1);\n\t\tCONT;\n\n\tJMP_TAIL_CALL: {\n\t\tstruct bpf_map *map = (struct bpf_map *) (unsigned long) BPF_R2;\n\t\tstruct bpf_array *array = container_of(map, struct bpf_array, map);\n\t\tstruct bpf_prog *prog;\n\t\tu32 index = BPF_R3;\n\n\t\tif (unlikely(index >= array->map.max_entries))\n\t\t\tgoto out;\n\n\t\tif (unlikely(tail_call_cnt >= MAX_TAIL_CALL_CNT))\n\t\t\tgoto out;\n\n\t\ttail_call_cnt++;\n\n\t\tprog = READ_ONCE(array->ptrs[index]);\n\t\tif (!prog)\n\t\t\tgoto out;\n\n\t\t/* ARG1 at this point is guaranteed to point to CTX from\n\t\t * the verifier side due to the fact that the tail call is\n\t\t * handled like a helper, that is, bpf_tail_call_proto,\n\t\t * where arg1_type is ARG_PTR_TO_CTX.\n\t\t */\n\t\tinsn = prog->insnsi;\n\t\tgoto select_insn;\nout:\n\t\tCONT;\n\t}\n\tJMP_JA:\n\t\tinsn += insn->off;\n\t\tCONT;\n\tJMP_EXIT:\n\t\treturn BPF_R0;\n\t/* JMP */\n#define COND_JMP(SIGN, OPCODE, CMP_OP)\t\t\t\t\\\n\tJMP_##OPCODE##_X:\t\t\t\t\t\\\n\t\tif ((SIGN##64) DST CMP_OP (SIGN##64) SRC) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\t\t\t\t\t\t\\\n\tJMP32_##OPCODE##_X:\t\t\t\t\t\\\n\t\tif ((SIGN##32) DST CMP_OP (SIGN##32) SRC) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\t\t\t\t\t\t\\\n\tJMP_##OPCODE##_K:\t\t\t\t\t\\\n\t\tif ((SIGN##64) DST CMP_OP (SIGN##64) IMM) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\t\t\t\t\t\t\\\n\tJMP32_##OPCODE##_K:\t\t\t\t\t\\\n\t\tif ((SIGN##32) DST CMP_OP (SIGN##32) IMM) {\t\\\n\t\t\tinsn += insn->off;\t\t\t\\\n\t\t\tCONT_JMP;\t\t\t\t\\\n\t\t}\t\t\t\t\t\t\\\n\t\tCONT;\n\tCOND_JMP(u, JEQ, ==)\n\tCOND_JMP(u, JNE, !=)\n\tCOND_JMP(u, JGT, >)\n\tCOND_JMP(u, JLT, <)\n\tCOND_JMP(u, JGE, >=)\n\tCOND_JMP(u, JLE, <=)\n\tCOND_JMP(u, JSET, &)\n\tCOND_JMP(s, JSGT, >)\n\tCOND_JMP(s, JSLT, <)\n\tCOND_JMP(s, JSGE, >=)\n\tCOND_JMP(s, JSLE, <=)\n#undef COND_JMP\n\t/* ST, STX and LDX*/\n\tST_NOSPEC:\n\t\t/* Speculation barrier for mitigating Speculative Store Bypass.\n\t\t * In case of arm64, we rely on the firmware mitigation as\n\t\t * controlled via the ssbd kernel parameter. Whenever the\n\t\t * mitigation is enabled, it works for all of the kernel code\n\t\t * with no need to provide any additional instructions here.\n\t\t * In case of x86, we use 'lfence' insn for mitigation. We\n\t\t * reuse preexisting logic from Spectre v1 mitigation that\n\t\t * happens to produce the required code on x86 for v4 as well.\n\t\t */\n\t\tbarrier_nospec();\n\t\tCONT;\n#define LDST(SIZEOP, SIZE)\t\t\t\t\t\t\\\n\tSTX_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\t*(SIZE *)(unsigned long) (DST + insn->off) = SRC;\t\\\n\t\tCONT;\t\t\t\t\t\t\t\\\n\tST_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\t*(SIZE *)(unsigned long) (DST + insn->off) = IMM;\t\\\n\t\tCONT;\t\t\t\t\t\t\t\\\n\tLDX_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\tDST = *(SIZE *)(unsigned long) (SRC + insn->off);\t\\\n\t\tCONT;\t\t\t\t\t\t\t\\\n\tLDX_PROBE_MEM_##SIZEOP:\t\t\t\t\t\t\\\n\t\tbpf_probe_read_kernel(&DST, sizeof(SIZE),\t\t\\\n\t\t\t\t      (const void *)(long) (SRC + insn->off));\t\\\n\t\tDST = *((SIZE *)&DST);\t\t\t\t\t\\\n\t\tCONT;\n\n\tLDST(B,   u8)\n\tLDST(H,  u16)\n\tLDST(W,  u32)\n\tLDST(DW, u64)\n#undef LDST\n\n#define ATOMIC_ALU_OP(BOP, KOP)\t\t\t\t\t\t\\\n\t\tcase BOP:\t\t\t\t\t\t\\\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\t\t\\\n\t\t\t\tatomic_##KOP((u32) SRC, (atomic_t *)(unsigned long) \\\n\t\t\t\t\t     (DST + insn->off));\t\\\n\t\t\telse\t\t\t\t\t\t\\\n\t\t\t\tatomic64_##KOP((u64) SRC, (atomic64_t *)(unsigned long) \\\n\t\t\t\t\t       (DST + insn->off));\t\\\n\t\t\tbreak;\t\t\t\t\t\t\\\n\t\tcase BOP | BPF_FETCH:\t\t\t\t\t\\\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\t\t\\\n\t\t\t\tSRC = (u32) atomic_fetch_##KOP(\t\t\\\n\t\t\t\t\t(u32) SRC,\t\t\t\\\n\t\t\t\t\t(atomic_t *)(unsigned long) (DST + insn->off)); \\\n\t\t\telse\t\t\t\t\t\t\\\n\t\t\t\tSRC = (u64) atomic64_fetch_##KOP(\t\\\n\t\t\t\t\t(u64) SRC,\t\t\t\\\n\t\t\t\t\t(atomic64_t *)(unsigned long) (DST + insn->off)); \\\n\t\t\tbreak;\n\n\tSTX_ATOMIC_DW:\n\tSTX_ATOMIC_W:\n\t\tswitch (IMM) {\n\t\tATOMIC_ALU_OP(BPF_ADD, add)\n\t\tATOMIC_ALU_OP(BPF_AND, and)\n\t\tATOMIC_ALU_OP(BPF_OR, or)\n\t\tATOMIC_ALU_OP(BPF_XOR, xor)\n#undef ATOMIC_ALU_OP\n\n\t\tcase BPF_XCHG:\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\n\t\t\t\tSRC = (u32) atomic_xchg(\n\t\t\t\t\t(atomic_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u32) SRC);\n\t\t\telse\n\t\t\t\tSRC = (u64) atomic64_xchg(\n\t\t\t\t\t(atomic64_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u64) SRC);\n\t\t\tbreak;\n\t\tcase BPF_CMPXCHG:\n\t\t\tif (BPF_SIZE(insn->code) == BPF_W)\n\t\t\t\tBPF_R0 = (u32) atomic_cmpxchg(\n\t\t\t\t\t(atomic_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u32) BPF_R0, (u32) SRC);\n\t\t\telse\n\t\t\t\tBPF_R0 = (u64) atomic64_cmpxchg(\n\t\t\t\t\t(atomic64_t *)(unsigned long) (DST + insn->off),\n\t\t\t\t\t(u64) BPF_R0, (u64) SRC);\n\t\t\tbreak;\n\n\t\tdefault:\n\t\t\tgoto default_label;\n\t\t}\n\t\tCONT;\n\n\tdefault_label:\n\t\t/* If we ever reach this, we have a bug somewhere. Die hard here\n\t\t * instead of just returning 0; we could be somewhere in a subprog,\n\t\t * so execution could continue otherwise which we do /not/ want.\n\t\t *\n\t\t * Note, verifier whitelists all opcodes in bpf_opcode_in_insntable().\n\t\t */\n\t\tpr_warn(\"BPF interpreter: unknown opcode %02x (imm: 0x%x)\\n\",\n\t\t\tinsn->code, insn->imm);\n\t\tBUG_ON(1);\n\t\treturn 0;\n}\n\n#define PROG_NAME(stack_size) __bpf_prog_run##stack_size",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "#ifdef CONFIG_X86",
+      "#endif"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "Copy_from_user on 64-bit versions of the Linux kernel does not implement the __uaccess_begin_nospec allowing a user to bypass the \"access_ok\" check and pass a kernel pointer to copy_from_user(). This would allow an attacker to leak information. We recommend upgrading beyond commit 74e19ef0ff8061ef55957c3abd71614ef0f42f47",
+  "id": 6274
+},
+{
+  "cve_id": "CVE-2023-25565",
+  "code_before_change": "int ntlm_decode_target_info(struct ntlm_ctx *ctx, struct ntlm_buffer *buffer,\n                            char **nb_computer_name, char **nb_domain_name,\n                            char **dns_computer_name, char **dns_domain_name,\n                            char **dns_tree_name, char **av_target_name,\n                            uint32_t *av_flags, uint64_t *av_timestamp,\n                            struct ntlm_buffer *av_single_host,\n                            struct ntlm_buffer *av_cb)\n{\n    struct wire_av_pair *av_pair;\n    uint16_t av_id = (uint16_t)-1;\n    uint16_t av_len = (uint16_t)-1;\n    struct ntlm_buffer sh = { NULL, 0 };\n    struct ntlm_buffer cb = { NULL, 0 };\n    char *nb_computer = NULL;\n    char *nb_domain = NULL;\n    char *dns_computer = NULL;\n    char *dns_domain = NULL;\n    char *dns_tree = NULL;\n    char *av_target = NULL;\n    size_t data_offs = 0;\n    uint64_t timestamp = 0;\n    uint32_t flags = 0;\n    int ret = 0;\n\n    while (data_offs + 4 <= buffer->length) {\n        av_pair = (struct wire_av_pair *)&buffer->data[data_offs];\n        data_offs += 4;\n        av_id = le16toh(av_pair->av_id);\n        av_len = le16toh(av_pair->av_len);\n        if (av_len > buffer->length - data_offs) {\n            ret = ERR_DECODE;\n            goto done;\n        }\n        data_offs += av_len;\n\n        switch (av_id) {\n        case MSV_AV_CHANNEL_BINDINGS:\n            if (!av_cb) continue;\n            cb.data = av_pair->value;\n            cb.length = av_len;\n            break;\n        case MSV_AV_TARGET_NAME:\n            if (!av_target_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &av_target);\n            if (ret) goto done;\n            break;\n        case MSV_AV_SINGLE_HOST:\n            if (!av_single_host) continue;\n            sh.data = av_pair->value;\n            sh.length = av_len;\n            break;\n        case MSV_AV_TIMESTAMP:\n            if (!av_timestamp) continue;\n            memcpy(&timestamp, av_pair->value, sizeof(timestamp));\n            timestamp = le64toh(timestamp);\n            break;\n        case MSV_AV_FLAGS:\n            if (!av_flags) continue;\n            memcpy(&flags, av_pair->value, sizeof(flags));\n            flags = le32toh(flags);\n            break;\n        case MSV_AV_DNS_TREE_NAME:\n            if (!dns_tree_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &dns_tree);\n            if (ret) goto done;\n            break;\n        case MSV_AV_DNS_DOMAIN_NAME:\n            if (!dns_domain_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &dns_domain);\n            if (ret) goto done;\n            break;\n        case MSV_AV_DNS_COMPUTER_NAME:\n            if (!dns_computer_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &dns_computer);\n            if (ret) goto done;\n            break;\n        case MSV_AV_NB_DOMAIN_NAME:\n            if (!nb_domain_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &nb_domain);\n            if (ret) goto done;\n            break;\n        case MSV_AV_NB_COMPUTER_NAME:\n            if (!nb_computer_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &nb_computer);\n            if (ret) goto done;\n            break;\n        default:\n            /* unknown av_pair, or EOL */\n            break;\n        }\n        if (av_id == MSV_AV_EOL) break;\n    }\n\n    if (av_id != MSV_AV_EOL || av_len != 0) {\n        ret = ERR_DECODE;\n    }\n\ndone:\n    if (ret) {\n        ntlm_free_buffer_data(&sh);\n        ntlm_free_buffer_data(&cb);\n        safefree(nb_computer);\n        safefree(nb_domain);\n        safefree(dns_computer);\n        safefree(dns_domain);\n        safefree(dns_tree);\n        safefree(av_target);\n    } else {\n        if (nb_computer_name) *nb_computer_name = nb_computer;\n        if (nb_domain_name) *nb_domain_name = nb_domain;\n        if (dns_computer_name) *dns_computer_name = dns_computer;\n        if (dns_domain_name) *dns_domain_name = dns_domain;\n        if (dns_tree_name) *dns_tree_name = dns_tree;\n        if (av_target_name) *av_target_name = av_target;\n        if (av_timestamp) *av_timestamp = timestamp;\n        if (av_single_host) *av_single_host = sh;\n        if (av_flags) *av_flags = flags;\n        if (av_cb) *av_cb = cb;\n    }\n    return ret;\n}",
+  "code_after_change": "int ntlm_decode_target_info(struct ntlm_ctx *ctx, struct ntlm_buffer *buffer,\n                            char **nb_computer_name, char **nb_domain_name,\n                            char **dns_computer_name, char **dns_domain_name,\n                            char **dns_tree_name, char **av_target_name,\n                            uint32_t *av_flags, uint64_t *av_timestamp,\n                            struct ntlm_buffer *av_single_host,\n                            struct ntlm_buffer *av_cb)\n{\n    struct wire_av_pair *av_pair;\n    uint16_t av_id = (uint16_t)-1;\n    uint16_t av_len = (uint16_t)-1;\n    struct ntlm_buffer sh = { NULL, 0 };\n    struct ntlm_buffer cb = { NULL, 0 };\n    char *nb_computer = NULL;\n    char *nb_domain = NULL;\n    char *dns_computer = NULL;\n    char *dns_domain = NULL;\n    char *dns_tree = NULL;\n    char *av_target = NULL;\n    size_t data_offs = 0;\n    uint64_t timestamp = 0;\n    uint32_t flags = 0;\n    int ret = 0;\n\n    while (data_offs + 4 <= buffer->length) {\n        av_pair = (struct wire_av_pair *)&buffer->data[data_offs];\n        data_offs += 4;\n        av_id = le16toh(av_pair->av_id);\n        av_len = le16toh(av_pair->av_len);\n        if (av_len > buffer->length - data_offs) {\n            ret = ERR_DECODE;\n            goto done;\n        }\n        data_offs += av_len;\n\n        switch (av_id) {\n        case MSV_AV_CHANNEL_BINDINGS:\n            if (!av_cb) continue;\n            cb.data = av_pair->value;\n            cb.length = av_len;\n            break;\n        case MSV_AV_TARGET_NAME:\n            if (!av_target_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &av_target);\n            if (ret) goto done;\n            break;\n        case MSV_AV_SINGLE_HOST:\n            if (!av_single_host) continue;\n            sh.data = av_pair->value;\n            sh.length = av_len;\n            break;\n        case MSV_AV_TIMESTAMP:\n            if (!av_timestamp) continue;\n            memcpy(&timestamp, av_pair->value, sizeof(timestamp));\n            timestamp = le64toh(timestamp);\n            break;\n        case MSV_AV_FLAGS:\n            if (!av_flags) continue;\n            memcpy(&flags, av_pair->value, sizeof(flags));\n            flags = le32toh(flags);\n            break;\n        case MSV_AV_DNS_TREE_NAME:\n            if (!dns_tree_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &dns_tree);\n            if (ret) goto done;\n            break;\n        case MSV_AV_DNS_DOMAIN_NAME:\n            if (!dns_domain_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &dns_domain);\n            if (ret) goto done;\n            break;\n        case MSV_AV_DNS_COMPUTER_NAME:\n            if (!dns_computer_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &dns_computer);\n            if (ret) goto done;\n            break;\n        case MSV_AV_NB_DOMAIN_NAME:\n            if (!nb_domain_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &nb_domain);\n            if (ret) goto done;\n            break;\n        case MSV_AV_NB_COMPUTER_NAME:\n            if (!nb_computer_name) continue;\n            ret = ntlm_decode_av_pair_u16l_str(ctx, av_pair, &nb_computer);\n            if (ret) goto done;\n            break;\n        default:\n            /* unknown av_pair, or EOL */\n            break;\n        }\n        if (av_id == MSV_AV_EOL) break;\n    }\n\n    if (av_id != MSV_AV_EOL || av_len != 0) {\n        ret = ERR_DECODE;\n    }\n\ndone:\n    if (ret) {\n        safefree(nb_computer);\n        safefree(nb_domain);\n        safefree(dns_computer);\n        safefree(dns_domain);\n        safefree(dns_tree);\n        safefree(av_target);\n    } else {\n        if (nb_computer_name) *nb_computer_name = nb_computer;\n        if (nb_domain_name) *nb_domain_name = nb_domain;\n        if (dns_computer_name) *dns_computer_name = dns_computer;\n        if (dns_domain_name) *dns_domain_name = dns_domain;\n        if (dns_tree_name) *dns_tree_name = dns_tree;\n        if (av_target_name) *av_target_name = av_target;\n        if (av_timestamp) *av_timestamp = timestamp;\n        if (av_single_host) *av_single_host = sh;\n        if (av_flags) *av_flags = flags;\n        if (av_cb) *av_cb = cb;\n    }\n    return ret;\n}\n\nint ntlm_process_target_info(struct ntlm_ctx *ctx, bool protect,",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "        ntlm_free_buffer_data(&sh);",
+      "        ntlm_free_buffer_data(&cb);"
+    ]
+  },
+  "cwe": [
+    "CWE-763"
+  ],
+  "cve_description": "GSS-NTLMSSP is a mechglue plugin for the GSSAPI library that implements NTLM authentication. Prior to version 1.2.0, an incorrect free when decoding target information can trigger a denial of service. The error condition incorrectly assumes the `cb` and `sh` buffers contain a copy of the data that needs to be freed. However, that is not the case. This vulnerability can be triggered via the main `gss_accept_sec_context` entry point. This will likely trigger an assertion failure in `free`, causing a denial-of-service. This issue is fixed in version 1.2.0.",
+  "id": 6275
+}
+]

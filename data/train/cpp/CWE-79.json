@@ -1,0 +1,156 @@
+[
+{
+  "cve_id": "CVE-2014-3148",
+  "code_before_change": "http_error_t::make_body (int n, const str &si, const str &aux)\n{\n  strbuf b;\n  str ldesc;\n  const str sdesc = http_status.get_desc (n, &ldesc);\n  b << \"<html>\\n\"\n    << \" <head>\\n\"\n    << \"  <title>\" << n << \" \" << sdesc << \"</title>\\n\"\n    << \" </head>\\n\"\n    << \" <body>\\n\"\n    << \" <h1>Error \" << n << \" \" << sdesc << \"</h1><br><br>\\n\"\n    ;\n  if (n == HTTP_NOT_FOUND && aux) {\n    b << \"The file <tt>\" << aux \n      << \"</tt> was not found on this server.<br><br>\\n\\n\";\n  }\n  b << \"  <hr>\\n\"\n    << \"  <i>\" << si << \"</i>\\n\"\n    << \" <br>\\n\"\n    << \" </body>\\n\"\n    << \"</html>\\n\"\n    ;\n  return b;\n}",
+  "code_after_change": "http_error_t::make_body (int n, const str &si, const str &aux)\n{\n  strbuf b;\n  str ldesc;\n  const str sdesc = xss_escape (http_status.get_desc (n, &ldesc));\n  b << \"<html>\\n\"\n    << \" <head>\\n\"\n    << \"  <title>\" << n << \" \" << sdesc << \"</title>\\n\"\n    << \" </head>\\n\"\n    << \" <body>\\n\"\n    << \" <h1>Error \" << n << \" \" << sdesc << \"</h1><br><br>\\n\"\n    ;\n  if (n == HTTP_NOT_FOUND && aux) {\n    b << \"The file <tt>\" << xss_escape (aux)\n      << \"</tt> was not found on this server.<br><br>\\n\\n\";\n  }\n  b << \"  <hr>\\n\"\n    << \"  <i>\" << xss_escape (si) << \"</i>\\n\"\n    << \" <br>\\n\"\n    << \" </body>\\n\"\n    << \"</html>\\n\"\n    ;\n  return b;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  const str sdesc = xss_escape (http_status.get_desc (n, &ldesc));",
+      "    b << \"The file <tt>\" << xss_escape (aux)",
+      "    << \"  <i>\" << xss_escape (si) << \"</i>\\n\""
+    ],
+    "deleted": [
+      "  const str sdesc = http_status.get_desc (n, &ldesc);",
+      "    b << \"The file <tt>\" << aux",
+      "    << \"  <i>\" << si << \"</i>\\n\""
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "Cross-site scripting (XSS) vulnerability in libahttp/err.c in OkCupid OKWS (OK Web Server) allows remote attackers to inject arbitrary web script or HTML via the PATH_INFO to a non-existent page, which is not properly handled in a 404 error page.",
+  "id": 2247
+},
+{
+  "cve_id": "CVE-2014-9714",
+  "code_before_change": "bool WddxPacket::recursiveAddVar(const String& varName,\n                                 const Variant& varVariant,\n                                 bool hasVarTag) {\n\n  bool isArray = varVariant.isArray();\n  bool isObject = varVariant.isObject();\n\n  if (isArray || isObject) {\n    if (hasVarTag) {\n      m_packetString += \"<var name='\";\n      m_packetString += varName.data();\n      m_packetString += \"'>\";\n    }\n\n    Array varAsArray;\n    Object varAsObject = varVariant.toObject();\n    if (isArray) varAsArray = varVariant.toArray();\n    if (isObject) varAsArray = varAsObject.toArray();\n\n    int length = varAsArray.length();\n    if (length > 0) {\n      ArrayIter it = ArrayIter(varAsArray);\n      if (it.first().isString()) isObject = true;\n      if (isObject) {\n        m_packetString += \"<struct>\";\n        if (!isArray) {\n          m_packetString += \"<var name='php_class_name'><string>\";\n          m_packetString += varAsObject->o_getClassName().c_str();\n          m_packetString += \"</string></var>\";\n        }\n      } else {\n        m_packetString += \"<array length='\";\n        m_packetString += std::to_string(length);\n        m_packetString += \"'>\";\n      }\n      for (ArrayIter it(varAsArray); it; ++it) {\n        Variant key = it.first();\n        Variant value = it.second();\n        recursiveAddVar(key.toString(), value, isObject);\n      }\n      if (isObject) {\n        m_packetString += \"</struct>\";\n      }\n      else {\n        m_packetString += \"</array>\";\n      }\n    }\n    else {\n      //empty object\n      if (isObject) {\n        m_packetString += \"<struct>\";\n        if (!isArray) {\n          m_packetString += \"<var name='php_class_name'><string>\";\n          m_packetString += varAsObject->o_getClassName().c_str();\n          m_packetString += \"</string></var>\";\n        }\n        m_packetString += \"</struct>\";\n      }\n    }\n    if (hasVarTag) {\n      m_packetString += \"</var>\";\n    }\n    return true;\n  }\n\n  std::string varType = getDataTypeString(varVariant.getType()).data();\n  if (!getWddxEncoded(varType, \"\", varName, false).empty()) {\n    std::string varValue = varVariant.toString().data();\n    if (varType.compare(\"boolean\") == 0) {\n      varValue = varVariant.toBoolean() ? \"true\" : \"false\";\n    }\n    m_packetString += getWddxEncoded(varType, varValue, varName, hasVarTag);\n    return true;\n  }\n\n  return false;\n}",
+  "code_after_change": "bool WddxPacket::recursiveAddVar(const String& varName,\n                                 const Variant& varVariant,\n                                 bool hasVarTag) {\n\n  bool isArray = varVariant.isArray();\n  bool isObject = varVariant.isObject();\n\n  if (isArray || isObject) {\n    if (hasVarTag) {\n      m_packetString += \"<var name='\";\n      m_packetString += varName.data();\n      m_packetString += \"'>\";\n    }\n\n    Array varAsArray;\n    Object varAsObject = varVariant.toObject();\n    if (isArray) varAsArray = varVariant.toArray();\n    if (isObject) varAsArray = varAsObject.toArray();\n\n    int length = varAsArray.length();\n    if (length > 0) {\n      ArrayIter it = ArrayIter(varAsArray);\n      if (it.first().isString()) isObject = true;\n      if (isObject) {\n        m_packetString += \"<struct>\";\n        if (!isArray) {\n          m_packetString += \"<var name='php_class_name'><string>\";\n          m_packetString += varAsObject->o_getClassName().c_str();\n          m_packetString += \"</string></var>\";\n        }\n      } else {\n        m_packetString += \"<array length='\";\n        m_packetString += std::to_string(length);\n        m_packetString += \"'>\";\n      }\n      for (ArrayIter it(varAsArray); it; ++it) {\n        Variant key = it.first();\n        Variant value = it.second();\n        recursiveAddVar(key.toString(), value, isObject);\n      }\n      if (isObject) {\n        m_packetString += \"</struct>\";\n      }\n      else {\n        m_packetString += \"</array>\";\n      }\n    }\n    else {\n      //empty object\n      if (isObject) {\n        m_packetString += \"<struct>\";\n        if (!isArray) {\n          m_packetString += \"<var name='php_class_name'><string>\";\n          m_packetString += varAsObject->o_getClassName().c_str();\n          m_packetString += \"</string></var>\";\n        }\n        m_packetString += \"</struct>\";\n      }\n    }\n    if (hasVarTag) {\n      m_packetString += \"</var>\";\n    }\n    return true;\n  }\n\n  std::string varType = getDataTypeString(varVariant.getType()).data();\n  if (!getWddxEncoded(varType, \"\", varName, false).empty()) {\n    std::string varValue;\n    if (varType.compare(\"boolean\") == 0) {\n      varValue = varVariant.toBoolean() ? \"true\" : \"false\";\n    } else {\n      varValue = StringUtil::HtmlEncode(varVariant.toString(),\n                                        StringUtil::QuoteStyle::Double,\n                                        \"UTF-8\", false, false).toCppString();\n    }\n    m_packetString += getWddxEncoded(varType, varValue, varName, hasVarTag);\n    return true;\n  }\n\n  return false;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    std::string varValue;",
+      "    } else {",
+      "      varValue = StringUtil::HtmlEncode(varVariant.toString(),",
+      "                                        StringUtil::QuoteStyle::Double,",
+      "                                        \"UTF-8\", false, false).toCppString();"
+    ],
+    "deleted": [
+      "    std::string varValue = varVariant.toString().data();"
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "Cross-site scripting (XSS) vulnerability in the WddxPacket::recursiveAddVar function in HHVM (aka the HipHop Virtual Machine) before 3.5.0 allows remote attackers to inject arbitrary web script or HTML via a crafted string to the wddx_serialize_value function.",
+  "id": 2248
+},
+{
+  "cve_id": "CVE-2017-6503",
+  "code_before_change": "void Logger::addMessage(const QString &message, const Log::MsgType &type)\n{\n    QWriteLocker locker(&lock);\n\n    Log::Msg temp = { msgCounter++, QDateTime::currentMSecsSinceEpoch(), type, message };\n    m_messages.push_back(temp);\n\n    if (m_messages.size() >= MAX_LOG_MESSAGES)\n        m_messages.pop_front();\n\n    emit newLogMessage(temp);\n}",
+  "code_after_change": "void Logger::addMessage(const QString &message, const Log::MsgType &type)\n{\n    QWriteLocker locker(&lock);\n\n    Log::Msg temp = { msgCounter++, QDateTime::currentMSecsSinceEpoch(), type, Utils::String::toHtmlEscaped(message) };\n    m_messages.push_back(temp);\n\n    if (m_messages.size() >= MAX_LOG_MESSAGES)\n        m_messages.pop_front();\n\n    emit newLogMessage(temp);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    Log::Msg temp = { msgCounter++, QDateTime::currentMSecsSinceEpoch(), type, Utils::String::toHtmlEscaped(message) };"
+    ],
+    "deleted": [
+      "    Log::Msg temp = { msgCounter++, QDateTime::currentMSecsSinceEpoch(), type, message };"
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "WebUI in qBittorrent before 3.3.11 did not escape many values, which could potentially lead to XSS.",
+  "id": 2249
+},
+{
+  "cve_id": "CVE-2017-6503",
+  "code_before_change": "void Logger::addPeer(const QString &ip, bool blocked, const QString &reason)\n{\n    QWriteLocker locker(&lock);\n\n    Log::Peer temp = { peerCounter++, QDateTime::currentMSecsSinceEpoch(), ip, blocked, reason };\n    m_peers.push_back(temp);\n\n    if (m_peers.size() >= MAX_LOG_MESSAGES)\n        m_peers.pop_front();\n\n    emit newLogPeer(temp);\n}",
+  "code_after_change": "void Logger::addPeer(const QString &ip, bool blocked, const QString &reason)\n{\n    QWriteLocker locker(&lock);\n\n    Log::Peer temp = { peerCounter++, QDateTime::currentMSecsSinceEpoch(), Utils::String::toHtmlEscaped(ip), blocked, Utils::String::toHtmlEscaped(reason) };\n    m_peers.push_back(temp);\n\n    if (m_peers.size() >= MAX_LOG_MESSAGES)\n        m_peers.pop_front();\n\n    emit newLogPeer(temp);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    Log::Peer temp = { peerCounter++, QDateTime::currentMSecsSinceEpoch(), Utils::String::toHtmlEscaped(ip), blocked, Utils::String::toHtmlEscaped(reason) };"
+    ],
+    "deleted": [
+      "    Log::Peer temp = { peerCounter++, QDateTime::currentMSecsSinceEpoch(), ip, blocked, reason };"
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "WebUI in qBittorrent before 3.3.11 did not escape many values, which could potentially lead to XSS.",
+  "id": 2250
+},
+{
+  "cve_id": "CVE-2017-6503",
+  "code_before_change": "  DeletionConfirmationDlg(QWidget *parent, const int &size, const QString &name, bool defaultDeleteFiles): QDialog(parent) {\n    setupUi(this);\n    if (size == 1)\n      label->setText(tr(\"Are you sure you want to delete '%1' from the transfer list?\", \"Are you sure you want to delete 'ubuntu-linux-iso' from the transfer list?\").arg(name));\n    else\n      label->setText(tr(\"Are you sure you want to delete these %1 torrents from the transfer list?\", \"Are you sure you want to delete these 5 torrents from the transfer list?\").arg(QString::number(size)));\n    // Icons\n    lbl_warn->setPixmap(GuiIconProvider::instance()->getIcon(\"dialog-warning\").pixmap(lbl_warn->height()));\n    lbl_warn->setFixedWidth(lbl_warn->height());\n    rememberBtn->setIcon(GuiIconProvider::instance()->getIcon(\"object-locked\"));\n\n    move(Utils::Misc::screenCenter(this));\n    checkPermDelete->setChecked(defaultDeleteFiles || Preferences::instance()->deleteTorrentFilesAsDefault());\n    connect(checkPermDelete, SIGNAL(clicked()), this, SLOT(updateRememberButtonState()));\n    buttonBox->button(QDialogButtonBox::Cancel)->setFocus();\n  }",
+  "code_after_change": "  DeletionConfirmationDlg(QWidget *parent, const int &size, const QString &name, bool defaultDeleteFiles): QDialog(parent) {\n    setupUi(this);\n    if (size == 1)\n      label->setText(tr(\"Are you sure you want to delete '%1' from the transfer list?\", \"Are you sure you want to delete 'ubuntu-linux-iso' from the transfer list?\").arg(Utils::String::toHtmlEscaped(name)));\n    else\n      label->setText(tr(\"Are you sure you want to delete these %1 torrents from the transfer list?\", \"Are you sure you want to delete these 5 torrents from the transfer list?\").arg(QString::number(size)));\n    // Icons\n    lbl_warn->setPixmap(GuiIconProvider::instance()->getIcon(\"dialog-warning\").pixmap(lbl_warn->height()));\n    lbl_warn->setFixedWidth(lbl_warn->height());\n    rememberBtn->setIcon(GuiIconProvider::instance()->getIcon(\"object-locked\"));\n\n    move(Utils::Misc::screenCenter(this));\n    checkPermDelete->setChecked(defaultDeleteFiles || Preferences::instance()->deleteTorrentFilesAsDefault());\n    connect(checkPermDelete, SIGNAL(clicked()), this, SLOT(updateRememberButtonState()));\n    buttonBox->button(QDialogButtonBox::Cancel)->setFocus();\n  }",
+  "function_modified_lines": {
+    "added": [
+      "      label->setText(tr(\"Are you sure you want to delete '%1' from the transfer list?\", \"Are you sure you want to delete 'ubuntu-linux-iso' from the transfer list?\").arg(Utils::String::toHtmlEscaped(name)));"
+    ],
+    "deleted": [
+      "      label->setText(tr(\"Are you sure you want to delete '%1' from the transfer list?\", \"Are you sure you want to delete 'ubuntu-linux-iso' from the transfer list?\").arg(name));"
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "WebUI in qBittorrent before 3.3.11 did not escape many values, which could potentially lead to XSS.",
+  "id": 2251
+},
+{
+  "cve_id": "CVE-2017-6503",
+  "code_before_change": "QStandardItem* PeerListWidget::addPeer(const QString& ip, BitTorrent::TorrentHandle *const torrent, const BitTorrent::PeerInfo &peer)\n{\n    int row = m_listModel->rowCount();\n    // Adding Peer to peer list\n    m_listModel->insertRow(row);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::IP), ip);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::IP), ip, Qt::ToolTipRole);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PORT), peer.address().port);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::IP_HIDDEN), ip);\n    if (m_resolveCountries) {\n        const QIcon ico = GuiIconProvider::instance()->getFlagIcon(peer.country());\n        if (!ico.isNull()) {\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), ico, Qt::DecorationRole);\n            const QString countryName = Net::GeoIPManager::CountryName(peer.country());\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), countryName, Qt::ToolTipRole);\n        }\n        else {\n            m_missingFlags.insert(ip);\n        }\n    }\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CONNECTION), peer.connectionType());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flags());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flagsDescription(), Qt::ToolTipRole);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), peer.client());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PROGRESS), peer.progress());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWN_SPEED), peer.payloadDownSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::UP_SPEED), peer.payloadUpSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_DOWN), peer.totalDownload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_UP), peer.totalUpload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::RELEVANCE), peer.relevance());\n    QStringList downloadingFiles(torrent->info().filesForPiece(peer.downloadingPieceIndex()));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\";\")));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\"\\n\")), Qt::ToolTipRole);\n\n    return m_listModel->item(row, PeerListDelegate::IP);\n}",
+  "code_after_change": "QStandardItem* PeerListWidget::addPeer(const QString& ip, BitTorrent::TorrentHandle *const torrent, const BitTorrent::PeerInfo &peer)\n{\n    int row = m_listModel->rowCount();\n    // Adding Peer to peer list\n    m_listModel->insertRow(row);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::IP), ip);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::IP), ip, Qt::ToolTipRole);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PORT), peer.address().port);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::IP_HIDDEN), ip);\n    if (m_resolveCountries) {\n        const QIcon ico = GuiIconProvider::instance()->getFlagIcon(peer.country());\n        if (!ico.isNull()) {\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), ico, Qt::DecorationRole);\n            const QString countryName = Net::GeoIPManager::CountryName(peer.country());\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), countryName, Qt::ToolTipRole);\n        }\n        else {\n            m_missingFlags.insert(ip);\n        }\n    }\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CONNECTION), peer.connectionType());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flags());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flagsDescription(), Qt::ToolTipRole);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), Utils::String::toHtmlEscaped(peer.client()));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PROGRESS), peer.progress());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWN_SPEED), peer.payloadDownSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::UP_SPEED), peer.payloadUpSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_DOWN), peer.totalDownload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_UP), peer.totalUpload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::RELEVANCE), peer.relevance());\n    QStringList downloadingFiles(torrent->info().filesForPiece(peer.downloadingPieceIndex()));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\";\")));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\"\\n\")), Qt::ToolTipRole);\n\n    return m_listModel->item(row, PeerListDelegate::IP);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), Utils::String::toHtmlEscaped(peer.client()));"
+    ],
+    "deleted": [
+      "    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), peer.client());"
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "WebUI in qBittorrent before 3.3.11 did not escape many values, which could potentially lead to XSS.",
+  "id": 2252
+},
+{
+  "cve_id": "CVE-2017-6503",
+  "code_before_change": "void PeerListWidget::updatePeer(const QString &ip, BitTorrent::TorrentHandle *const torrent, const BitTorrent::PeerInfo &peer)\n{\n    QStandardItem *item = m_peerItems.value(ip);\n    int row = item->row();\n    if (m_resolveCountries) {\n        const QIcon ico = GuiIconProvider::instance()->getFlagIcon(peer.country());\n        if (!ico.isNull()) {\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), ico, Qt::DecorationRole);\n            const QString countryName = Net::GeoIPManager::CountryName(peer.country());\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), countryName, Qt::ToolTipRole);\n            m_missingFlags.remove(ip);\n        }\n    }\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CONNECTION), peer.connectionType());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PORT), peer.address().port);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flags());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flagsDescription(), Qt::ToolTipRole);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), peer.client());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PROGRESS), peer.progress());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWN_SPEED), peer.payloadDownSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::UP_SPEED), peer.payloadUpSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_DOWN), peer.totalDownload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_UP), peer.totalUpload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::RELEVANCE), peer.relevance());\n    QStringList downloadingFiles(torrent->info().filesForPiece(peer.downloadingPieceIndex()));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\";\")));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\"\\n\")), Qt::ToolTipRole);\n}",
+  "code_after_change": "void PeerListWidget::updatePeer(const QString &ip, BitTorrent::TorrentHandle *const torrent, const BitTorrent::PeerInfo &peer)\n{\n    QStandardItem *item = m_peerItems.value(ip);\n    int row = item->row();\n    if (m_resolveCountries) {\n        const QIcon ico = GuiIconProvider::instance()->getFlagIcon(peer.country());\n        if (!ico.isNull()) {\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), ico, Qt::DecorationRole);\n            const QString countryName = Net::GeoIPManager::CountryName(peer.country());\n            m_listModel->setData(m_listModel->index(row, PeerListDelegate::COUNTRY), countryName, Qt::ToolTipRole);\n            m_missingFlags.remove(ip);\n        }\n    }\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CONNECTION), peer.connectionType());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PORT), peer.address().port);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flags());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::FLAGS), peer.flagsDescription(), Qt::ToolTipRole);\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), Utils::String::toHtmlEscaped(peer.client()));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::PROGRESS), peer.progress());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWN_SPEED), peer.payloadDownSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::UP_SPEED), peer.payloadUpSpeed());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_DOWN), peer.totalDownload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::TOT_UP), peer.totalUpload());\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::RELEVANCE), peer.relevance());\n    QStringList downloadingFiles(torrent->info().filesForPiece(peer.downloadingPieceIndex()));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\";\")));\n    m_listModel->setData(m_listModel->index(row, PeerListDelegate::DOWNLOADING_PIECE), downloadingFiles.join(QLatin1String(\"\\n\")), Qt::ToolTipRole);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), Utils::String::toHtmlEscaped(peer.client()));"
+    ],
+    "deleted": [
+      "    m_listModel->setData(m_listModel->index(row, PeerListDelegate::CLIENT), peer.client());"
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "WebUI in qBittorrent before 3.3.11 did not escape many values, which could potentially lead to XSS.",
+  "id": 2253
+},
+{
+  "cve_id": "CVE-2017-6503",
+  "code_before_change": "void PropertiesWidget::loadTorrentInfos(BitTorrent::TorrentHandle *const torrent)\n{\n    clear();\n    m_torrent = torrent;\n    downloaded_pieces->setTorrent(m_torrent);\n    pieces_availability->setTorrent(m_torrent);\n    if (!m_torrent) return;\n\n    // Save path\n    updateSavePath(m_torrent);\n    // Hash\n    hash_lbl->setText(m_torrent->hash());\n    PropListModel->model()->clear();\n    if (m_torrent->hasMetadata()) {\n        // Creation date\n        lbl_creationDate->setText(m_torrent->creationDate().toString(Qt::DefaultLocaleShortDate));\n\n        label_total_size_val->setText(Utils::Misc::friendlyUnit(m_torrent->totalSize()));\n\n        // Comment\n        comment_text->setText(Utils::Misc::parseHtmlLinks(m_torrent->comment()));\n\n        // URL seeds\n        loadUrlSeeds();\n\n        label_created_by_val->setText(m_torrent->creator());\n\n        // List files in torrent\n        PropListModel->model()->setupModelData(m_torrent->info());\n        filesList->setExpanded(PropListModel->index(0, 0), true);\n\n        // Load file priorities\n        PropListModel->model()->updateFilesPriorities(m_torrent->filePriorities());\n    }\n    // Load dynamic data\n    loadDynamicData();\n}",
+  "code_after_change": "void PropertiesWidget::loadTorrentInfos(BitTorrent::TorrentHandle *const torrent)\n{\n    clear();\n    m_torrent = torrent;\n    downloaded_pieces->setTorrent(m_torrent);\n    pieces_availability->setTorrent(m_torrent);\n    if (!m_torrent) return;\n\n    // Save path\n    updateSavePath(m_torrent);\n    // Hash\n    hash_lbl->setText(m_torrent->hash());\n    PropListModel->model()->clear();\n    if (m_torrent->hasMetadata()) {\n        // Creation date\n        lbl_creationDate->setText(m_torrent->creationDate().toString(Qt::DefaultLocaleShortDate));\n\n        label_total_size_val->setText(Utils::Misc::friendlyUnit(m_torrent->totalSize()));\n\n        // Comment\n        comment_text->setText(Utils::Misc::parseHtmlLinks(Utils::String::toHtmlEscaped(m_torrent->comment())));\n\n        // URL seeds\n        loadUrlSeeds();\n\n        label_created_by_val->setText(Utils::String::toHtmlEscaped(m_torrent->creator()));\n\n        // List files in torrent\n        PropListModel->model()->setupModelData(m_torrent->info());\n        filesList->setExpanded(PropListModel->index(0, 0), true);\n\n        // Load file priorities\n        PropListModel->model()->updateFilesPriorities(m_torrent->filePriorities());\n    }\n    // Load dynamic data\n    loadDynamicData();\n}",
+  "function_modified_lines": {
+    "added": [
+      "        comment_text->setText(Utils::Misc::parseHtmlLinks(Utils::String::toHtmlEscaped(m_torrent->comment())));",
+      "        label_created_by_val->setText(Utils::String::toHtmlEscaped(m_torrent->creator()));"
+    ],
+    "deleted": [
+      "        comment_text->setText(Utils::Misc::parseHtmlLinks(m_torrent->comment()));",
+      "        label_created_by_val->setText(m_torrent->creator());"
+    ]
+  },
+  "cwe": [
+    "CWE-79"
+  ],
+  "cve_description": "WebUI in qBittorrent before 3.3.11 did not escape many values, which could potentially lead to XSS.",
+  "id": 2254
+}
+]

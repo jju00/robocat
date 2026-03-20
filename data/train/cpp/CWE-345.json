@@ -1,0 +1,44 @@
+[
+{
+  "cve_id": "CVE-2016-1000004",
+  "code_before_change": "xmlNodePtr SimpleXMLElement_exportNode(const Object& sxe) {\n  assert(sxe->instanceof(SimpleXMLElement_classof()));\n  auto data = Native::data<SimpleXMLElement>(sxe.get());\n  return php_sxe_get_first_node(data, data->nodep());\n}",
+  "code_after_change": "xmlNodePtr SimpleXMLElement_exportNode(const Object& sxe) {\n  if (!sxe->instanceof(SimpleXMLElement_classof())) return nullptr;\n  auto data = Native::data<SimpleXMLElement>(sxe.get());\n  return php_sxe_get_first_node(data, data->nodep());\n}",
+  "function_modified_lines": {
+    "added": [
+      "  if (!sxe->instanceof(SimpleXMLElement_classof())) return nullptr;"
+    ],
+    "deleted": [
+      "  assert(sxe->instanceof(SimpleXMLElement_classof()));"
+    ]
+  },
+  "cwe": [
+    "CWE-345"
+  ],
+  "cve_description": "Insufficient type checks were employed prior to casting input data in SimpleXMLElement_exportNode and simplexml_import_dom. This issue affects HHVM versions prior to 3.9.5, all versions between 3.10.0 and 3.12.3 (inclusive), and all versions between 3.13.0 and 3.14.1 (inclusive).",
+  "id": 1314
+},
+{
+  "cve_id": "CVE-2016-1000004",
+  "code_before_change": "static Variant HHVM_FUNCTION(simplexml_import_dom,\n  const Object& node,\n  const String& class_name /* = \"SimpleXMLElement\" */) {\n  auto domnode = Native::data<DOMNode>(node);\n  xmlNodePtr nodep = domnode->nodep();\n\n  if (nodep) {\n    if (nodep->doc == nullptr) {\n      raise_warning(\"Imported Node must have associated Document\");\n      return init_null();\n    }\n    if (nodep->type == XML_DOCUMENT_NODE ||\n        nodep->type == XML_HTML_DOCUMENT_NODE) {\n      nodep = xmlDocGetRootElement((xmlDocPtr) nodep);\n    }\n  }\n\n  if (nodep && nodep->type == XML_ELEMENT_NODE) {\n    auto cls = class_from_name(class_name, \"simplexml_import_dom\");\n    if (!cls) {\n      return init_null();\n    }\n    Object obj = create_object(cls->nameStr(), Array(), false);\n    auto sxe = Native::data<SimpleXMLElement>(obj.get());\n    sxe->node = libxml_register_node(nodep);\n    return obj;\n  } else {\n    raise_warning(\"Invalid Nodetype to import\");\n    return init_null();\n  }\n  return false;\n}",
+  "code_after_change": "static Variant HHVM_FUNCTION(simplexml_import_dom,\n                             const Object& node,\n                             const String& class_name) {\n  if (!node->instanceof(s_DOMNode)) {\n    raise_warning(\"Invalid Nodetype to import\");\n    return init_null();\n  }\n  auto domnode = Native::data<DOMNode>(node);\n  xmlNodePtr nodep = domnode->nodep();\n\n  if (nodep) {\n    if (nodep->doc == nullptr) {\n      raise_warning(\"Imported Node must have associated Document\");\n      return init_null();\n    }\n    if (nodep->type == XML_DOCUMENT_NODE ||\n        nodep->type == XML_HTML_DOCUMENT_NODE) {\n      nodep = xmlDocGetRootElement((xmlDocPtr) nodep);\n    }\n  }\n\n  if (nodep && nodep->type == XML_ELEMENT_NODE) {\n    auto cls = class_from_name(class_name, \"simplexml_import_dom\");\n    if (!cls) {\n      return init_null();\n    }\n    Object obj = create_object(cls->nameStr(), Array(), false);\n    auto sxe = Native::data<SimpleXMLElement>(obj.get());\n    sxe->node = libxml_register_node(nodep);\n    return obj;\n  } else {\n    raise_warning(\"Invalid Nodetype to import\");\n    return init_null();\n  }\n  return false;\n}",
+  "function_modified_lines": {
+    "added": [
+      "                             const Object& node,",
+      "                             const String& class_name) {",
+      "  if (!node->instanceof(s_DOMNode)) {",
+      "    raise_warning(\"Invalid Nodetype to import\");",
+      "    return init_null();",
+      "  }"
+    ],
+    "deleted": [
+      "  const Object& node,",
+      "  const String& class_name /* = \"SimpleXMLElement\" */) {"
+    ]
+  },
+  "cwe": [
+    "CWE-345"
+  ],
+  "cve_description": "Insufficient type checks were employed prior to casting input data in SimpleXMLElement_exportNode and simplexml_import_dom. This issue affects HHVM versions prior to 3.9.5, all versions between 3.10.0 and 3.12.3 (inclusive), and all versions between 3.13.0 and 3.14.1 (inclusive).",
+  "id": 1315
+}
+]

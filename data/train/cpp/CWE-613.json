@@ -1,0 +1,196 @@
+[
+{
+  "cve_id": "CVE-2021-25940",
+  "code_before_change": "void AuthenticationFeature::collectOptions(std::shared_ptr<ProgramOptions> options) {\n  options->addOldOption(\"server.disable-authentication\",\n                        \"server.authentication\");\n  options->addOldOption(\"server.disable-authentication-unix-sockets\",\n                        \"server.authentication-unix-sockets\");\n  options->addOldOption(\"server.authenticate-system-only\",\n                        \"server.authentication-system-only\");\n  options->addOldOption(\"server.allow-method-override\",\n                        \"http.allow-method-override\");\n  options->addOldOption(\"server.hide-product-header\",\n                        \"http.hide-product-header\");\n  options->addOldOption(\"server.keep-alive-timeout\", \"http.keep-alive-timeout\");\n  options->addOldOption(\"server.default-api-compatibility\", \"\");\n  options->addOldOption(\"no-server\", \"server.rest-server\");\n\n  options->addOption(\"--server.authentication\",\n                     \"enable authentication for ALL client requests\",\n                     new BooleanParameter(&_active));\n\n  options->addOption(\n      \"--server.authentication-timeout\",\n      \"timeout for the authentication cache in seconds (0 = indefinitely)\",\n      new DoubleParameter(&_authenticationTimeout));\n\n  options->addOption(\"--server.local-authentication\",\n                     \"enable authentication using the local user database\",\n                     new BooleanParameter(&_localAuthentication));\n\n  options->addOption(\n      \"--server.authentication-system-only\",\n      \"use HTTP authentication only for requests to /_api and /_admin\",\n      new BooleanParameter(&_authenticationSystemOnly));\n\n#ifdef ARANGODB_HAVE_DOMAIN_SOCKETS\n  options->addOption(\"--server.authentication-unix-sockets\",\n                     \"authentication for requests via UNIX domain sockets\",\n                     new BooleanParameter(&_authenticationUnixSockets));\n#endif\n\n  // Maybe deprecate this option in devel\n  options\n      ->addOption(\"--server.jwt-secret\",\n                  \"secret to use when doing jwt authentication\",\n                  new StringParameter(&_jwtSecretProgramOption))\n      .setDeprecatedIn(30322)\n      .setDeprecatedIn(30402);\n\n  options->addOption(\n      \"--server.jwt-secret-keyfile\",\n      \"file containing jwt secret to use when doing jwt authentication.\",\n      new StringParameter(&_jwtSecretKeyfileProgramOption));\n\n  options->addOption(\n      \"--server.jwt-secret-folder\",\n      \"folder containing one or more jwt secret files to use for jwt \"\n      \"authentication. Files are sorted alphabetically: First secret \"\n      \"is used for signing + verifying JWT tokens. The latter secrets \"\n      \"are only used for verifying.\",\n      new StringParameter(&_jwtSecretFolderProgramOption),\n      arangodb::options::makeDefaultFlags(arangodb::options::Flags::Enterprise))\n      .setIntroducedIn(30700);\n}",
+  "code_after_change": "void AuthenticationFeature::collectOptions(std::shared_ptr<ProgramOptions> options) {\n  options->addOldOption(\"server.disable-authentication\",\n                        \"server.authentication\");\n  options->addOldOption(\"server.disable-authentication-unix-sockets\",\n                        \"server.authentication-unix-sockets\");\n  options->addOldOption(\"server.authenticate-system-only\",\n                        \"server.authentication-system-only\");\n  options->addOldOption(\"server.allow-method-override\",\n                        \"http.allow-method-override\");\n  options->addOldOption(\"server.hide-product-header\",\n                        \"http.hide-product-header\");\n  options->addOldOption(\"server.keep-alive-timeout\", \"http.keep-alive-timeout\");\n  options->addOldOption(\"server.default-api-compatibility\", \"\");\n  options->addOldOption(\"no-server\", \"server.rest-server\");\n\n  options->addOption(\"--server.authentication\",\n                     \"enable authentication for ALL client requests\",\n                     new BooleanParameter(&_active));\n\n  options->addOption(\n      \"--server.authentication-timeout\",\n      \"timeout for the authentication cache in seconds (0 = indefinitely)\",\n      new DoubleParameter(&_authenticationTimeout));\n  \n  options->addOption(\"--server.session-timeout\",\n                     \"timeout in seconds for web interface JWT sessions\",\n                     new DoubleParameter(&_sessionTimeout),\n                     arangodb::options::makeFlags(\n                       arangodb::options::Flags::DefaultNoComponents,\n                       arangodb::options::Flags::OnCoordinator,\n                       arangodb::options::Flags::OnSingle))\n                     .setIntroducedIn(30900);\n\n  options->addOption(\"--server.local-authentication\",\n                     \"enable authentication using the local user database\",\n                     new BooleanParameter(&_localAuthentication),\n                     arangodb::options::makeFlags(\n                       arangodb::options::Flags::DefaultNoComponents,\n                       arangodb::options::Flags::OnCoordinator,\n                       arangodb::options::Flags::OnSingle));\n\n  options->addOption(\n      \"--server.authentication-system-only\",\n      \"use HTTP authentication only for requests to /_api and /_admin\",\n      new BooleanParameter(&_authenticationSystemOnly));\n\n#ifdef ARANGODB_HAVE_DOMAIN_SOCKETS\n  options->addOption(\"--server.authentication-unix-sockets\",\n                     \"authentication for requests via UNIX domain sockets\",\n                     new BooleanParameter(&_authenticationUnixSockets),\n                     arangodb::options::makeFlags(\n                       arangodb::options::Flags::DefaultNoOs,\n                       arangodb::options::Flags::OsLinux,\n                       arangodb::options::Flags::OsMac));\n#endif\n\n  options\n      ->addOption(\"--server.jwt-secret\",\n                  \"secret to use when doing jwt authentication\",\n                  new StringParameter(&_jwtSecretProgramOption))\n      .setDeprecatedIn(30322)\n      .setDeprecatedIn(30402);\n\n  options->addOption(\n      \"--server.jwt-secret-keyfile\",\n      \"file containing jwt secret to use when doing jwt authentication.\",\n      new StringParameter(&_jwtSecretKeyfileProgramOption));\n\n  options->addOption(\n      \"--server.jwt-secret-folder\",\n      \"folder containing one or more jwt secret files to use for jwt \"\n      \"authentication. Files are sorted alphabetically: First secret \"\n      \"is used for signing + verifying JWT tokens. The latter secrets \"\n      \"are only used for verifying.\",\n      new StringParameter(&_jwtSecretFolderProgramOption),\n      arangodb::options::makeDefaultFlags(arangodb::options::Flags::Enterprise))\n      .setIntroducedIn(30700);\n}",
+  "function_modified_lines": {
+    "added": [
+      "  options->addOption(\"--server.session-timeout\",",
+      "                     \"timeout in seconds for web interface JWT sessions\",",
+      "                     new DoubleParameter(&_sessionTimeout),",
+      "                     arangodb::options::makeFlags(",
+      "                       arangodb::options::Flags::DefaultNoComponents,",
+      "                       arangodb::options::Flags::OnCoordinator,",
+      "                       arangodb::options::Flags::OnSingle))",
+      "                     .setIntroducedIn(30900);",
+      "                     new BooleanParameter(&_localAuthentication),",
+      "                     arangodb::options::makeFlags(",
+      "                       arangodb::options::Flags::DefaultNoComponents,",
+      "                       arangodb::options::Flags::OnCoordinator,",
+      "                       arangodb::options::Flags::OnSingle));",
+      "                     new BooleanParameter(&_authenticationUnixSockets),",
+      "                     arangodb::options::makeFlags(",
+      "                       arangodb::options::Flags::DefaultNoOs,",
+      "                       arangodb::options::Flags::OsLinux,",
+      "                       arangodb::options::Flags::OsMac));"
+    ],
+    "deleted": [
+      "                     new BooleanParameter(&_localAuthentication));",
+      "                     new BooleanParameter(&_authenticationUnixSockets));",
+      "  // Maybe deprecate this option in devel"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "In ArangoDB, versions v3.7.6 through v3.8.3 are vulnerable to Insufficient Session Expiration. When a user’s password is changed by the administrator, the session isn’t invalidated, allowing a malicious user to still be logged in and perform arbitrary actions within the system.",
+  "id": 1688
+},
+{
+  "cve_id": "CVE-2021-25940",
+  "code_before_change": "AuthenticationFeature::AuthenticationFeature(application_features::ApplicationServer& server)\n    : ApplicationFeature(server, \"Authentication\"),\n      _userManager(nullptr),\n      _authCache(nullptr),\n      _authenticationUnixSockets(true),\n      _authenticationSystemOnly(true),\n      _localAuthentication(true),\n      _active(true),\n      _authenticationTimeout(0.0) {\n  setOptional(false);\n  startsAfter<application_features::BasicFeaturePhaseServer>();\n\n#ifdef USE_ENTERPRISE\n  startsAfter<LdapFeature>();\n#endif\n}",
+  "code_after_change": "AuthenticationFeature::AuthenticationFeature(application_features::ApplicationServer& server)\n    : ApplicationFeature(server, \"Authentication\"),\n      _userManager(nullptr),\n      _authCache(nullptr),\n      _authenticationUnixSockets(true),\n      _authenticationSystemOnly(true),\n      _localAuthentication(true),\n      _active(true),\n      _authenticationTimeout(0.0),\n      _sessionTimeout(static_cast<double>(1 * std::chrono::hours(1) / std::chrono::seconds(1))) { // 1 hour\n  setOptional(false);\n  startsAfter<application_features::BasicFeaturePhaseServer>();\n\n#ifdef USE_ENTERPRISE\n  startsAfter<LdapFeature>();\n#endif\n}",
+  "function_modified_lines": {
+    "added": [
+      "      _authenticationTimeout(0.0),",
+      "      _sessionTimeout(static_cast<double>(1 * std::chrono::hours(1) / std::chrono::seconds(1))) { // 1 hour"
+    ],
+    "deleted": [
+      "      _authenticationTimeout(0.0) {"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "In ArangoDB, versions v3.7.6 through v3.8.3 are vulnerable to Insufficient Session Expiration. When a user’s password is changed by the administrator, the session isn’t invalidated, allowing a malicious user to still be logged in and perform arbitrary actions within the system.",
+  "id": 1689
+},
+{
+  "cve_id": "CVE-2021-25940",
+  "code_before_change": "RestStatus RestAuthHandler::execute() {\n  auto const type = _request->requestType();\n  if (type != rest::RequestType::POST) {\n    generateError(rest::ResponseCode::METHOD_NOT_ALLOWED, TRI_ERROR_HTTP_METHOD_NOT_ALLOWED);\n    return RestStatus::DONE;\n  }\n\n  bool parseSuccess = false;\n  VPackSlice slice = this->parseVPackBody(parseSuccess);\n  if (!parseSuccess) { // error already set\n    return RestStatus::DONE;\n  }\n\n  if (!slice.isObject()) {\n    return badRequest();\n  }\n\n  VPackSlice usernameSlice = slice.get(\"username\");\n  VPackSlice passwordSlice = slice.get(\"password\");\n\n  if (!usernameSlice.isString() || !passwordSlice.isString()) {\n    return badRequest();\n  }\n\n  _username = usernameSlice.copyString();\n  std::string const password = passwordSlice.copyString();\n\n  auth::UserManager* um = AuthenticationFeature::instance()->userManager();\n  if (um == nullptr) {\n    std::string msg = \"This server does not support users\";\n    LOG_TOPIC(\"2e7d4\", ERR, Logger::AUTHENTICATION) << msg;\n    generateError(rest::ResponseCode::UNAUTHORIZED, TRI_ERROR_HTTP_UNAUTHORIZED, msg);\n  } else if (um->checkPassword(_username, password)) {\n    VPackBuilder resultBuilder;\n    {\n      VPackObjectBuilder b(&resultBuilder);\n      std::string jwt = generateJwt(_username, password);\n      resultBuilder.add(\"jwt\", VPackValue(jwt));\n    }\n\n    _isValid = true;\n    generateDocument(resultBuilder.slice(), true, &VPackOptions::Defaults);\n  } else {\n    // mop: rfc 2616 10.4.2 (if credentials wrong 401)\n    generateError(rest::ResponseCode::UNAUTHORIZED, TRI_ERROR_HTTP_UNAUTHORIZED,\n                  \"Wrong credentials\");\n  }\n  return RestStatus::DONE;\n}",
+  "code_after_change": "RestStatus RestAuthHandler::execute() {\n  auto const type = _request->requestType();\n  if (type != rest::RequestType::POST) {\n    generateError(rest::ResponseCode::METHOD_NOT_ALLOWED, TRI_ERROR_HTTP_METHOD_NOT_ALLOWED);\n    return RestStatus::DONE;\n  }\n\n  bool parseSuccess = false;\n  VPackSlice slice = this->parseVPackBody(parseSuccess);\n  if (!parseSuccess) { // error already set\n    return RestStatus::DONE;\n  }\n\n  if (!slice.isObject()) {\n    return badRequest();\n  }\n\n  VPackSlice usernameSlice = slice.get(\"username\");\n  VPackSlice passwordSlice = slice.get(\"password\");\n\n  if (!usernameSlice.isString() || !passwordSlice.isString()) {\n    return badRequest();\n  }\n\n  std::string const username = usernameSlice.copyString();\n  std::string const password = passwordSlice.copyString();\n\n  bool isValid = false;\n\n  auto guard = scopeGuard([&]() {\n    try {\n      if (isValid) {\n        events::LoggedIn(*_request, username);\n      } else {\n        events::CredentialsBad(*_request, username);\n      }\n    } catch (...) {\n      // nothing we can do\n    }\n  });\n  \n  auth::UserManager* um = AuthenticationFeature::instance()->userManager();\n  if (um == nullptr) {\n    std::string msg = \"This server does not support users\";\n    LOG_TOPIC(\"2e7d4\", ERR, Logger::AUTHENTICATION) << msg;\n    generateError(rest::ResponseCode::UNAUTHORIZED, TRI_ERROR_HTTP_UNAUTHORIZED, msg);\n  } else if (um->checkPassword(username, password)) {\n    VPackBuilder resultBuilder;\n    {\n      VPackObjectBuilder b(&resultBuilder);\n      resultBuilder.add(\"jwt\", VPackValue(generateJwt(username)));\n    }\n\n    isValid = true;\n    generateDocument(resultBuilder.slice(), true, &VPackOptions::Defaults);\n  } else {\n    // mop: rfc 2616 10.4.2 (if credentials wrong 401)\n    generateError(rest::ResponseCode::UNAUTHORIZED, TRI_ERROR_HTTP_UNAUTHORIZED,\n                  \"Wrong credentials\");\n  }\n  return RestStatus::DONE;\n}",
+  "function_modified_lines": {
+    "added": [
+      "  std::string const username = usernameSlice.copyString();",
+      "  bool isValid = false;",
+      "  auto guard = scopeGuard([&]() {",
+      "    try {",
+      "      if (isValid) {",
+      "        events::LoggedIn(*_request, username);",
+      "      } else {",
+      "        events::CredentialsBad(*_request, username);",
+      "      }",
+      "    } catch (...) {",
+      "      // nothing we can do",
+      "    }",
+      "  });",
+      "  } else if (um->checkPassword(username, password)) {",
+      "      resultBuilder.add(\"jwt\", VPackValue(generateJwt(username)));",
+      "    isValid = true;"
+    ],
+    "deleted": [
+      "  _username = usernameSlice.copyString();",
+      "  } else if (um->checkPassword(_username, password)) {",
+      "      std::string jwt = generateJwt(_username, password);",
+      "      resultBuilder.add(\"jwt\", VPackValue(jwt));",
+      "    _isValid = true;"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "In ArangoDB, versions v3.7.6 through v3.8.3 are vulnerable to Insufficient Session Expiration. When a user’s password is changed by the administrator, the session isn’t invalidated, allowing a malicious user to still be logged in and perform arbitrary actions within the system.",
+  "id": 1690
+},
+{
+  "cve_id": "CVE-2021-25940",
+  "code_before_change": "RestAuthHandler::RestAuthHandler(application_features::ApplicationServer& server,\n                                 GeneralRequest* request, GeneralResponse* response)\n    : RestVocbaseBaseHandler(server, request, response),\n      _validFor(60 * 60 * 24 * 30) {}",
+  "code_after_change": "RestAuthHandler::RestAuthHandler(application_features::ApplicationServer& server,\n                                 GeneralRequest* request, GeneralResponse* response)\n    : RestVocbaseBaseHandler(server, request, response) {}",
+  "function_modified_lines": {
+    "added": [
+      "    : RestVocbaseBaseHandler(server, request, response) {}"
+    ],
+    "deleted": [
+      "    : RestVocbaseBaseHandler(server, request, response),",
+      "      _validFor(60 * 60 * 24 * 30) {}"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "In ArangoDB, versions v3.7.6 through v3.8.3 are vulnerable to Insufficient Session Expiration. When a user’s password is changed by the administrator, the session isn’t invalidated, allowing a malicious user to still be logged in and perform arbitrary actions within the system.",
+  "id": 1691
+},
+{
+  "cve_id": "CVE-2021-25940",
+  "code_before_change": "std::string RestAuthHandler::generateJwt(std::string const& username,\n                                         std::string const& password) {\n  AuthenticationFeature* af = AuthenticationFeature::instance();\n  TRI_ASSERT(af != nullptr);\n  return fuerte::jwt::generateUserToken(af->tokenCache().jwtSecret(), username, _validFor);\n}",
+  "code_after_change": "std::string RestAuthHandler::generateJwt(std::string const& username) const {\n  AuthenticationFeature* af = AuthenticationFeature::instance();\n  TRI_ASSERT(af != nullptr);\n  return fuerte::jwt::generateUserToken(\n      af->tokenCache().jwtSecret(), \n      username, \n      std::chrono::seconds(uint64_t(af->sessionTimeout())));\n}",
+  "function_modified_lines": {
+    "added": [
+      "std::string RestAuthHandler::generateJwt(std::string const& username) const {",
+      "  AuthenticationFeature* af = AuthenticationFeature::instance();",
+      "  TRI_ASSERT(af != nullptr);",
+      "  return fuerte::jwt::generateUserToken(",
+      "      af->tokenCache().jwtSecret(),",
+      "      username,",
+      "      std::chrono::seconds(uint64_t(af->sessionTimeout())));",
+      "}"
+    ],
+    "deleted": [
+      "std::string RestAuthHandler::generateJwt(std::string const& username,",
+      "                                         std::string const& password) {",
+      "  AuthenticationFeature* af = AuthenticationFeature::instance();",
+      "  TRI_ASSERT(af != nullptr);",
+      "  return fuerte::jwt::generateUserToken(af->tokenCache().jwtSecret(), username, _validFor);",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "In ArangoDB, versions v3.7.6 through v3.8.3 are vulnerable to Insufficient Session Expiration. When a user’s password is changed by the administrator, the session isn’t invalidated, allowing a malicious user to still be logged in and perform arbitrary actions within the system.",
+  "id": 1692
+},
+{
+  "cve_id": "CVE-2021-25940",
+  "code_before_change": "void RestAuthHandler::shutdownExecute(bool isFinalized) noexcept {\n  try {\n    if (_isValid) {\n      events::LoggedIn(*_request, _username);\n    } else {\n      events::CredentialsBad(*_request, _username);\n    }\n  } catch (...) {\n  }\n  RestVocbaseBaseHandler::shutdownExecute(isFinalized);\n}",
+  "code_after_change": "  AuthenticationFeature* af = AuthenticationFeature::instance();\n  TRI_ASSERT(af != nullptr);\n  return fuerte::jwt::generateUserToken(\n      af->tokenCache().jwtSecret(), \n      username, \n      std::chrono::seconds(uint64_t(af->sessionTimeout())));\n}\n\nRestStatus RestAuthHandler::badRequest() {\n  generateError(rest::ResponseCode::BAD, TRI_ERROR_HTTP_BAD_PARAMETER,\n                \"invalid JSON\");",
+  "function_modified_lines": {
+    "added": [
+      "  AuthenticationFeature* af = AuthenticationFeature::instance();",
+      "  TRI_ASSERT(af != nullptr);",
+      "  return fuerte::jwt::generateUserToken(",
+      "      af->tokenCache().jwtSecret(),",
+      "      username,",
+      "      std::chrono::seconds(uint64_t(af->sessionTimeout())));",
+      "}"
+    ],
+    "deleted": [
+      "void RestAuthHandler::shutdownExecute(bool isFinalized) noexcept {",
+      "  try {",
+      "    if (_isValid) {",
+      "      events::LoggedIn(*_request, _username);",
+      "    } else {",
+      "      events::CredentialsBad(*_request, _username);",
+      "    }",
+      "  } catch (...) {",
+      "  }",
+      "  RestVocbaseBaseHandler::shutdownExecute(isFinalized);",
+      "}"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "In ArangoDB, versions v3.7.6 through v3.8.3 are vulnerable to Insufficient Session Expiration. When a user’s password is changed by the administrator, the session isn’t invalidated, allowing a malicious user to still be logged in and perform arbitrary actions within the system.",
+  "id": 1693
+},
+{
+  "cve_id": "CVE-2021-25940",
+  "code_before_change": "void ServerFeature::collectOptions(std::shared_ptr<ProgramOptions> options) {\n  options->addOption(\"--console\", \"start a JavaScript emergency console\",\n                     new BooleanParameter(&_console));\n\n  options->addSection(\"server\", \"server features\");\n\n  options->addOption(\"--server.rest-server\", \"start a rest-server\",\n                     new BooleanParameter(&_restServer),\n                     arangodb::options::makeDefaultFlags(arangodb::options::Flags::Hidden));\n  \n  options->addOption(\"--server.validate-utf8-strings\", \"perform UTF-8 string validation for incoming JSON and VelocyPack data\",\n                     new BooleanParameter(&_validateUtf8Strings),\n                     arangodb::options::makeDefaultFlags(arangodb::options::Flags::Hidden)).setIntroducedIn(30700);\n\n  options->addOption(\"--javascript.script\", \"run scripts and exit\",\n                     new VectorParameter<StringParameter>(&_scripts));\n\n#if _WIN32\n  options->addOption(\"--console.code-page\",\n                     \"Windows code page to use; defaults to UTF8\",\n                     new UInt16Parameter(&_codePage),\n                     arangodb::options::makeDefaultFlags(arangodb::options::Flags::Hidden));\n#endif\n\n  // add several obsoleted options here\n  options->addSection(\"vst\", \"VelocyStream protocol\", \"\", true, true);\n  options->addObsoleteOption(\"--vst.maxsize\", \"maximal size (in bytes) \"\n                             \"for a VelocyPack chunk\", true);\n  \n  options->addObsoleteOption(\n      \"--server.session-timeout\",\n      \"timeout of web interface server sessions (in seconds)\", true);\n\n  // add obsolete MMFiles WAL options (obsoleted in 3.7)\n  options->addSection(\"wal\", \"WAL of the MMFiles engine\", \"\", true, true);\n  options->addObsoleteOption(\"--wal.allow-oversize-entries\",\n                             \"allow entries that are bigger than '--wal.logfile-size'\", false);\n  options->addObsoleteOption(\"--wal.use-mlock\",\n                             \"mlock WAL logfiles in memory (may require elevated privileges or limits)\", false);\n  options->addObsoleteOption(\"--wal.directory\", \"logfile directory\", true);\n  options->addObsoleteOption(\"--wal.historic-logfiles\", \"maximum number of historic logfiles to keep after collection\", true);\n  options->addObsoleteOption(\"--wal.ignore-logfile-errors\", \n                             \"ignore logfile errors. this will read recoverable data from corrupted logfiles but ignore any unrecoverable data\", false);\n  options->addObsoleteOption(\"--wal.ignore-recovery-errors\", \"continue recovery even if re-applying operations fails\", false);\n  options->addObsoleteOption(\"--wal.flush-timeout\", \"flush timeout (in milliseconds)\", true);\n  options->addObsoleteOption(\"--wal.logfile-size\", \"size of each logfile (in bytes)\", true);\n  options->addObsoleteOption(\"--wal.open-logfiles\", \"maximum number of parallel open logfiles\", true);\n  options->addObsoleteOption(\"--wal.reserve-logfiles\", \"maximum number of reserve logfiles to maintain\", true);\n  options->addObsoleteOption(\"--wal.slots\", \"number of logfile slots to use\", true);\n  options->addObsoleteOption(\"--wal.sync-interval\", \"interval for automatic, non-requested disk syncs (in milliseconds)\", true);\n  options->addObsoleteOption(\"--wal.throttle-when-pending\", \n                             \"throttle writes when at least this many operations are waiting for collection (set to 0 to deactivate write-throttling)\", true);\n  options->addObsoleteOption(\"--wal.throttle-wait\", \"maximum wait time per operation when write-throttled (in milliseconds)\", true);\n}",
+  "code_after_change": "void ServerFeature::collectOptions(std::shared_ptr<ProgramOptions> options) {\n  options->addOption(\"--console\", \"start a JavaScript emergency console\",\n                     new BooleanParameter(&_console));\n\n  options->addSection(\"server\", \"server features\");\n\n  options->addOption(\"--server.rest-server\", \"start a rest-server\",\n                     new BooleanParameter(&_restServer),\n                     arangodb::options::makeDefaultFlags(arangodb::options::Flags::Hidden));\n  \n  options->addOption(\"--server.validate-utf8-strings\", \"perform UTF-8 string validation for incoming JSON and VelocyPack data\",\n                     new BooleanParameter(&_validateUtf8Strings),\n                     arangodb::options::makeDefaultFlags(arangodb::options::Flags::Hidden)).setIntroducedIn(30700);\n\n  options->addOption(\"--javascript.script\", \"run scripts and exit\",\n                     new VectorParameter<StringParameter>(&_scripts));\n\n#if _WIN32\n  options->addOption(\"--console.code-page\",\n                     \"Windows code page to use; defaults to UTF8\",\n                     new UInt16Parameter(&_codePage),\n                     arangodb::options::makeDefaultFlags(arangodb::options::Flags::Hidden));\n#endif\n\n  // add several obsoleted options here\n  options->addSection(\"vst\", \"VelocyStream protocol\", \"\", true, true);\n  options->addObsoleteOption(\"--vst.maxsize\", \"maximal size (in bytes) \"\n                             \"for a VelocyPack chunk\", true);\n  \n  // add obsolete MMFiles WAL options (obsoleted in 3.7)\n  options->addSection(\"wal\", \"WAL of the MMFiles engine\", \"\", true, true);\n  options->addObsoleteOption(\"--wal.allow-oversize-entries\",\n                             \"allow entries that are bigger than '--wal.logfile-size'\", false);\n  options->addObsoleteOption(\"--wal.use-mlock\",\n                             \"mlock WAL logfiles in memory (may require elevated privileges or limits)\", false);\n  options->addObsoleteOption(\"--wal.directory\", \"logfile directory\", true);\n  options->addObsoleteOption(\"--wal.historic-logfiles\", \"maximum number of historic logfiles to keep after collection\", true);\n  options->addObsoleteOption(\"--wal.ignore-logfile-errors\", \n                             \"ignore logfile errors. this will read recoverable data from corrupted logfiles but ignore any unrecoverable data\", false);\n  options->addObsoleteOption(\"--wal.ignore-recovery-errors\", \"continue recovery even if re-applying operations fails\", false);\n  options->addObsoleteOption(\"--wal.flush-timeout\", \"flush timeout (in milliseconds)\", true);\n  options->addObsoleteOption(\"--wal.logfile-size\", \"size of each logfile (in bytes)\", true);\n  options->addObsoleteOption(\"--wal.open-logfiles\", \"maximum number of parallel open logfiles\", true);\n  options->addObsoleteOption(\"--wal.reserve-logfiles\", \"maximum number of reserve logfiles to maintain\", true);\n  options->addObsoleteOption(\"--wal.slots\", \"number of logfile slots to use\", true);\n  options->addObsoleteOption(\"--wal.sync-interval\", \"interval for automatic, non-requested disk syncs (in milliseconds)\", true);\n  options->addObsoleteOption(\"--wal.throttle-when-pending\", \n                             \"throttle writes when at least this many operations are waiting for collection (set to 0 to deactivate write-throttling)\", true);\n  options->addObsoleteOption(\"--wal.throttle-wait\", \"maximum wait time per operation when write-throttled (in milliseconds)\", true);\n}\n\nvoid ServerFeature::validateOptions(std::shared_ptr<ProgramOptions> options) {\n  int count = 0;\n",
+  "function_modified_lines": {
+    "added": [],
+    "deleted": [
+      "  options->addObsoleteOption(",
+      "      \"--server.session-timeout\",",
+      "      \"timeout of web interface server sessions (in seconds)\", true);"
+    ]
+  },
+  "cwe": [
+    "CWE-613"
+  ],
+  "cve_description": "In ArangoDB, versions v3.7.6 through v3.8.3 are vulnerable to Insufficient Session Expiration. When a user’s password is changed by the administrator, the session isn’t invalidated, allowing a malicious user to still be logged in and perform arbitrary actions within the system.",
+  "id": 1694
+}
+]

@@ -1,0 +1,27 @@
+[
+    {
+        "CVE_id": "CVE-2013-10006",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Insecure string comparison that allows timing attacks due to variable response times based on input similarity.",
+            "trigger_condition": "An attacker sends different authentication credentials and measures the response time to infer correctness, leading to potential credential leakage.",
+            "specific_code_behavior_causing_vulnerability": "The use of the equality operator for string comparison results in varying execution times based on how closely the strings match, which can be exploited by an attacker."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to implement a timing-resistant string comparison function that ensures the comparison takes a constant amount of time regardless of the input values. This prevents attackers from gaining information based on response time and protects against timing attacks.",
+        "purpose": "\"The function HTTPAuthorized checks if the provided HTTP authorization header contains valid Basic authentication credentials by decoding and comparing them to a predefined user-password string.\"",
+        "function": "1. Checks if the \"authorization\" header starts with \"Basic \".  \n2. Extracts and trims the Base64 encoded user credentials from the authorization header.  \n3. Decodes the Base64 string and compares it to a predefined user-password string for authentication.",
+        "analysis": "The modification to the `HTTPAuthorized` function is necessary to mitigate a timing attack vulnerability, specifically CVE-2013-10006. Here's a breakdown of why the change is important:\n\n### Timing Attacks\nTiming attacks exploit the time it takes for a system to respond to different inputs. In the original code, the comparison of `strUserPass` and `strRPCUserColonPass` is done using the `==` operator. This operator can lead to timing discrepancies based on how similar the two strings are:\n\n- If the two strings are equal, the comparison will complete quickly.\n- If they differ, the comparison will take longer, especially if the difference occurs early in the string.\n\nAn attacker can use this information to infer whether parts of the input (like the username or password) are correct or incorrect based on the response time. This can allow them to gradually guess the correct credentials.\n\n### The Modification\nThe modification replaces the direct comparison with a function called `TimingResistantEqual`. This function is designed to compare two strings in a way that takes a constant amount of time, regardless of how similar the strings are. This means that:\n\n- The time taken to compare the strings does not reveal any information about their contents.\n- An attacker cannot gain any advantage by measuring the response time, making it significantly harder to exploit the vulnerability.\n\n### Conclusion\nBy implementing `TimingResistantEqual`, the code becomes resistant to timing attacks, thereby enhancing the security of the authentication process. This change is crucial for protecting sensitive information and ensuring that the system is not vulnerable to exploitation through timing discrepancies.",
+        "code_before_change": "bool HTTPAuthorized(map<string, string>& mapHeaders)\n{\n    string strAuth = mapHeaders[\"authorization\"];\n    if (strAuth.substr(0,6) != \"Basic \")\n        return false;\n    string strUserPass64 = strAuth.substr(6); boost::trim(strUserPass64);\n    string strUserPass = DecodeBase64(strUserPass64);\n    return strUserPass == strRPCUserColonPass;\n}",
+        "code_after_change": "bool HTTPAuthorized(map<string, string>& mapHeaders)\n{\n    string strAuth = mapHeaders[\"authorization\"];\n    if (strAuth.substr(0,6) != \"Basic \")\n        return false;\n    string strUserPass64 = strAuth.substr(6); boost::trim(strUserPass64);\n    string strUserPass = DecodeBase64(strUserPass64);\n    return TimingResistantEqual(strUserPass, strRPCUserColonPass);\n}",
+        "modified_lines": {
+            "added": [
+                "    return TimingResistantEqual(strUserPass, strRPCUserColonPass);"
+            ],
+            "deleted": [
+                "    return strUserPass == strRPCUserColonPass;"
+            ]
+        },
+        "vulnerability_cause_description": "Insecure string comparison that allows timing attacks due to variable response times based on input similarity.",
+        "trigger_condition": "An attacker sends different authentication credentials and measures the response time to infer correctness, leading to potential credential leakage.",
+        "specific_code_behavior_causing_vulnerability": "The use of the equality operator for string comparison results in varying execution times based on how closely the strings match, which can be exploited by an attacker."
+    }
+]

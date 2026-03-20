@@ -1,0 +1,92 @@
+[
+{
+  "cve_id": "CVE-2018-1000052",
+  "code_before_change": "  BasicWriter<Char>::prepare_int_buffer(\n    unsigned num_digits, const Spec &spec,\n    const char *prefix, unsigned prefix_size) {\n  unsigned width = spec.width();\n  Alignment align = spec.align();\n  Char fill = internal::CharTraits<Char>::cast(spec.fill());\n  if (spec.precision() > static_cast<int>(num_digits)) {\n    // Octal prefix '0' is counted as a digit, so ignore it if precision\n    // is specified.\n    if (prefix_size > 0 && prefix[prefix_size - 1] == '0')\n      --prefix_size;\n    unsigned number_size =\n        prefix_size + internal::to_unsigned(spec.precision());\n    AlignSpec subspec(number_size, '0', ALIGN_NUMERIC);\n    if (number_size >= width)\n      return prepare_int_buffer(num_digits, subspec, prefix, prefix_size);\n    buffer_.reserve(width);\n    unsigned fill_size = width - number_size;\n    if (align != ALIGN_LEFT) {\n      CharPtr p = grow_buffer(fill_size);\n      std::uninitialized_fill(p, p + fill_size, fill);\n    }\n    CharPtr result = prepare_int_buffer(\n        num_digits, subspec, prefix, prefix_size);\n    if (align == ALIGN_LEFT) {\n      CharPtr p = grow_buffer(fill_size);\n      std::uninitialized_fill(p, p + fill_size, fill);\n    }\n    return result;\n  }\n  unsigned size = prefix_size + num_digits;\n  if (width <= size) {\n    CharPtr p = grow_buffer(size);\n    std::uninitialized_copy(prefix, prefix + prefix_size, p);\n    return p + size - 1;\n  }\n  CharPtr p = grow_buffer(width);\n  CharPtr end = p + width;\n  if (align == ALIGN_LEFT) {\n    std::uninitialized_copy(prefix, prefix + prefix_size, p);\n    p += size;\n    std::uninitialized_fill(p, end, fill);\n  } else if (align == ALIGN_CENTER) {\n    p = fill_padding(p, width, size, fill);\n    std::uninitialized_copy(prefix, prefix + prefix_size, p);\n    p += size;\n  } else {\n    if (align == ALIGN_NUMERIC) {\n      if (prefix_size != 0) {\n        p = std::uninitialized_copy(prefix, prefix + prefix_size, p);\n        size -= prefix_size;\n      }\n    } else {\n      std::uninitialized_copy(prefix, prefix + prefix_size, end - size);\n    }\n    std::uninitialized_fill(p, end - size, fill);\n    p = end;\n  }\n  return p - 1;\n}",
+  "code_after_change": "  BasicWriter<Char>::prepare_int_buffer(\n    unsigned num_digits, const Spec &spec,\n    const char *prefix, unsigned prefix_size) {\n  unsigned width = spec.width();\n  Alignment align = spec.align();\n  Char fill = internal::CharTraits<Char>::cast(spec.fill());\n  if (spec.precision() > static_cast<int>(num_digits)) {\n    // Octal prefix '0' is counted as a digit, so ignore it if precision\n    // is specified.\n    if (prefix_size > 0 && prefix[prefix_size - 1] == '0')\n      --prefix_size;\n    unsigned number_size =\n        prefix_size + internal::to_unsigned(spec.precision());\n    AlignSpec subspec(number_size, '0', ALIGN_NUMERIC);\n    if (number_size >= width)\n      return prepare_int_buffer(num_digits, subspec, prefix, prefix_size);\n    buffer_.reserve(width);\n    unsigned fill_size = width - number_size;\n    if (align != ALIGN_LEFT) {\n      CharPtr p = grow_buffer(fill_size);\n      std::uninitialized_fill(p, p + fill_size, fill);\n    }\n    std::ptrdiff_t offset = get(prepare_int_buffer(\n        num_digits, subspec, prefix, prefix_size)) - &buffer_[0];\n    if (align == ALIGN_LEFT) {\n      CharPtr p = grow_buffer(fill_size);\n      std::uninitialized_fill(p, p + fill_size, fill);\n    }\n    return internal::make_ptr(&buffer_[0], buffer_.size()) + offset;\n  }\n  unsigned size = prefix_size + num_digits;\n  if (width <= size) {\n    CharPtr p = grow_buffer(size);\n    std::uninitialized_copy(prefix, prefix + prefix_size, p);\n    return p + size - 1;\n  }\n  CharPtr p = grow_buffer(width);\n  CharPtr end = p + width;\n  if (align == ALIGN_LEFT) {\n    std::uninitialized_copy(prefix, prefix + prefix_size, p);\n    p += size;\n    std::uninitialized_fill(p, end, fill);\n  } else if (align == ALIGN_CENTER) {\n    p = fill_padding(p, width, size, fill);\n    std::uninitialized_copy(prefix, prefix + prefix_size, p);\n    p += size;\n  } else {\n    if (align == ALIGN_NUMERIC) {\n      if (prefix_size != 0) {\n        p = std::uninitialized_copy(prefix, prefix + prefix_size, p);\n        size -= prefix_size;\n      }\n    } else {\n      std::uninitialized_copy(prefix, prefix + prefix_size, end - size);\n    }\n    std::uninitialized_fill(p, end - size, fill);\n    p = end;\n  }\n  return p - 1;\n}",
+  "function_modified_lines": {
+    "added": [
+      "    std::ptrdiff_t offset = get(prepare_int_buffer(",
+      "        num_digits, subspec, prefix, prefix_size)) - &buffer_[0];",
+      "    return internal::make_ptr(&buffer_[0], buffer_.size()) + offset;"
+    ],
+    "deleted": [
+      "    CharPtr result = prepare_int_buffer(",
+      "        num_digits, subspec, prefix, prefix_size);",
+      "    return result;"
+    ]
+  },
+  "cwe": [
+    "CWE-134"
+  ],
+  "cve_description": "fmtlib version prior to version 4.1.0 (before commit 0555cea5fc0bf890afe0071a558e44625a34ba85) contains a Memory corruption (SIGSEGV), CWE-134 vulnerability in fmt::print() library function that can result in Denial of Service. This attack appear to be exploitable via Specifying an invalid format specifier in the fmt::print() function results in a SIGSEGV (memory corruption, invalid write). This vulnerability appears to have been fixed in after commit 8cf30aa2be256eba07bb1cefb998c52326e846e7.",
+  "id": 661
+},
+{
+  "cve_id": "CVE-2020-15203",
+  "code_before_change": "  explicit AsStringOp(OpKernelConstruction* ctx) : OpKernel(ctx) {\n    int32 precision;\n    bool scientific;\n    bool shortest;\n    int32 width;\n    string fill_string;\n    DataType dtype;\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"T\", &dtype));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"precision\", &precision));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"scientific\", &scientific));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"shortest\", &shortest));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"width\", &width));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"fill\", &fill_string));\n    switch (dtype) {\n      case DT_FLOAT:\n      case DT_DOUBLE:\n      case DT_COMPLEX64:\n      case DT_COMPLEX128:\n        break;\n      default:\n        OP_REQUIRES(ctx, !(scientific || shortest),\n                    errors::InvalidArgument(\"scientific and shortest format \"\n                                            \"not supported for datatype \",\n                                            DataTypeString(dtype)));\n        OP_REQUIRES(ctx, precision < 0,\n                    errors::InvalidArgument(\"precision not supported \"\n                                            \"for datatype \",\n                                            DataTypeString(dtype)));\n    }\n    OP_REQUIRES(\n        ctx, fill_string.size() <= 1,\n        errors::InvalidArgument(\"Fill string must be one or fewer characters\"));\n    OP_REQUIRES(ctx, !(scientific && shortest),\n                errors::InvalidArgument(\n                    \"Cannot select both scientific and shortest notation\"));\n    format_ = \"%\";\n    if (width > -1) {\n      strings::Appendf(&format_, \"%s%d\", fill_string.c_str(), width);\n    }\n    if (precision > -1) {\n      strings::Appendf(&format_, \".%d\", precision);\n    }\n    switch (dtype) {\n      case DT_INT8:\n      case DT_INT16:\n      case DT_INT32:\n        strings::Appendf(&format_, \"d\");\n        break;\n      case DT_INT64:\n        strings::Appendf(&format_, \"lld\");\n        break;\n      case DT_FLOAT:\n      case DT_DOUBLE:\n      case DT_COMPLEX64:\n      case DT_COMPLEX128:\n        if (shortest) {\n          strings::Appendf(&format_, \"g\");\n        } else if (scientific) {\n          strings::Appendf(&format_, \"e\");\n        } else {\n          strings::Appendf(&format_, \"f\");\n        }\n        break;\n      case DT_BOOL:\n        break;\n      default:\n        bool type_not_supported = true;\n        OP_REQUIRES(ctx, !type_not_supported,\n                    errors::InvalidArgument(\"Type not supported: \",\n                                            DataTypeString(dtype)));\n    }\n\n    if (dtype == DT_COMPLEX64 || dtype == DT_COMPLEX128) {\n      format_ = strings::Printf(\"(%s,%s)\", format_.c_str(), format_.c_str());\n    }\n  }",
+  "code_after_change": "  explicit AsStringOp(OpKernelConstruction* ctx) : OpKernel(ctx) {\n    int32 precision;\n    bool scientific;\n    bool shortest;\n    int32 width;\n    string fill_string;\n    DataType dtype;\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"T\", &dtype));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"precision\", &precision));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"scientific\", &scientific));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"shortest\", &shortest));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"width\", &width));\n    OP_REQUIRES_OK(ctx, ctx->GetAttr(\"fill\", &fill_string));\n    switch (dtype) {\n      case DT_FLOAT:\n      case DT_DOUBLE:\n      case DT_COMPLEX64:\n      case DT_COMPLEX128:\n        break;\n      default:\n        OP_REQUIRES(ctx, !(scientific || shortest),\n                    errors::InvalidArgument(\"scientific and shortest format \"\n                                            \"not supported for datatype \",\n                                            DataTypeString(dtype)));\n        OP_REQUIRES(ctx, precision < 0,\n                    errors::InvalidArgument(\"precision not supported \"\n                                            \"for datatype \",\n                                            DataTypeString(dtype)));\n    }\n    OP_REQUIRES(\n        ctx, fill_string.size() <= 1,\n        errors::InvalidArgument(\"Fill string must be one or fewer characters\"));\n    OP_REQUIRES(ctx, !(scientific && shortest),\n                errors::InvalidArgument(\n                    \"Cannot select both scientific and shortest notation\"));\n\n    format_ = \"%\";\n    if (!fill_string.empty()) {\n      switch (fill_string[0]) {\n        case ' ':\n        case '+':\n        case '-':\n        case '0':\n        case '#':\n          strings::Appendf(&format_, \"%s\", fill_string.c_str());\n          break;\n        default:\n          bool fill_not_supported = true;\n          OP_REQUIRES(ctx, !fill_not_supported,\n                      errors::InvalidArgument(\"Fill argument not supported: \\\"\",\n                                              fill_string, \"\\\"\"));\n      }\n    }\n    if (width > -1) {\n      strings::Appendf(&format_, \"%d\", width);\n    }\n    if (precision > -1) {\n      strings::Appendf(&format_, \".%d\", precision);\n    }\n    switch (dtype) {\n      case DT_INT8:\n      case DT_INT16:\n      case DT_INT32:\n        strings::Appendf(&format_, \"d\");\n        break;\n      case DT_INT64:\n        strings::Appendf(&format_, \"lld\");\n        break;\n      case DT_FLOAT:\n      case DT_DOUBLE:\n      case DT_COMPLEX64:\n      case DT_COMPLEX128:\n        if (shortest) {\n          strings::Appendf(&format_, \"g\");\n        } else if (scientific) {\n          strings::Appendf(&format_, \"e\");\n        } else {\n          strings::Appendf(&format_, \"f\");\n        }\n        break;\n      case DT_BOOL:\n        break;\n      default:\n        bool type_not_supported = true;\n        OP_REQUIRES(ctx, !type_not_supported,\n                    errors::InvalidArgument(\"Type not supported: \",\n                                            DataTypeString(dtype)));\n    }\n\n    if (dtype == DT_COMPLEX64 || dtype == DT_COMPLEX128) {\n      format_ = strings::Printf(\"(%s,%s)\", format_.c_str(), format_.c_str());\n    }\n  }",
+  "function_modified_lines": {
+    "added": [
+      "    if (!fill_string.empty()) {",
+      "      switch (fill_string[0]) {",
+      "        case ' ':",
+      "        case '+':",
+      "        case '-':",
+      "        case '0':",
+      "        case '#':",
+      "          strings::Appendf(&format_, \"%s\", fill_string.c_str());",
+      "          break;",
+      "        default:",
+      "          bool fill_not_supported = true;",
+      "          OP_REQUIRES(ctx, !fill_not_supported,",
+      "                      errors::InvalidArgument(\"Fill argument not supported: \\\"\",",
+      "                                              fill_string, \"\\\"\"));",
+      "      }",
+      "    }",
+      "      strings::Appendf(&format_, \"%d\", width);"
+    ],
+    "deleted": [
+      "      strings::Appendf(&format_, \"%s%d\", fill_string.c_str(), width);"
+    ]
+  },
+  "cwe": [
+    "CWE-134"
+  ],
+  "cve_description": "In Tensorflow before versions 1.15.4, 2.0.3, 2.1.2, 2.2.1 and 2.3.1, by controlling the `fill` argument of tf.strings.as_string, a malicious attacker is able to trigger a format string vulnerability due to the way the internal format use in a `printf` call is constructed. This may result in segmentation fault. The issue is patched in commit 33be22c65d86256e6826666662e40dbdfe70ee83, and is released in TensorFlow versions 1.15.4, 2.0.3, 2.1.2, 2.2.1, or 2.3.1.",
+  "id": 662
+},
+{
+  "cve_id": "CVE-2021-41193",
+  "code_before_change": "CbrDetectorRemote::Result CbrDetectorRemote::Decrypt(cricket::MediaType media_type,\n\t\t\t\t\t\tconst std::vector<uint32_t>& csrcs,\n\t\t\t\t\t\trtc::ArrayView<const uint8_t> additional_data,\n\t\t\t\t\t\trtc::ArrayView<const uint8_t> encrypted_frame,\n\t\t\t\t\t\trtc::ArrayView<uint8_t> frame)\n{\n\tconst uint8_t *src = encrypted_frame.data();\n\tuint8_t *dst = frame.data();\n\tuint32_t data_len = encrypted_frame.size();\n\n\tif (media_type == cricket::MEDIA_TYPE_AUDIO) {\n\t\tif (data_len == frame_size && frame_size >= 40) {\n\t\t\tframe_count++;\n\t\t\tif (frame_count > 200 && !detected) {\n\t\t\t\tinfo(\"CBR detector: remote cbr detected\\n\");\n\t\t\t\tdetected = true;\n\t\t\t}\n\t\t}\n\t\telse {\n\t\t\tframe_count = 0;\n\t\t\tframe_size = data_len;\n\t\t\tif (detected) {\n\t\t\t\tinfo(\"CBR detector: remote cbr detected disabled\\n\");\n\t\t\t\tdetected = false;\n\t\t\t}\n\t\t}\n\n\t}\n\n\tmemcpy(dst, src, data_len);\n\nout:\n\treturn CbrDetectorRemote::Result(CbrDetectorRemote::Status::kOk, data_len);\n}",
+  "code_after_change": "CbrDetectorRemote::Result CbrDetectorRemote::Decrypt(cricket::MediaType media_type,\n\t\t\t\t\t\tconst std::vector<uint32_t>& csrcs,\n\t\t\t\t\t\trtc::ArrayView<const uint8_t> additional_data,\n\t\t\t\t\t\trtc::ArrayView<const uint8_t> encrypted_frame,\n\t\t\t\t\t\trtc::ArrayView<uint8_t> frame)\n{\n\tconst uint8_t *src = encrypted_frame.data();\n\tuint8_t *dst = frame.data();\n\tuint32_t data_len = encrypted_frame.size();\n\n\tif (media_type == cricket::MEDIA_TYPE_AUDIO) {\n\t\tif (data_len == frame_size && frame_size >= 40) {\n\t\t\tmissmatch_count = 0;\n\t\t\tframe_count++;\n\t\t\tif (frame_count > MIN_MATCH && !detected) {\n\t\t\t\tinfo(\"CBR detector: remote cbr detected\\n\");\n\t\t\t\tdetected = true;\n\t\t\t}\n\t\t}\n\t\telse {\n\t\t\tmissmatch_count++;\n\t\t\tif (!detected\n\t\t\t    || (detected && missmatch_count > MAX_MISSMATCH)) {\n\t\t\t\tframe_count = 0;\n\t\t\t\tframe_size = data_len;\n\t\t\t\tmissmatch_count = 0;\n\t\t\t\tif (detected) {\n\t\t\t\t\tinfo(\"CBR detector: remote cbr detected disabled\\n\");\n\t\t\t\t\tdetected = false;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\tmemcpy(dst, src, data_len);\n\nout:\n\treturn CbrDetectorRemote::Result(CbrDetectorRemote::Status::kOk, data_len);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\tmissmatch_count = 0;",
+      "\t\t\tif (frame_count > MIN_MATCH && !detected) {",
+      "\t\t\tmissmatch_count++;",
+      "\t\t\tif (!detected",
+      "\t\t\t    || (detected && missmatch_count > MAX_MISSMATCH)) {",
+      "\t\t\t\tframe_count = 0;",
+      "\t\t\t\tframe_size = data_len;",
+      "\t\t\t\tmissmatch_count = 0;",
+      "\t\t\t\tif (detected) {",
+      "\t\t\t\t\tinfo(\"CBR detector: remote cbr detected disabled\\n\");",
+      "\t\t\t\t\tdetected = false;",
+      "\t\t\t\t}"
+    ],
+    "deleted": [
+      "\t\t\tif (frame_count > 200 && !detected) {",
+      "\t\t\tframe_count = 0;",
+      "\t\t\tframe_size = data_len;",
+      "\t\t\tif (detected) {",
+      "\t\t\t\tinfo(\"CBR detector: remote cbr detected disabled\\n\");",
+      "\t\t\t\tdetected = false;"
+    ]
+  },
+  "cwe": [
+    "CWE-134"
+  ],
+  "cve_description": "wire-avs is the audio visual signaling (AVS) component of Wire, an open-source messenger. A remote format string vulnerability in versions prior to 7.1.12 allows an attacker to cause a denial of service or possibly execute arbitrary code. The issue has been fixed in wire-avs 7.1.12. There are currently no known workarounds.",
+  "id": 663
+}
+]

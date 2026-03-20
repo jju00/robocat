@@ -1,0 +1,325 @@
+[
+{
+  "cve_id": "CVE-2017-8326",
+  "code_before_change": "static int find_low_bit(unsigned int x)\n{\n\tint i;\n\tfor(i=0;i<=31;i++) {\n\t\tif(x&(1<<i)) return i;\n\t}\n\treturn 0;\n}",
+  "code_after_change": "static int find_low_bit(unsigned int x)\n{\n\tint i;\n\tfor(i=0;i<=31;i++) {\n\t\tif(x&(1U<<(unsigned int)i)) return i;\n\t}\n\treturn 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif(x&(1U<<(unsigned int)i)) return i;"
+    ],
+    "deleted": [
+      "\t\tif(x&(1<<i)) return i;"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "libimageworsener.a in ImageWorsener before 1.3.1 has \"left shift cannot be represented in type int\" undefined behavior issues, which might allow remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via a crafted image, related to imagew-bmp.c and imagew-util.c.",
+  "id": 6161
+},
+{
+  "cve_id": "CVE-2017-8326",
+  "code_before_change": "static int find_high_bit(unsigned int x)\n{\n\tint i;\n\tfor(i=31;i>=0;i--) {\n\t\tif(x&(1<<i)) return i;\n\t}\n\treturn 0;\n}",
+  "code_after_change": "static int find_high_bit(unsigned int x)\n{\n\tint i;\n\tfor(i=31;i>=0;i--) {\n\t\tif(x&(1U<<(unsigned int)i)) return i;\n\t}\n\treturn 0;\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\tif(x&(1U<<(unsigned int)i)) return i;"
+    ],
+    "deleted": [
+      "\t\tif(x&(1<<i)) return i;"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "libimageworsener.a in ImageWorsener before 1.3.1 has \"left shift cannot be represented in type int\" undefined behavior issues, which might allow remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via a crafted image, related to imagew-bmp.c and imagew-util.c.",
+  "id": 6162
+},
+{
+  "cve_id": "CVE-2017-8326",
+  "code_before_change": "IW_IMPL(int) iw_get_i32le(const iw_byte *b)\n{\n\treturn (iw_int32)(iw_uint32)(b[0] | (b[1]<<8) | (b[2]<<16) | (b[3]<<24));\n}",
+  "code_after_change": "IW_IMPL(int) iw_get_i32le(const iw_byte *b)\n{\n\treturn (iw_int32)(iw_uint32)((unsigned int)b[0] | ((unsigned int)b[1]<<8) |\n\t\t((unsigned int)b[2]<<16) | ((unsigned int)b[3]<<24));\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn (iw_int32)(iw_uint32)((unsigned int)b[0] | ((unsigned int)b[1]<<8) |",
+      "\t\t((unsigned int)b[2]<<16) | ((unsigned int)b[3]<<24));"
+    ],
+    "deleted": [
+      "\treturn (iw_int32)(iw_uint32)(b[0] | (b[1]<<8) | (b[2]<<16) | (b[3]<<24));"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "libimageworsener.a in ImageWorsener before 1.3.1 has \"left shift cannot be represented in type int\" undefined behavior issues, which might allow remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via a crafted image, related to imagew-bmp.c and imagew-util.c.",
+  "id": 6163
+},
+{
+  "cve_id": "CVE-2017-8326",
+  "code_before_change": "IW_IMPL(unsigned int) iw_get_ui32le(const iw_byte *b)\n{\n\treturn b[0] | (b[1]<<8) | (b[2]<<16) | (b[3]<<24);\n}",
+  "code_after_change": "IW_IMPL(unsigned int) iw_get_ui32le(const iw_byte *b)\n{\n\treturn (unsigned int)b[0] | ((unsigned int)b[1]<<8) |\n\t\t((unsigned int)b[2]<<16) | ((unsigned int)b[3]<<24);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn (unsigned int)b[0] | ((unsigned int)b[1]<<8) |",
+      "\t\t((unsigned int)b[2]<<16) | ((unsigned int)b[3]<<24);"
+    ],
+    "deleted": [
+      "\treturn b[0] | (b[1]<<8) | (b[2]<<16) | (b[3]<<24);"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "libimageworsener.a in ImageWorsener before 1.3.1 has \"left shift cannot be represented in type int\" undefined behavior issues, which might allow remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via a crafted image, related to imagew-bmp.c and imagew-util.c.",
+  "id": 6164
+},
+{
+  "cve_id": "CVE-2017-8326",
+  "code_before_change": "IW_IMPL(unsigned int) iw_get_ui16le(const iw_byte *b)\n{\n\treturn b[0] | (b[1]<<8);\n}",
+  "code_after_change": "IW_IMPL(unsigned int) iw_get_ui16le(const iw_byte *b)\n{\n\treturn (unsigned int)b[0] | ((unsigned int)b[1]<<8);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn (unsigned int)b[0] | ((unsigned int)b[1]<<8);"
+    ],
+    "deleted": [
+      "\treturn b[0] | (b[1]<<8);"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "libimageworsener.a in ImageWorsener before 1.3.1 has \"left shift cannot be represented in type int\" undefined behavior issues, which might allow remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via a crafted image, related to imagew-bmp.c and imagew-util.c.",
+  "id": 6165
+},
+{
+  "cve_id": "CVE-2017-8326",
+  "code_before_change": "IW_IMPL(unsigned int) iw_get_ui16be(const iw_byte *b)\n{\n\treturn (b[0]<<8) | b[1];\n}",
+  "code_after_change": "IW_IMPL(unsigned int) iw_get_ui16be(const iw_byte *b)\n{\n\treturn ((unsigned int)b[0]<<8) | (unsigned int)b[1];\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn ((unsigned int)b[0]<<8) | (unsigned int)b[1];"
+    ],
+    "deleted": [
+      "\treturn (b[0]<<8) | b[1];"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "libimageworsener.a in ImageWorsener before 1.3.1 has \"left shift cannot be represented in type int\" undefined behavior issues, which might allow remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via a crafted image, related to imagew-bmp.c and imagew-util.c.",
+  "id": 6166
+},
+{
+  "cve_id": "CVE-2017-8326",
+  "code_before_change": "IW_IMPL(unsigned int) iw_get_ui32be(const iw_byte *b)\n{\n\treturn (b[0]<<24) | (b[1]<<16) | (b[2]<<8) | b[3];\n}",
+  "code_after_change": "IW_IMPL(unsigned int) iw_get_ui32be(const iw_byte *b)\n{\n\treturn ((unsigned int)b[0]<<24) | ((unsigned int)b[1]<<16) |\n\t\t((unsigned int)b[2]<<8) | (unsigned int)b[3];\n}",
+  "function_modified_lines": {
+    "added": [
+      "\treturn ((unsigned int)b[0]<<24) | ((unsigned int)b[1]<<16) |",
+      "\t\t((unsigned int)b[2]<<8) | (unsigned int)b[3];"
+    ],
+    "deleted": [
+      "\treturn (b[0]<<24) | (b[1]<<16) | (b[2]<<8) | b[3];"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "libimageworsener.a in ImageWorsener before 1.3.1 has \"left shift cannot be represented in type int\" undefined behavior issues, which might allow remote attackers to cause a denial of service (application crash) or possibly have unspecified other impact via a crafted image, related to imagew-bmp.c and imagew-util.c.",
+  "id": 6167
+},
+{
+  "cve_id": "CVE-2019-16346",
+  "code_before_change": "static void WritePixel(struct ngiflib_img * i, struct ngiflib_decode_context * context, u8 v) {\n\tstruct ngiflib_gif * p = i->parent;\n\n\tif(v!=i->gce.transparent_color || !i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t*context->frbuff_p.p8 = v;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else\n\t\t\t*context->frbuff_p.p32 =\n\t\t\t   GifIndexToTrueColor(i->palette, v);\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n\tif(--(context->Xtogo) <= 0) {\n\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\tcontext->Xtogo = i->width;\n\t\tswitch(context->pass) {\n\t\tcase 0:\n\t\t\tcontext->curY++;\n\t\t\tbreak;\n\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\tcontext->curY += 8;\n\t\t\tif(context->curY >= p->height) {\n\t\t\t\tcontext->pass++;\n\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t}\n\t\t\tbreak;\n\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\tcontext->curY += 8;\n\t\t\tif(context->curY >= p->height) {\n\t\t\t\tcontext->pass++;\n\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t}\n\t\t\tbreak;\n\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\tcontext->curY += 4;\n\t\t\tif(context->curY >= p->height) {\n\t\t\t\tcontext->pass++;\n\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t}\n\t\t\tbreak;\n\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\tcontext->curY += 2;\n\t\t\tbreak;\n\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t} else {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\tcontext->frbuff_p.p8++;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\tcontext->frbuff_p.p32++;\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n}",
+  "code_after_change": "static void WritePixel(struct ngiflib_img * i, struct ngiflib_decode_context * context, u8 v) {\n\tstruct ngiflib_gif * p = i->parent;\n\n\tif(v!=i->gce.transparent_color || !i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t*context->frbuff_p.p8 = v;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else\n\t\t\t*context->frbuff_p.p32 =\n\t\t\t   GifIndexToTrueColor(i->palette, v);\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n\tif(--(context->Xtogo) <= 0) {\n\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\tcontext->Xtogo = i->width;\n\t\tswitch(context->pass) {\n\t\tcase 0:\n\t\t\tcontext->curY++;\n\t\t\tbreak;\n\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\tcontext->curY += 8;\n\t\t\tbreak;\n\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\tcontext->curY += 8;\n\t\t\tbreak;\n\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\tcontext->curY += 4;\n\t\t\tbreak;\n\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\tcontext->curY += 2;\n\t\t\tbreak;\n\t\t}\n\t\twhile(context->pass > 0 && context->pass < 4 &&\n\t\t      context->curY >= p->height) {\n\t\t\tswitch(++context->pass) {\n\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t\tbreak;\n\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t\tbreak;\n\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t} else {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\tcontext->frbuff_p.p8++;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\tcontext->frbuff_p.p32++;\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\twhile(context->pass > 0 && context->pass < 4 &&",
+      "\t\t      context->curY >= p->height) {",
+      "\t\t\tswitch(++context->pass) {",
+      "\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */",
+      "\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t\tbreak;",
+      "\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */",
+      "\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t\tbreak;",
+      "\t\t\tcase 4:\t/* 4th pass : every odd row */",
+      "\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t\tbreak;",
+      "\t\t\t}",
+      "\t\t}"
+    ],
+    "deleted": [
+      "\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\tcontext->pass++;",
+      "\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t}",
+      "\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\tcontext->pass++;",
+      "\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t}",
+      "\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\tcontext->pass++;",
+      "\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-682"
+  ],
+  "cve_description": "ngiflib 0.4 has a heap-based buffer overflow in WritePixel() in ngiflib.c when called from DecodeGifImg, because deinterlacing for small pictures is mishandled.",
+  "id": 6168
+},
+{
+  "cve_id": "CVE-2019-16346",
+  "code_before_change": "static void WritePixels(struct ngiflib_img * i, struct ngiflib_decode_context * context, const u8 * pixels, u16 n) {\n\tu16 tocopy;\t\n\tstruct ngiflib_gif * p = i->parent;\n\n\twhile(n > 0) {\n\t\ttocopy = (context->Xtogo < n) ? context->Xtogo : n;\n\t\tif(!i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tngiflib_memcpy(context->frbuff_p.p8, pixels, tocopy);\n\t\t\t\tpixels += tocopy;\n\t\t\t\tcontext->frbuff_p.p8 += tocopy;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tint j;\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\t*(context->frbuff_p.p32++) =\n\t\t\t\t\t   GifIndexToTrueColor(i->palette, *pixels++);\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t} else {\n\t\t\tint j;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) *context->frbuff_p.p8 = *pixels;\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p8++;\n\t\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) {\n\t\t\t\t\t\t*context->frbuff_p.p32 = GifIndexToTrueColor(i->palette, *pixels);\n\t\t\t\t\t}\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p32++;\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tcontext->Xtogo -= tocopy;\n\t\tif(context->Xtogo == 0) {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\tcontext->Xtogo = i->width;\n\t\t\tswitch(context->pass) {\n\t\t\tcase 0:\n\t\t\t\tcontext->curY++;\n\t\t\t\tbreak;\n\t\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tif(context->curY >= p->height) {\n\t\t\t\t\tcontext->pass++;\n\t\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tif(context->curY >= p->height) {\n\t\t\t\t\tcontext->pass++;\n\t\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\tcontext->curY += 4;\n\t\t\t\tif(context->curY >= p->height) {\n\t\t\t\t\tcontext->pass++;\n\t\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\tcontext->curY += 2;\n\t\t\t\tbreak;\n\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tn -= tocopy;\n\t}\n}",
+  "code_after_change": "static void WritePixels(struct ngiflib_img * i, struct ngiflib_decode_context * context, const u8 * pixels, u16 n) {\n\tu16 tocopy;\t\n\tstruct ngiflib_gif * p = i->parent;\n\n\twhile(n > 0) {\n\t\ttocopy = (context->Xtogo < n) ? context->Xtogo : n;\n\t\tif(!i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tngiflib_memcpy(context->frbuff_p.p8, pixels, tocopy);\n\t\t\t\tpixels += tocopy;\n\t\t\t\tcontext->frbuff_p.p8 += tocopy;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tint j;\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\t*(context->frbuff_p.p32++) =\n\t\t\t\t\t   GifIndexToTrueColor(i->palette, *pixels++);\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t} else {\n\t\t\tint j;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) *context->frbuff_p.p8 = *pixels;\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p8++;\n\t\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) {\n\t\t\t\t\t\t*context->frbuff_p.p32 = GifIndexToTrueColor(i->palette, *pixels);\n\t\t\t\t\t}\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p32++;\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tcontext->Xtogo -= tocopy;\n\t\tif(context->Xtogo == 0) {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\tcontext->Xtogo = i->width;\n\t\t\tswitch(context->pass) {\n\t\t\tcase 0:\n\t\t\t\tcontext->curY++;\n\t\t\t\tbreak;\n\t\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tbreak;\n\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tbreak;\n\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\tcontext->curY += 4;\n\t\t\t\tbreak;\n\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\tcontext->curY += 2;\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\twhile(context->pass > 0 && context->pass < 4 &&\n\t\t\t      context->curY >= p->height) {\n\t\t\t\tswitch(++context->pass) {\n\t\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tn -= tocopy;\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\twhile(context->pass > 0 && context->pass < 4 &&",
+      "\t\t\t      context->curY >= p->height) {",
+      "\t\t\t\tswitch(++context->pass) {",
+      "\t\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */",
+      "\t\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t\t\tbreak;",
+      "\t\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */",
+      "\t\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t\t\tbreak;",
+      "\t\t\t\tcase 4:\t/* 4th pass : every odd row */",
+      "\t\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t\t\tbreak;",
+      "\t\t\t\t}",
+      "\t\t\t}"
+    ],
+    "deleted": [
+      "\t\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\t\tcontext->pass++;",
+      "\t\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t\t}",
+      "\t\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\t\tcontext->pass++;",
+      "\t\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t\t}",
+      "\t\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\t\tcontext->pass++;",
+      "\t\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-682"
+  ],
+  "cve_description": "ngiflib 0.4 has a heap-based buffer overflow in WritePixel() in ngiflib.c when called from DecodeGifImg, because deinterlacing for small pictures is mishandled.",
+  "id": 6169
+},
+{
+  "cve_id": "CVE-2019-16347",
+  "code_before_change": "static void WritePixel(struct ngiflib_img * i, struct ngiflib_decode_context * context, u8 v) {\n\tstruct ngiflib_gif * p = i->parent;\n\n\tif(v!=i->gce.transparent_color || !i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t*context->frbuff_p.p8 = v;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else\n\t\t\t*context->frbuff_p.p32 =\n\t\t\t   GifIndexToTrueColor(i->palette, v);\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n\tif(--(context->Xtogo) <= 0) {\n\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\tcontext->Xtogo = i->width;\n\t\tswitch(context->pass) {\n\t\tcase 0:\n\t\t\tcontext->curY++;\n\t\t\tbreak;\n\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\tcontext->curY += 8;\n\t\t\tif(context->curY >= p->height) {\n\t\t\t\tcontext->pass++;\n\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t}\n\t\t\tbreak;\n\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\tcontext->curY += 8;\n\t\t\tif(context->curY >= p->height) {\n\t\t\t\tcontext->pass++;\n\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t}\n\t\t\tbreak;\n\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\tcontext->curY += 4;\n\t\t\tif(context->curY >= p->height) {\n\t\t\t\tcontext->pass++;\n\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t}\n\t\t\tbreak;\n\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\tcontext->curY += 2;\n\t\t\tbreak;\n\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t} else {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\tcontext->frbuff_p.p8++;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\tcontext->frbuff_p.p32++;\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n}",
+  "code_after_change": "static void WritePixel(struct ngiflib_img * i, struct ngiflib_decode_context * context, u8 v) {\n\tstruct ngiflib_gif * p = i->parent;\n\n\tif(v!=i->gce.transparent_color || !i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t*context->frbuff_p.p8 = v;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else\n\t\t\t*context->frbuff_p.p32 =\n\t\t\t   GifIndexToTrueColor(i->palette, v);\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n\tif(--(context->Xtogo) <= 0) {\n\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\tcontext->Xtogo = i->width;\n\t\tswitch(context->pass) {\n\t\tcase 0:\n\t\t\tcontext->curY++;\n\t\t\tbreak;\n\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\tcontext->curY += 8;\n\t\t\tbreak;\n\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\tcontext->curY += 8;\n\t\t\tbreak;\n\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\tcontext->curY += 4;\n\t\t\tbreak;\n\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\tcontext->curY += 2;\n\t\t\tbreak;\n\t\t}\n\t\twhile(context->pass > 0 && context->pass < 4 &&\n\t\t      context->curY >= p->height) {\n\t\t\tswitch(++context->pass) {\n\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t\tbreak;\n\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t\tbreak;\n\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t#else\n\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t} else {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\tcontext->frbuff_p.p8++;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t} else {\n\t\t\tcontext->frbuff_p.p32++;\n\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\twhile(context->pass > 0 && context->pass < 4 &&",
+      "\t\t      context->curY >= p->height) {",
+      "\t\t\tswitch(++context->pass) {",
+      "\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */",
+      "\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t\tbreak;",
+      "\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */",
+      "\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t\tbreak;",
+      "\t\t\tcase 4:\t/* 4th pass : every odd row */",
+      "\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t\tbreak;",
+      "\t\t\t}",
+      "\t\t}"
+    ],
+    "deleted": [
+      "\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\tcontext->pass++;",
+      "\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t}",
+      "\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\tcontext->pass++;",
+      "\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t}",
+      "\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\tcontext->pass++;",
+      "\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-682"
+  ],
+  "cve_description": "ngiflib 0.4 has a heap-based buffer overflow in WritePixels() in ngiflib.c when called from DecodeGifImg, because deinterlacing for small pictures is mishandled.",
+  "id": 6170
+},
+{
+  "cve_id": "CVE-2019-16347",
+  "code_before_change": "static void WritePixels(struct ngiflib_img * i, struct ngiflib_decode_context * context, const u8 * pixels, u16 n) {\n\tu16 tocopy;\t\n\tstruct ngiflib_gif * p = i->parent;\n\n\twhile(n > 0) {\n\t\ttocopy = (context->Xtogo < n) ? context->Xtogo : n;\n\t\tif(!i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tngiflib_memcpy(context->frbuff_p.p8, pixels, tocopy);\n\t\t\t\tpixels += tocopy;\n\t\t\t\tcontext->frbuff_p.p8 += tocopy;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tint j;\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\t*(context->frbuff_p.p32++) =\n\t\t\t\t\t   GifIndexToTrueColor(i->palette, *pixels++);\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t} else {\n\t\t\tint j;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) *context->frbuff_p.p8 = *pixels;\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p8++;\n\t\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) {\n\t\t\t\t\t\t*context->frbuff_p.p32 = GifIndexToTrueColor(i->palette, *pixels);\n\t\t\t\t\t}\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p32++;\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tcontext->Xtogo -= tocopy;\n\t\tif(context->Xtogo == 0) {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\tcontext->Xtogo = i->width;\n\t\t\tswitch(context->pass) {\n\t\t\tcase 0:\n\t\t\t\tcontext->curY++;\n\t\t\t\tbreak;\n\t\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tif(context->curY >= p->height) {\n\t\t\t\t\tcontext->pass++;\n\t\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tif(context->curY >= p->height) {\n\t\t\t\t\tcontext->pass++;\n\t\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\tcontext->curY += 4;\n\t\t\t\tif(context->curY >= p->height) {\n\t\t\t\t\tcontext->pass++;\n\t\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t\t}\n\t\t\t\tbreak;\n\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\tcontext->curY += 2;\n\t\t\t\tbreak;\n\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tn -= tocopy;\n\t}\n}",
+  "code_after_change": "static void WritePixels(struct ngiflib_img * i, struct ngiflib_decode_context * context, const u8 * pixels, u16 n) {\n\tu16 tocopy;\t\n\tstruct ngiflib_gif * p = i->parent;\n\n\twhile(n > 0) {\n\t\ttocopy = (context->Xtogo < n) ? context->Xtogo : n;\n\t\tif(!i->gce.transparent_flag) {\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tngiflib_memcpy(context->frbuff_p.p8, pixels, tocopy);\n\t\t\t\tpixels += tocopy;\n\t\t\t\tcontext->frbuff_p.p8 += tocopy;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tint j;\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\t*(context->frbuff_p.p32++) =\n\t\t\t\t\t   GifIndexToTrueColor(i->palette, *pixels++);\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t} else {\n\t\t\tint j;\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) *context->frbuff_p.p8 = *pixels;\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p8++;\n\t\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\tfor(j = (int)tocopy; j > 0; j--) {\n\t\t\t\t\tif(*pixels != i->gce.transparent_color) {\n\t\t\t\t\t\t*context->frbuff_p.p32 = GifIndexToTrueColor(i->palette, *pixels);\n\t\t\t\t\t}\n\t\t\t\t\tpixels++;\n\t\t\t\t\tcontext->frbuff_p.p32++;\n\t\t\t\t}\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tcontext->Xtogo -= tocopy;\n\t\tif(context->Xtogo == 0) {\n\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\tif(p->line_cb) p->line_cb(p, context->line_p, context->curY);\n\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\tcontext->Xtogo = i->width;\n\t\t\tswitch(context->pass) {\n\t\t\tcase 0:\n\t\t\t\tcontext->curY++;\n\t\t\t\tbreak;\n\t\t\tcase 1:\t/* 1st pass : every eighth row starting from 0 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tbreak;\n\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\tcontext->curY += 8;\n\t\t\t\tbreak;\n\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\tcontext->curY += 4;\n\t\t\t\tbreak;\n\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\tcontext->curY += 2;\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\twhile(context->pass > 0 && context->pass < 4 &&\n\t\t\t      context->curY >= p->height) {\n\t\t\t\tswitch(++context->pass) {\n\t\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */\n\t\t\t\t\tcontext->curY = i->posY + 4;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */\n\t\t\t\t\tcontext->curY = i->posY + 2;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 4:\t/* 4th pass : every odd row */\n\t\t\t\t\tcontext->curY = i->posY + 1;\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t}\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\tif(p->mode & NGIFLIB_MODE_INDEXED) {\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p8 = context->line_p.p8 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p8 = p->frbuff.p8 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n#ifndef NGIFLIB_INDEXED_ONLY\n\t\t\t} else {\n\t\t\t\t#ifdef NGIFLIB_ENABLE_CALLBACKS\n\t\t\t\tcontext->line_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width;\n\t\t\t\tcontext->frbuff_p.p32 = context->line_p.p32 + i->posX;\n\t\t\t\t#else\n\t\t\t\tcontext->frbuff_p.p32 = p->frbuff.p32 + (u32)context->curY*p->width + i->posX;\n\t\t\t\t#endif /* NGIFLIB_ENABLE_CALLBACKS */\n\t\t\t}\n#endif /* NGIFLIB_INDEXED_ONLY */\n\t\t}\n\t\tn -= tocopy;\n\t}\n}",
+  "function_modified_lines": {
+    "added": [
+      "\t\t\twhile(context->pass > 0 && context->pass < 4 &&",
+      "\t\t\t      context->curY >= p->height) {",
+      "\t\t\t\tswitch(++context->pass) {",
+      "\t\t\t\tcase 2:\t/* 2nd pass : every eighth row starting from 4 */",
+      "\t\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t\t\tbreak;",
+      "\t\t\t\tcase 3:\t/* 3rd pass : every fourth row starting from 2 */",
+      "\t\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t\t\tbreak;",
+      "\t\t\t\tcase 4:\t/* 4th pass : every odd row */",
+      "\t\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t\t\tbreak;",
+      "\t\t\t\t}",
+      "\t\t\t}"
+    ],
+    "deleted": [
+      "\t\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\t\tcontext->pass++;",
+      "\t\t\t\t\tcontext->curY = i->posY + 4;",
+      "\t\t\t\t}",
+      "\t\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\t\tcontext->pass++;",
+      "\t\t\t\t\tcontext->curY = i->posY + 2;",
+      "\t\t\t\t}",
+      "\t\t\t\tif(context->curY >= p->height) {",
+      "\t\t\t\t\tcontext->pass++;",
+      "\t\t\t\t\tcontext->curY = i->posY + 1;",
+      "\t\t\t\t}"
+    ]
+  },
+  "cwe": [
+    "CWE-787",
+    "CWE-682"
+  ],
+  "cve_description": "ngiflib 0.4 has a heap-based buffer overflow in WritePixels() in ngiflib.c when called from DecodeGifImg, because deinterlacing for small pictures is mishandled.",
+  "id": 6171
+},
+{
+  "cve_id": "CVE-2023-3161",
+  "code_before_change": "static int fbcon_set_font(struct vc_data *vc, struct console_font *font,\n\t\t\t  unsigned int flags)\n{\n\tstruct fb_info *info = fbcon_info_from_console(vc->vc_num);\n\tunsigned charcount = font->charcount;\n\tint w = font->width;\n\tint h = font->height;\n\tint size;\n\tint i, csum;\n\tu8 *new_data, *data = font->data;\n\tint pitch = PITCH(font->width);\n\n\t/* Is there a reason why fbconsole couldn't handle any charcount >256?\n\t * If not this check should be changed to charcount < 256 */\n\tif (charcount != 256 && charcount != 512)\n\t\treturn -EINVAL;\n\n\t/* font bigger than screen resolution ? */\n\tif (w > FBCON_SWAP(info->var.rotate, info->var.xres, info->var.yres) ||\n\t    h > FBCON_SWAP(info->var.rotate, info->var.yres, info->var.xres))\n\t\treturn -EINVAL;\n\n\t/* Make sure drawing engine can handle the font */\n\tif (!(info->pixmap.blit_x & (1 << (font->width - 1))) ||\n\t    !(info->pixmap.blit_y & (1 << (font->height - 1))))\n\t\treturn -EINVAL;\n\n\t/* Make sure driver can handle the font length */\n\tif (fbcon_invalid_charcount(info, charcount))\n\t\treturn -EINVAL;\n\n\tsize = CALC_FONTSZ(h, pitch, charcount);\n\n\tnew_data = kmalloc(FONT_EXTRA_WORDS * sizeof(int) + size, GFP_USER);\n\n\tif (!new_data)\n\t\treturn -ENOMEM;\n\n\tmemset(new_data, 0, FONT_EXTRA_WORDS * sizeof(int));\n\n\tnew_data += FONT_EXTRA_WORDS * sizeof(int);\n\tFNTSIZE(new_data) = size;\n\tREFCOUNT(new_data) = 0;\t/* usage counter */\n\tfor (i=0; i< charcount; i++) {\n\t\tmemcpy(new_data + i*h*pitch, data +  i*32*pitch, h*pitch);\n\t}\n\n\t/* Since linux has a nice crc32 function use it for counting font\n\t * checksums. */\n\tcsum = crc32(0, new_data, size);\n\n\tFNTSUM(new_data) = csum;\n\t/* Check if the same font is on some other console already */\n\tfor (i = first_fb_vc; i <= last_fb_vc; i++) {\n\t\tstruct vc_data *tmp = vc_cons[i].d;\n\t\t\n\t\tif (fb_display[i].userfont &&\n\t\t    fb_display[i].fontdata &&\n\t\t    FNTSUM(fb_display[i].fontdata) == csum &&\n\t\t    FNTSIZE(fb_display[i].fontdata) == size &&\n\t\t    tmp->vc_font.width == w &&\n\t\t    !memcmp(fb_display[i].fontdata, new_data, size)) {\n\t\t\tkfree(new_data - FONT_EXTRA_WORDS * sizeof(int));\n\t\t\tnew_data = (u8 *)fb_display[i].fontdata;\n\t\t\tbreak;\n\t\t}\n\t}\n\treturn fbcon_do_set_font(vc, font->width, font->height, charcount, new_data, 1);\n}",
+  "code_after_change": "static int fbcon_set_font(struct vc_data *vc, struct console_font *font,\n\t\t\t  unsigned int flags)\n{\n\tstruct fb_info *info = fbcon_info_from_console(vc->vc_num);\n\tunsigned charcount = font->charcount;\n\tint w = font->width;\n\tint h = font->height;\n\tint size;\n\tint i, csum;\n\tu8 *new_data, *data = font->data;\n\tint pitch = PITCH(font->width);\n\n\t/* Is there a reason why fbconsole couldn't handle any charcount >256?\n\t * If not this check should be changed to charcount < 256 */\n\tif (charcount != 256 && charcount != 512)\n\t\treturn -EINVAL;\n\n\t/* font bigger than screen resolution ? */\n\tif (w > FBCON_SWAP(info->var.rotate, info->var.xres, info->var.yres) ||\n\t    h > FBCON_SWAP(info->var.rotate, info->var.yres, info->var.xres))\n\t\treturn -EINVAL;\n\n\tif (font->width > 32 || font->height > 32)\n\t\treturn -EINVAL;\n\n\t/* Make sure drawing engine can handle the font */\n\tif (!(info->pixmap.blit_x & BIT(font->width - 1)) ||\n\t    !(info->pixmap.blit_y & BIT(font->height - 1)))\n\t\treturn -EINVAL;\n\n\t/* Make sure driver can handle the font length */\n\tif (fbcon_invalid_charcount(info, charcount))\n\t\treturn -EINVAL;\n\n\tsize = CALC_FONTSZ(h, pitch, charcount);\n\n\tnew_data = kmalloc(FONT_EXTRA_WORDS * sizeof(int) + size, GFP_USER);\n\n\tif (!new_data)\n\t\treturn -ENOMEM;\n\n\tmemset(new_data, 0, FONT_EXTRA_WORDS * sizeof(int));\n\n\tnew_data += FONT_EXTRA_WORDS * sizeof(int);\n\tFNTSIZE(new_data) = size;\n\tREFCOUNT(new_data) = 0;\t/* usage counter */\n\tfor (i=0; i< charcount; i++) {\n\t\tmemcpy(new_data + i*h*pitch, data +  i*32*pitch, h*pitch);\n\t}\n\n\t/* Since linux has a nice crc32 function use it for counting font\n\t * checksums. */\n\tcsum = crc32(0, new_data, size);\n\n\tFNTSUM(new_data) = csum;\n\t/* Check if the same font is on some other console already */\n\tfor (i = first_fb_vc; i <= last_fb_vc; i++) {\n\t\tstruct vc_data *tmp = vc_cons[i].d;\n\t\t\n\t\tif (fb_display[i].userfont &&\n\t\t    fb_display[i].fontdata &&\n\t\t    FNTSUM(fb_display[i].fontdata) == csum &&\n\t\t    FNTSIZE(fb_display[i].fontdata) == size &&\n\t\t    tmp->vc_font.width == w &&\n\t\t    !memcmp(fb_display[i].fontdata, new_data, size)) {\n\t\t\tkfree(new_data - FONT_EXTRA_WORDS * sizeof(int));\n\t\t\tnew_data = (u8 *)fb_display[i].fontdata;\n\t\t\tbreak;\n\t\t}\n\t}\n\treturn fbcon_do_set_font(vc, font->width, font->height, charcount, new_data, 1);\n}",
+  "function_modified_lines": {
+    "added": [
+      "\tif (font->width > 32 || font->height > 32)",
+      "\t\treturn -EINVAL;",
+      "\tif (!(info->pixmap.blit_x & BIT(font->width - 1)) ||",
+      "\t    !(info->pixmap.blit_y & BIT(font->height - 1)))"
+    ],
+    "deleted": [
+      "\tif (!(info->pixmap.blit_x & (1 << (font->width - 1))) ||",
+      "\t    !(info->pixmap.blit_y & (1 << (font->height - 1))))"
+    ]
+  },
+  "cwe": [
+    "CWE-682"
+  ],
+  "cve_description": "A flaw was found in the Framebuffer Console (fbcon) in the Linux Kernel. When providing font->width and font->height greater than 32 to fbcon_set_font, since there are no checks in place, a shift-out-of-bounds occurs leading to undefined behavior and possible denial of service.",
+  "id": 6172
+}
+]

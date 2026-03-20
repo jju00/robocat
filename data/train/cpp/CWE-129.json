@@ -1,0 +1,38 @@
+[
+{
+  "cve_id": "CVE-2022-31135",
+  "code_before_change": "void AOClient::pktEditEvidence(AreaData* area, int argc, QStringList argv, AOPacket packet)\n{\n    if (!checkEvidenceAccess(area))\n        return;\n    bool is_int = false;\n    int idx = argv[0].toInt(&is_int);\n    AreaData::Evidence evi = {argv[1], argv[2], argv[3]};\n    if (is_int && idx <= area->evidence().size() && idx >= 0) {\n        area->replaceEvidence(idx, evi);\n    }\n    sendEvidenceList(area);\n}",
+  "code_after_change": "void AOClient::pktEditEvidence(AreaData* area, int argc, QStringList argv, AOPacket packet)\n{\n    if (!checkEvidenceAccess(area))\n        return;\n    bool is_int = false;\n    int idx = argv[0].toInt(&is_int);\n    AreaData::Evidence evi = {argv[1], argv[2], argv[3]};\n    if (is_int && idx < area->evidence().size() && idx >= 0) {\n        area->replaceEvidence(idx, evi);\n    }\n    sendEvidenceList(area);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    if (is_int && idx < area->evidence().size() && idx >= 0) {"
+    ],
+    "deleted": [
+      "    if (is_int && idx <= area->evidence().size() && idx >= 0) {"
+    ]
+  },
+  "cwe": [
+    "CWE-129"
+  ],
+  "cve_description": "Akashi is an open source server implementation of the Attorney Online video game based on the Ace Attorney universe. Affected versions of Akashi are subject to a denial of service attack. An attacker can use a specially crafted evidence packet to make an illegal modification, causing a server crash. This can be used to mount a denial-of-service exploit. Users are advised to upgrade. There is no known workaround for this issue.",
+  "id": 645
+},
+{
+  "cve_id": "CVE-2022-31135",
+  "code_before_change": "void AOClient::pktRemoveEvidence(AreaData* area, int argc, QStringList argv, AOPacket packet)\n{\n    if (!checkEvidenceAccess(area))\n        return;\n    bool is_int = false;\n    int idx = argv[0].toInt(&is_int);\n    if (is_int && idx <= area->evidence().size() && idx >= 0) {\n        area->deleteEvidence(idx);\n    }\n    sendEvidenceList(area);\n}",
+  "code_after_change": "void AOClient::pktRemoveEvidence(AreaData* area, int argc, QStringList argv, AOPacket packet)\n{\n    if (!checkEvidenceAccess(area))\n        return;\n    bool is_int = false;\n    int idx = argv[0].toInt(&is_int);\n    if (is_int && idx < area->evidence().size() && idx >= 0) {\n        area->deleteEvidence(idx);\n    }\n    sendEvidenceList(area);\n}",
+  "function_modified_lines": {
+    "added": [
+      "    if (is_int && idx < area->evidence().size() && idx >= 0) {"
+    ],
+    "deleted": [
+      "    if (is_int && idx <= area->evidence().size() && idx >= 0) {"
+    ]
+  },
+  "cwe": [
+    "CWE-129"
+  ],
+  "cve_description": "Akashi is an open source server implementation of the Attorney Online video game based on the Ace Attorney universe. Affected versions of Akashi are subject to a denial of service attack. An attacker can use a specially crafted evidence packet to make an illegal modification, causing a server crash. This can be used to mount a denial-of-service exploit. Users are advised to upgrade. There is no known workaround for this issue.",
+  "id": 646
+}
+]
