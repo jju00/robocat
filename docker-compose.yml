@@ -5,11 +5,6 @@ services:
     ports:
       - "${JOERN_PORT}:9000"
     volumes:
-<<<<<<< HEAD
       - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
       - ${HOST_WORKSPACE_ROOT}:${CONTAINER_WORKSPACE_ROOT}
-=======
-      - ${TARGET_PATH}:/app/target
-      - ${WORKSPACE_PATH}:/app/workspace
->>>>>>> 276b2fa (rename: docker-compose app디렉터리 이름 변경경)
     command: ["--server", "--server-host", "0.0.0.0", "--server-port", "9000"]
