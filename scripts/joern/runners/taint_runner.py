@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Tuple
 
 import requests
 
+_QUERIES_DIR = Path(__file__).resolve().parents[1] / "queries"
+
 
 class TaintRunner:
     def __init__(self, config: Dict[str, Any], rules: Dict[str, Any]):
@@ -57,13 +59,21 @@ class TaintRunner:
         return re.sub(r"\x1B\[[0-?]*[ -/]*[@-~]", "", text)
 
     @staticmethod
+    def extract_output_marker(stdout: str) -> str | None:
+        """Extract JSON from lines prefixed with 'OUTPUT: ' (println-based templates)."""
+        for line in stdout.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("OUTPUT: "):
+                return stripped[len("OUTPUT: "):]
+        return None
+
+    @staticmethod
     def extract_res_string(stdout: str) -> str | None:
-        # triple-quoted String
+        """Fallback: extract from Joern REPL val assignment (val resN: String = ...)."""
         m = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
         if m:
             return m[-1]
 
-        # normal quoted String
         m = re.findall(r'val res\d+: String = "(.*)"', stdout, re.DOTALL)
         if m:
             raw = m[-1]
@@ -76,11 +86,24 @@ class TaintRunner:
 
     @staticmethod
     def escape_for_joern_string(value: str) -> str:
-        """
-        Escape Python/JSON string so it can be safely embedded inside
-        a Scala/Joern string literal.
-        """
+        """Escape a Python string for safe embedding inside a Scala/Joern string literal."""
         return value.replace("\\", "\\\\").replace('"', '\\"')
+
+    @staticmethod
+    def load_scala_template(name: str) -> str:
+        """Load a .scala query template from the queries directory."""
+        path = _QUERIES_DIR / name
+        if not path.exists():
+            raise FileNotFoundError(f"Scala template not found: {path}")
+        return path.read_text(encoding="utf-8")
+
+    @staticmethod
+    def fill_template(template: str, **kwargs: str) -> str:
+        """Replace $KEY placeholders in a scala template with provided values."""
+        result = template
+        for key, value in kwargs.items():
+            result = result.replace(f"${key}", value)
+        return result
 
     @staticmethod
     def normalize_parsed_json(parsed: Any) -> Any:
@@ -137,26 +160,14 @@ class TaintRunner:
             time.sleep(poll_interval)
 
     def build_import_query(self) -> str:
-        import_stmt = f'importCode.{self.joern_import}("{self.target_path}", "{self.project_name}")'
-
-        return rf'''
-{import_stmt}
-open("{self.project_name}")
-run.ossdataflow
-
-val summary =
-  Map(
-    "project_name" -> "{self.project_name}",
-    "language" -> "{self.language}",
-    "target_path" -> "{self.target_path}",
-    "files" -> cpg.file.name.l.size,
-    "methods" -> cpg.method.name.l.size,
-    "calls" -> cpg.call.name.l.size,
-    "identifiers" -> cpg.identifier.name.l.size
-  )
-
-ujson.write(ujson.read(summary.toJson), indent = 2)
-'''
+        template = self.load_scala_template("import_project.scala")
+        return self.fill_template(
+            template,
+            JOERN_IMPORT=self.joern_import,
+            TARGET_PATH=self.escape_for_joern_string(self.target_path),
+            PROJECT_NAME=self.escape_for_joern_string(self.project_name),
+            LANGUAGE=self.escape_for_joern_string(self.language),
+        )
 
     def build_source_query_expr(self) -> str:
         """
@@ -197,52 +208,16 @@ ujson.write(ujson.read(summary.toJson), indent = 2)
         return " ++ ".join(f"({expr})" for expr in exprs)
 
     def build_taint_query(self, sink_name: str, sink_regex: str) -> str:
-        source_expr = self.build_source_query_expr()
-        escaped_sink_regex = self.escape_for_joern_string(sink_regex)
-
-        return rf'''
-import io.joern.dataflowengineoss.language.*
-
-open("{self.project_name}")
-run.ossdataflow
-
-val sources =
-  {source_expr}
-    .l
-
-val sinks =
-  cpg.call
-    .name("{escaped_sink_regex}")
-    .argument
-    .l
-
-val flows =
-  sinks.reachableByFlows(sources)
-    .map(flow =>
-      flow.elements.map(node =>
-        Map(
-          "line" -> node.lineNumber,
-          "code" -> node.code,
-          "type" -> node.label,
-          "file" -> node.file.name.headOption.getOrElse("")
+        template = self.load_scala_template("tain_flow.scala")
+        return self.fill_template(
+            template,
+            PROJECT_NAME=self.escape_for_joern_string(self.project_name),
+            SOURCE_EXPR=self.build_source_query_expr(),
+            SINK_REGEX=self.escape_for_joern_string(sink_regex),
+            SINK_NAME=self.escape_for_joern_string(sink_name),
+            LANGUAGE=self.escape_for_joern_string(self.language),
+            TARGET_PATH=self.escape_for_joern_string(self.target_path),
         )
-      )
-    ).l
-
-val out =
-  Map(
-    "project_name" -> "{self.project_name}",
-    "language" -> "{self.language}",
-    "target_path" -> "{self.target_path}",
-    "sink_name" -> "{sink_name}",
-    "source_count" -> sources.size,
-    "sink_count" -> sinks.size,
-    "flow_count" -> flows.size,
-    "flows" -> flows
-  )
-
-ujson.write(ujson.read(out.toJson), indent = 2)
-'''
 
     def run_json_query(self, query: str) -> Dict[str, Any]:
         uuid = self.submit_query(query)
@@ -251,7 +226,7 @@ ujson.write(ujson.read(out.toJson), indent = 2)
         stdout = self.strip_ansi(result.get("stdout", ""))
         stderr = self.strip_ansi(result.get("stderr", ""))
 
-        json_str = self.extract_res_string(stdout)
+        json_str = self.extract_output_marker(stdout) or self.extract_res_string(stdout)
         parsed: Any = None
 
         if json_str:
