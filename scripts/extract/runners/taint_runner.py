@@ -1,10 +1,3 @@
-'''
-Usage:
-python taint_runner.py --config configs/phpmyadmin.json --rules rules/php.json
-python taint_runner.py --config configs/some_c_project.json --rules rules/c.json
-python taint_runner.py --config configs/some_cpp_project.json --rules rules/cpp.json
-'''
-
 import argparse
 import json
 import re
@@ -59,6 +52,55 @@ class TaintRunner:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 
+    @staticmethod
+    def strip_ansi(text: str) -> str:
+        return re.sub(r"\x1B\[[0-?]*[ -/]*[@-~]", "", text)
+
+    @staticmethod
+    def extract_res_string(stdout: str) -> str | None:
+        # triple-quoted String
+        m = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
+        if m:
+            return m[-1]
+
+        # normal quoted String
+        m = re.findall(r'val res\d+: String = "(.*)"', stdout, re.DOTALL)
+        if m:
+            raw = m[-1]
+            try:
+                return raw.encode("utf-8").decode("unicode_escape")
+            except Exception:
+                return raw
+
+        return None
+
+    @staticmethod
+    def escape_for_joern_string(value: str) -> str:
+        """
+        Escape Python/JSON string so it can be safely embedded inside
+        a Scala/Joern string literal.
+        """
+        return value.replace("\\", "\\\\").replace('"', '\\"')
+
+    @staticmethod
+    def normalize_parsed_json(parsed: Any) -> Any:
+        """
+        Joern/ujson output sometimes comes back as a list of single-key objects:
+        [
+          {"methods": 26989},
+          {"calls": 1074204},
+          ...
+        ]
+        Convert that into a flat dict for backward compatibility.
+        """
+        if isinstance(parsed, list):
+            merged: Dict[str, Any] = {}
+            for item in parsed:
+                if isinstance(item, dict):
+                    merged.update(item)
+            return merged
+        return parsed
+
     def submit_query(self, query: str, timeout: int = 60) -> str:
         res = requests.post(
             f"{self.base_url}/query",
@@ -93,26 +135,6 @@ class TaintRunner:
                 return data
 
             time.sleep(poll_interval)
-
-    @staticmethod
-    def strip_ansi(text: str) -> str:
-        return re.sub(r"\x1B\[[0-?]*[ -/]*[@-~]", "", text)
-
-    @staticmethod
-    def extract_res_string(stdout: str) -> str | None:
-        m = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
-        if m:
-            return m[-1]
-
-        m = re.findall(r'val res\d+: String = "(.*)"', stdout, re.DOTALL)
-        if m:
-            raw = m[-1]
-            try:
-                return raw.encode("utf-8").decode("unicode_escape")
-            except Exception:
-                return raw
-
-        return None
 
     def build_import_query(self) -> str:
         import_stmt = f'importCode.{self.joern_import}("{self.target_path}", "{self.project_name}")'
@@ -153,13 +175,15 @@ ujson.write(ujson.read(summary.toJson), indent = 2)
             if not value:
                 continue
 
+            escaped_value = self.escape_for_joern_string(value)
+
             if rule_type == "identifier_regex":
                 exprs.append(
-                    f'cpg.identifier.code("{value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
+                    f'cpg.identifier.code("{escaped_value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
                 )
             elif rule_type == "call_regex":
                 exprs.append(
-                    f'cpg.call.name("{value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
+                    f'cpg.call.name("{escaped_value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
                 )
             else:
                 raise ValueError(f"Unsupported source rule type: {rule_type}")
@@ -174,6 +198,7 @@ ujson.write(ujson.read(summary.toJson), indent = 2)
 
     def build_taint_query(self, sink_name: str, sink_regex: str) -> str:
         source_expr = self.build_source_query_expr()
+        escaped_sink_regex = self.escape_for_joern_string(sink_regex)
 
         return rf'''
 import io.joern.dataflowengineoss.language.*
@@ -187,7 +212,7 @@ val sources =
 
 val sinks =
   cpg.call
-    .name("{sink_regex}")
+    .name("{escaped_sink_regex}")
     .argument
     .l
 
@@ -232,6 +257,7 @@ ujson.write(ujson.read(out.toJson), indent = 2)
         if json_str:
             try:
                 parsed = json.loads(json_str)
+                parsed = self.normalize_parsed_json(parsed)
             except json.JSONDecodeError:
                 parsed = {
                     "raw_json_string": json_str,

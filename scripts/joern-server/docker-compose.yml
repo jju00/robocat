@@ -7,4 +7,4 @@ services:
     volumes:
       - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
       - ${HOST_WORKSPACE_ROOT}:${CONTAINER_WORKSPACE_ROOT}
-    command: ["--server-port", "9000", "--server-host", "0.0.0.0"]
+    command: ["--server", "--server-host", "0.0.0.0", "--server-port", "9000"]
