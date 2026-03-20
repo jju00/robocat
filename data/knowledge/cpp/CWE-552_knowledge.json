@@ -1,0 +1,60 @@
+[
+    {
+        "CVE_id": "CVE-2022-25297",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Inadequate validation of file paths during file upload operations.",
+            "trigger_condition": "An attacker provides a manipulated file path that includes directory traversal sequences or absolute paths, allowing them to write files outside the intended upload directory.",
+            "specific_code_behavior_causing_vulnerability": "The code constructs file paths without properly validating that the final destination is within a designated upload directory, leading to potential unauthorized file writes."
+        },
+        "solution": "To mitigate the vulnerability, it is essential to validate that the resolved file path for saving is within the designated upload directory. This can be achieved by normalizing the paths and comparing them to ensure that the save path does not escape the intended directory. Additionally, create the upload directory if it does not exist to prevent errors during file operations.",
+        "purpose": "\"The function saves a file to a specified path, creating necessary directories if they do not exist, while potentially allowing for unsafe file path handling.\"",
+        "function": "1. Asserts that the provided path is not empty.  \n2. Checks if the `fileName_` is empty and returns -1 if it is.  \n3. Converts the provided path to a native filesystem path.  \n4. Checks if the path is not absolute and does not have a parent path, then constructs a new path using the upload path.  \n5. Converts the `fileName_` to a native filesystem path.  \n6. Checks if the constructed path exists.  \n7. If the path does not exist, attempts to create the necessary directories.  \n8. Returns the result of saving the file to the constructed path combined with the file name.",
+        "analysis": "The modification to the `HttpFileImpl::save` method is necessary to address a security vulnerability (CVE-2022-25297) that allows attackers to write files to arbitrary locations outside the designated upload directory. Here’s a breakdown of why each change is important:\n\n1. **Path Handling**: The original code did not sufficiently validate the upload path. An attacker could manipulate the `path` parameter to traverse directories (using `..`) or specify absolute paths, potentially allowing them to write files to sensitive locations on the server.\n\n2. **Weakly Canonical Paths**: The use of `filesystem::weakly_canonical` in the modified code helps to resolve the actual path of the directory while normalizing it. This means that any symbolic links or relative path components (like `..` or `.`) are resolved, which helps in ensuring that the final path is what the application expects.\n\n3. **Directory Existence Check**: The modified code checks if the resolved upload directory exists and creates it if it does not. This is important for ensuring that the application does not attempt to write to a non-existent directory, which could lead to errors or unintended behavior.\n\n4. **Path Comparison**: The critical addition is the comparison between `fsUploadDir` and `fsSaveToPath`. This check ensures that the final path where the file will be saved is indeed within the intended upload directory. If the resolved save path does not start with the upload directory path, it indicates an attempt to write outside of the designated area, which is a security risk. The application logs an error and returns early in such cases.\n\n5. **Error Logging**: The addition of error logging provides visibility into potential security violations, which can be crucial for monitoring and auditing purposes.\n\nOverall, these modifications are necessary to enforce strict path validation, prevent directory traversal attacks, and ensure that files are only written to safe, expected locations, thereby enhancing the security of the application.",
+        "code_before_change": "int HttpFileImpl::save(const std::string &path) const\n{\n    assert(!path.empty());\n    if (fileName_.empty())\n        return -1;\n    filesystem::path fsPath(utils::toNativePath(path));\n    if (!fsPath.is_absolute() &&\n        (!fsPath.has_parent_path() ||\n         (fsPath.begin()->string() != \".\" && fsPath.begin()->string() != \"..\")))\n    {\n        filesystem::path fsUploadPath(utils::toNativePath(\n            HttpAppFrameworkImpl::instance().getUploadPath()));\n        fsPath = fsUploadPath / fsPath;\n    }\n    filesystem::path fsFileName(utils::toNativePath(fileName_));\n    if (!filesystem::exists(fsPath))\n    {\n        LOG_TRACE << \"create path:\" << fsPath;\n        drogon::error_code err;\n        filesystem::create_directories(fsPath, err);\n        if (err)\n        {\n            LOG_SYSERR;\n            return -1;\n        }\n    }\n    return saveTo(fsPath / fsFileName);\n}",
+        "code_after_change": "int HttpFileImpl::save(const std::string &path) const\n{\n    assert(!path.empty());\n    if (fileName_.empty())\n        return -1;\n    filesystem::path fsUploadDir(utils::toNativePath(path));\n\n    if (!fsUploadDir.is_absolute() && (!fsUploadDir.has_parent_path() ||\n                                       (fsUploadDir.begin()->string() != \".\" &&\n                                        fsUploadDir.begin()->string() != \"..\")))\n    {\n        fsUploadDir = utils::toNativePath(\n                          HttpAppFrameworkImpl::instance().getUploadPath()) /\n                      fsUploadDir;\n    }\n\n    fsUploadDir = filesystem::weakly_canonical(fsUploadDir);\n\n    if (!filesystem::exists(fsUploadDir))\n    {\n        LOG_TRACE << \"create path:\" << fsUploadDir;\n        drogon::error_code err;\n        filesystem::create_directories(fsUploadDir, err);\n        if (err)\n        {\n            LOG_SYSERR;\n            return -1;\n        }\n    }\n\n    filesystem::path fsSaveToPath(filesystem::weakly_canonical(\n        fsUploadDir / utils::toNativePath(fileName_)));\n\n    if (!std::equal(fsUploadDir.begin(),\n                    fsUploadDir.end(),\n                    fsSaveToPath.begin()))\n    {\n        LOG_ERROR\n            << \"Attempt writing outside of upload directory detected. Path: \"\n            << fileName_;\n        return -1;\n    }\n\n    return saveTo(fsSaveToPath);\n}",
+        "modified_lines": {
+            "added": [
+                "    filesystem::path fsUploadDir(utils::toNativePath(path));",
+                "    if (!fsUploadDir.is_absolute() && (!fsUploadDir.has_parent_path() ||",
+                "                                       (fsUploadDir.begin()->string() != \".\" &&",
+                "                                        fsUploadDir.begin()->string() != \"..\")))",
+                "        fsUploadDir = utils::toNativePath(",
+                "                          HttpAppFrameworkImpl::instance().getUploadPath()) /",
+                "                      fsUploadDir;",
+                "    fsUploadDir = filesystem::weakly_canonical(fsUploadDir);",
+                "    if (!filesystem::exists(fsUploadDir))",
+                "        LOG_TRACE << \"create path:\" << fsUploadDir;",
+                "        filesystem::create_directories(fsUploadDir, err);",
+                "    filesystem::path fsSaveToPath(filesystem::weakly_canonical(",
+                "        fsUploadDir / utils::toNativePath(fileName_)));",
+                "    if (!std::equal(fsUploadDir.begin(),",
+                "                    fsUploadDir.end(),",
+                "                    fsSaveToPath.begin()))",
+                "    {",
+                "        LOG_ERROR",
+                "            << \"Attempt writing outside of upload directory detected. Path: \"",
+                "            << fileName_;",
+                "        return -1;",
+                "    }",
+                "    return saveTo(fsSaveToPath);"
+            ],
+            "deleted": [
+                "    filesystem::path fsPath(utils::toNativePath(path));",
+                "    if (!fsPath.is_absolute() &&",
+                "        (!fsPath.has_parent_path() ||",
+                "         (fsPath.begin()->string() != \".\" && fsPath.begin()->string() != \"..\")))",
+                "        filesystem::path fsUploadPath(utils::toNativePath(",
+                "            HttpAppFrameworkImpl::instance().getUploadPath()));",
+                "        fsPath = fsUploadPath / fsPath;",
+                "    filesystem::path fsFileName(utils::toNativePath(fileName_));",
+                "    if (!filesystem::exists(fsPath))",
+                "        LOG_TRACE << \"create path:\" << fsPath;",
+                "        filesystem::create_directories(fsPath, err);",
+                "    return saveTo(fsPath / fsFileName);"
+            ]
+        },
+        "vulnerability_cause_description": "Inadequate validation of file paths during file upload operations.",
+        "trigger_condition": "An attacker provides a manipulated file path that includes directory traversal sequences or absolute paths, allowing them to write files outside the intended upload directory.",
+        "specific_code_behavior_causing_vulnerability": "The code constructs file paths without properly validating that the final destination is within a designated upload directory, leading to potential unauthorized file writes."
+    }
+]

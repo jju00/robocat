@@ -1,0 +1,162 @@
+[
+    {
+        "CVE_id": "CVE-2020-11684",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper management of sensitive encryption and authentication keys in memory during error handling.",
+            "trigger_condition": "An error occurs during the decryption process or an invalid header is encountered, leading to a premature exit from the function without cleaning up sensitive data.",
+            "specific_code_behavior_causing_vulnerability": "The code uses return statements that exit the function immediately, which prevents the execution of necessary cleanup operations to wipe sensitive keys from memory."
+        },
+        "solution": "To mitigate the vulnerability, it is essential to implement a centralized cleanup mechanism that ensures sensitive keys are wiped from memory before the function exits, regardless of the execution path taken. This can be achieved by using a goto statement to direct the flow to a cleanup section whenever an error occurs.",
+        "purpose": "\"The function `secure_check` verifies the integrity of a secure header and decrypts the associated file data if the header is valid.\"",
+        "function": "1. Decrypts the provided data using the `secure_decrypt` function.  \n2. Validates the magic number in the header to ensure the data is legitimate.  \n3. Decrypts the file portion of the data after the header based on the specified file size.",
+        "analysis": "The modification to the code is necessary to address the vulnerability identified as CVE-2020-11684, which involves the improper handling of encryption and authentication keys in memory. Here’s a breakdown of why the changes are important:\n\n1. **Key Management**: The original code does not ensure that sensitive keys are wiped from memory before control is passed to a less privileged component. This could allow an attacker to access these keys, potentially compromising the security of the boot process.\n\n2. **Control Flow**: The original code uses `return` statements that immediately exit the function without performing any cleanup. If an error occurs during decryption or if the header's magic number is incorrect, the function would return -1 without wiping the keys. This means that the keys could remain in memory, making them vulnerable to being read by an attacker.\n\n3. **Error Handling**: The modified code introduces a `goto` statement that directs the flow to a cleanup section (`secure_wipe_keys`) whenever an error occurs. This ensures that regardless of how the function exits (whether due to an error in decryption or an invalid header), the keys are wiped from memory.\n\n4. **Consistent Cleanup**: By centralizing the key wiping in one location (`secure_wipe_keys`), the code ensures that it is always executed before the function returns, thus maintaining a consistent approach to memory management and security.\n\n5. **Return Value Management**: The modification also introduces a variable `ret` to hold the return value of the function. This allows the function to return the appropriate status code after ensuring that the keys have been wiped, rather than returning immediately and risking leaving sensitive data in memory.\n\nIn summary, the modification is necessary to enhance the security of the code by ensuring that sensitive encryption and authentication keys are properly wiped from memory before the function exits, regardless of the execution path taken. This helps to mitigate the risk of key disclosure and potential exploitation in the boot process.",
+        "code_before_change": "int secure_check(void *data)\n{\n\tconst at91_secure_header_t *header;\n\tvoid *file;\n\n\tif (secure_decrypt(data, sizeof(*header), 0))\n\t\treturn -1;\n\n\theader = (const at91_secure_header_t *)data;\n\tif (header->magic != AT91_SECURE_MAGIC)\n\t\treturn -1;\n\n\tfile = (unsigned char *)data + sizeof(*header);\n\treturn secure_decrypt(file, header->file_size, 1);\n}",
+        "code_after_change": "int secure_check(void *data)\n{\n\tconst at91_secure_header_t *header;\n\tvoid *file;\n\tint ret = -1;\n\n\tif (secure_decrypt(data, sizeof(*header), 0))\n\t\tgoto secure_wipe_keys;\n\n\theader = (const at91_secure_header_t *)data;\n\tif (header->magic != AT91_SECURE_MAGIC)\n\t\tgoto secure_wipe_keys;\n\n\tfile = (unsigned char *)data + sizeof(*header);\n\tret = secure_decrypt(file, header->file_size, 1);\n\nsecure_wipe_keys:\n\twipe_keys();\n\treturn ret;\n}",
+        "modified_lines": {
+            "added": [
+                "\tint ret = -1;",
+                "\t\tgoto secure_wipe_keys;",
+                "\t\tgoto secure_wipe_keys;",
+                "\tret = secure_decrypt(file, header->file_size, 1);",
+                "secure_wipe_keys:",
+                "\twipe_keys();",
+                "\treturn ret;"
+            ],
+            "deleted": [
+                "\t\treturn -1;",
+                "\t\treturn -1;",
+                "\treturn secure_decrypt(file, header->file_size, 1);"
+            ]
+        },
+        "vulnerability_cause_description": "Improper management of sensitive encryption and authentication keys in memory during error handling.",
+        "trigger_condition": "An error occurs during the decryption process or an invalid header is encountered, leading to a premature exit from the function without cleaning up sensitive data.",
+        "specific_code_behavior_causing_vulnerability": "The code uses return statements that exit the function immediately, which prevents the execution of necessary cleanup operations to wipe sensitive keys from memory."
+    },
+    {
+        "CVE_id": "CVE-2020-11684",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive encryption and authentication keys in memory.",
+            "trigger_condition": "Control is passed to a less privileged software component without securely wiping sensitive keys from memory, allowing potential exposure of these keys.",
+            "specific_code_behavior_causing_vulnerability": "The code initializes sensitive keys directly within a function, which may leave these keys in memory after the function exits, making them accessible to unauthorized components."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to use static arrays for sensitive keys and ensure that these keys are properly managed throughout their lifecycle. This includes implementing memory management practices that securely handle the keys and explicitly zeroing out the memory when the keys are no longer needed.",
+        "purpose": "\"The function initializes AES key sizes, cipher keys, CMAC keys, and an initialization vector (IV) based on predefined configuration values.\"",
+        "function": "1. Initializes the AES key size based on the defined configuration.  \n2. Sets the initialization vector (IV) values from the configuration.  \n3. Assigns cipher and CMAC keys from the configuration to the provided key arrays.  \n4. Handles different key sizes (128, 192, and 256 bits) by conditionally populating the key arrays.",
+        "analysis": "The modification is necessary to address the vulnerability identified as CVE-2020-11684, which involves the improper handling of encryption and authentication keys in memory. The original code snippet initializes the keys directly in the `init_keys` function, which means that these sensitive keys could remain in memory after the function exits. This could lead to potential exposure of the keys to less privileged components or processes, allowing an attacker to exploit this information.\n\nHere are the key reasons why the modification is necessary:\n\n1. **Memory Wiping**: The original implementation does not ensure that sensitive keys are wiped from memory before control is passed to less privileged software components. By moving the keys to static arrays, the keys are allocated in a specific memory location, and you can implement proper memory management practices to ensure they are securely handled.\n\n2. **Static Allocation**: The modified code uses static arrays for `cipher_key`, `cmac_key`, and `iv`. This approach allows for better control over the lifecycle of these keys. Static variables have a fixed memory location for the duration of the program, which can help in managing their security more effectively.\n\n3. **Separation of Concerns**: By separating the key initialization from the function that uses them, the code becomes cleaner and more maintainable. The `secure_decrypt` function can now focus on its primary responsibility without being concerned about key initialization.\n\n4. **Improved Security Practices**: The modification allows for the implementation of additional security measures, such as explicitly zeroing out the memory of the keys when they are no longer needed. This is a common practice in cryptographic applications to prevent sensitive data from lingering in memory.\n\n5. **Reduced Attack Surface**: By removing the inline function that initializes keys, the attack surface is reduced. The keys are now initialized in a controlled manner, and the risk of accidental exposure through stack memory is minimized.\n\nIn summary, the modification is crucial for enhancing the security of the system by ensuring that sensitive encryption and authentication keys are properly managed and protected from unauthorized access, thereby mitigating the risk of exploitation.",
+        "code_before_change": "static inline void init_keys(at91_aes_key_size_t *key_size,\n\t\t\t     unsigned int *cipher_key,\n\t\t\t     unsigned int *cmac_key,\n\t\t\t     unsigned int *iv)\n{\n#if defined(CONFIG_AES_KEY_SIZE_128)\n\t*key_size = AT91_AES_KEY_SIZE_128;\n#elif defined(CONFIG_AES_KEY_SIZE_192)\n\t*key_size = AT91_AES_KEY_SIZE_192;\n#elif defined(CONFIG_AES_KEY_SIZE_256)\n\t*key_size = AT91_AES_KEY_SIZE_256;\n#else\n#error \"bad AES key size\"\n#endif\n\n\tiv[0]\t\t= CONFIG_AES_IV_WORD0;\n\tiv[1]\t\t= CONFIG_AES_IV_WORD1;\n\tiv[2]\t\t= CONFIG_AES_IV_WORD2;\n\tiv[3]\t\t= CONFIG_AES_IV_WORD3;\n\n\tcipher_key[0]\t= CONFIG_AES_CIPHER_KEY_WORD0;\n\tcmac_key[0]\t= CONFIG_AES_CMAC_KEY_WORD0;\n\tcipher_key[1]\t= CONFIG_AES_CIPHER_KEY_WORD1;\n\tcmac_key[1]\t= CONFIG_AES_CMAC_KEY_WORD1;\n\tcipher_key[2]\t= CONFIG_AES_CIPHER_KEY_WORD2;\n\tcmac_key[2]\t= CONFIG_AES_CMAC_KEY_WORD2;\n\tcipher_key[3]\t= CONFIG_AES_CIPHER_KEY_WORD3;\n\tcmac_key[3]\t= CONFIG_AES_CMAC_KEY_WORD3;\n\n#if defined(CONFIG_AES_KEY_SIZE_192) || defined(CONFIG_AES_KEY_SIZE_256)\n\tcipher_key[4]\t= CONFIG_AES_CIPHER_KEY_WORD4;\n\tcmac_key[4]\t= CONFIG_AES_CMAC_KEY_WORD4;\n\tcipher_key[5]\t= CONFIG_AES_CIPHER_KEY_WORD5;\n\tcmac_key[5]\t= CONFIG_AES_CMAC_KEY_WORD5;\n#endif\n\n#if defined(CONFIG_AES_KEY_SIZE_256)\n\tcipher_key[6]\t= CONFIG_AES_CIPHER_KEY_WORD6;\n\tcmac_key[6]\t= CONFIG_AES_CMAC_KEY_WORD6;\n\tcipher_key[7]\t= CONFIG_AES_CIPHER_KEY_WORD7;\n\tcmac_key[7]\t= CONFIG_AES_CMAC_KEY_WORD7;\n#endif\n}",
+        "code_after_change": "\tCONFIG_AES_CIPHER_KEY_WORD0,\n\tCONFIG_AES_CIPHER_KEY_WORD1,\n\tCONFIG_AES_CIPHER_KEY_WORD2,\n\tCONFIG_AES_CIPHER_KEY_WORD3,\n#if defined(CONFIG_AES_KEY_SIZE_192) || defined(CONFIG_AES_KEY_SIZE_256)\n\tCONFIG_AES_CIPHER_KEY_WORD4,\n\tCONFIG_AES_CIPHER_KEY_WORD5,\n#endif\n#if defined(CONFIG_AES_KEY_SIZE_256)\n\tCONFIG_AES_CIPHER_KEY_WORD6,\n\tCONFIG_AES_CIPHER_KEY_WORD7,\n#endif\n};\n\nstatic unsigned int cmac_key[8] = {\n\tCONFIG_AES_CMAC_KEY_WORD0,\n\tCONFIG_AES_CMAC_KEY_WORD1,\n\tCONFIG_AES_CMAC_KEY_WORD2,\n\tCONFIG_AES_CMAC_KEY_WORD3,\n#if defined(CONFIG_AES_KEY_SIZE_192) || defined(CONFIG_AES_KEY_SIZE_256)\n\tCONFIG_AES_CMAC_KEY_WORD4,\n\tCONFIG_AES_CMAC_KEY_WORD5,\n#endif\n#if defined(CONFIG_AES_KEY_SIZE_256)\n\tCONFIG_AES_CMAC_KEY_WORD6,\n\tCONFIG_AES_CMAC_KEY_WORD7,\n#endif\n};\n\nstatic unsigned int iv[AT91_AES_IV_SIZE_WORD] = {\n\tCONFIG_AES_IV_WORD0,\n\tCONFIG_AES_IV_WORD1,\n\tCONFIG_AES_IV_WORD2,\n\tCONFIG_AES_IV_WORD3,\n};\n\nstatic int secure_decrypt(void *data, unsigned int data_length, int is_signed)\n{\n\tat91_aes_key_size_t key_size;\n\tunsigned int computed_cmac[AT91_AES_BLOCK_SIZE_WORD];\n\tunsigned int fixed_length;\n\tconst unsigned int *cmac;\n\tint rc = -1;",
+        "modified_lines": {
+            "added": [
+                "\tCONFIG_AES_CIPHER_KEY_WORD0,",
+                "\tCONFIG_AES_CIPHER_KEY_WORD1,",
+                "\tCONFIG_AES_CIPHER_KEY_WORD2,",
+                "\tCONFIG_AES_CIPHER_KEY_WORD3,",
+                "#if defined(CONFIG_AES_KEY_SIZE_192) || defined(CONFIG_AES_KEY_SIZE_256)",
+                "\tCONFIG_AES_CIPHER_KEY_WORD4,",
+                "\tCONFIG_AES_CIPHER_KEY_WORD5,",
+                "#if defined(CONFIG_AES_KEY_SIZE_256)",
+                "\tCONFIG_AES_CIPHER_KEY_WORD6,",
+                "\tCONFIG_AES_CIPHER_KEY_WORD7,",
+                "#endif",
+                "};",
+                "static unsigned int cmac_key[8] = {",
+                "\tCONFIG_AES_CMAC_KEY_WORD0,",
+                "\tCONFIG_AES_CMAC_KEY_WORD1,",
+                "\tCONFIG_AES_CMAC_KEY_WORD2,",
+                "\tCONFIG_AES_CMAC_KEY_WORD3,",
+                "\tCONFIG_AES_CMAC_KEY_WORD4,",
+                "\tCONFIG_AES_CMAC_KEY_WORD5,",
+                "\tCONFIG_AES_CMAC_KEY_WORD6,",
+                "\tCONFIG_AES_CMAC_KEY_WORD7,",
+                "};",
+                "static unsigned int iv[AT91_AES_IV_SIZE_WORD] = {",
+                "\tCONFIG_AES_IV_WORD0,",
+                "\tCONFIG_AES_IV_WORD1,",
+                "\tCONFIG_AES_IV_WORD2,",
+                "\tCONFIG_AES_IV_WORD3,",
+                "};",
+                "static int secure_decrypt(void *data, unsigned int data_length, int is_signed)"
+            ],
+            "deleted": [
+                "static inline void init_keys(at91_aes_key_size_t *key_size,",
+                "\t\t\t     unsigned int *cipher_key,",
+                "\t\t\t     unsigned int *cmac_key,",
+                "\t\t\t     unsigned int *iv)",
+                "{",
+                "#if defined(CONFIG_AES_KEY_SIZE_128)",
+                "\t*key_size = AT91_AES_KEY_SIZE_128;",
+                "#elif defined(CONFIG_AES_KEY_SIZE_192)",
+                "\t*key_size = AT91_AES_KEY_SIZE_192;",
+                "#elif defined(CONFIG_AES_KEY_SIZE_256)",
+                "\t*key_size = AT91_AES_KEY_SIZE_256;",
+                "#else",
+                "#error \"bad AES key size\"",
+                "\tiv[0]\t\t= CONFIG_AES_IV_WORD0;",
+                "\tiv[1]\t\t= CONFIG_AES_IV_WORD1;",
+                "\tiv[2]\t\t= CONFIG_AES_IV_WORD2;",
+                "\tiv[3]\t\t= CONFIG_AES_IV_WORD3;",
+                "\tcipher_key[0]\t= CONFIG_AES_CIPHER_KEY_WORD0;",
+                "\tcmac_key[0]\t= CONFIG_AES_CMAC_KEY_WORD0;",
+                "\tcipher_key[1]\t= CONFIG_AES_CIPHER_KEY_WORD1;",
+                "\tcmac_key[1]\t= CONFIG_AES_CMAC_KEY_WORD1;",
+                "\tcipher_key[2]\t= CONFIG_AES_CIPHER_KEY_WORD2;",
+                "\tcmac_key[2]\t= CONFIG_AES_CMAC_KEY_WORD2;",
+                "\tcipher_key[3]\t= CONFIG_AES_CIPHER_KEY_WORD3;",
+                "\tcmac_key[3]\t= CONFIG_AES_CMAC_KEY_WORD3;",
+                "\tcipher_key[4]\t= CONFIG_AES_CIPHER_KEY_WORD4;",
+                "\tcmac_key[4]\t= CONFIG_AES_CMAC_KEY_WORD4;",
+                "\tcipher_key[5]\t= CONFIG_AES_CIPHER_KEY_WORD5;",
+                "\tcmac_key[5]\t= CONFIG_AES_CMAC_KEY_WORD5;",
+                "\tcipher_key[6]\t= CONFIG_AES_CIPHER_KEY_WORD6;",
+                "\tcmac_key[6]\t= CONFIG_AES_CMAC_KEY_WORD6;",
+                "\tcipher_key[7]\t= CONFIG_AES_CIPHER_KEY_WORD7;",
+                "\tcmac_key[7]\t= CONFIG_AES_CMAC_KEY_WORD7;",
+                "}"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive encryption and authentication keys in memory.",
+        "trigger_condition": "Control is passed to a less privileged software component without securely wiping sensitive keys from memory, allowing potential exposure of these keys.",
+        "specific_code_behavior_causing_vulnerability": "The code initializes sensitive keys directly within a function, which may leave these keys in memory after the function exits, making them accessible to unauthorized components."
+    },
+    {
+        "CVE_id": "CVE-2020-11684",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of sensitive cryptographic keys in memory.",
+            "trigger_condition": "The function exits without securely wiping sensitive keys from memory, allowing potential access by less privileged components.",
+            "specific_code_behavior_causing_vulnerability": "The code initializes and uses encryption and authentication keys within the function but does not ensure these keys are cleared from memory before returning, leading to a risk of key disclosure."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to remove the declarations of sensitive keys from the function's context and ensure that any sensitive data is securely wiped from memory before the function exits. This prevents the exposure of cryptographic keys to less privileged components.",
+        "purpose": "\"The function `secure_decrypt` is designed to decrypt data while optionally verifying its authenticity using a CMAC signature, ensuring secure handling of cryptographic keys.\"",
+        "function": "1. Initialize encryption and authentication keys.  \n2. Initialize the AES peripheral for encryption operations.  \n3. Compute the CMAC (Cipher-based Message Authentication Code) if the data is signed.  \n4. Verify the computed CMAC against the provided CMAC.  \n5. Decrypt the data using AES in CBC (Cipher Block Chaining) mode.  \n6. Clean up and reset the AES peripheral after operations.  \n7. Clear sensitive key material from memory before returning.",
+        "analysis": "The modification to the `secure_decrypt` function is necessary to address the vulnerability described in CVE-2020-11684, which involves the improper handling of sensitive cryptographic keys in memory. Here are the key reasons why the changes are important:\n\n1. **Key Management**: The original code initializes and uses encryption and authentication keys (`cmac_key`, `cipher_key`, and `iv`) within the `secure_decrypt` function. However, these keys are not properly wiped from memory before the function exits. This can lead to a situation where the keys remain in memory and can be accessed by less privileged software components, potentially allowing an attacker to extract these keys and compromise the security of the system.\n\n2. **Static Key Size Definition**: The modification introduces a static definition of the AES key size based on configuration macros (`CONFIG_AES_KEY_SIZE_128`, `CONFIG_AES_KEY_SIZE_192`, `CONFIG_AES_KEY_SIZE_256`). This ensures that the key size is explicitly defined at compile time, reducing the risk of using an incorrect or insecure key size.\n\n3. **Removal of Sensitive Variables**: By removing the declarations of `cmac_key`, `cipher_key`, and `iv` from the function, the modified code reduces the risk of these sensitive keys being inadvertently exposed. The keys are no longer stored in the function's stack frame, which is a common area where sensitive data can be leaked if not handled properly.\n\n4. **Error Handling**: The modified code retains the error handling logic but ensures that sensitive data is not present in the function's context. This is crucial for maintaining the integrity and confidentiality of the cryptographic operations.\n\n5. **Security Best Practices**: The changes align with security best practices by minimizing the exposure of sensitive data and ensuring that cryptographic operations are performed in a secure manner. This includes ensuring that keys are not left in memory longer than necessary and are properly managed throughout their lifecycle.\n\nIn summary, the modifications are necessary to enhance the security of the `secure_decrypt` function by ensuring that sensitive cryptographic keys are not exposed or left in memory, thereby mitigating the risk of key disclosure and potential exploitation.",
+        "code_before_change": "int secure_decrypt(void *data, unsigned int data_length, int is_signed)\n{\n\tat91_aes_key_size_t key_size;\n\tunsigned int cmac_key[8], cipher_key[8];\n\tunsigned int iv[AT91_AES_IV_SIZE_WORD];\n\tunsigned int computed_cmac[AT91_AES_BLOCK_SIZE_WORD];\n\tunsigned int fixed_length;\n\tconst unsigned int *cmac;\n\tint rc = -1;\n\n\t/* Init keys */\n\tinit_keys(&key_size, cipher_key, cmac_key, iv);\n\n\t/* Init periph */\n\tat91_aes_init();\n\n\t/* Check signature if required */\n\tif (is_signed) {\n\t\t/* Compute the CMAC */\n\t\tif (at91_aes_cmac(data_length, data, computed_cmac,\n\t\t\t\t  key_size, cmac_key))\n\t\t\tgoto exit;\n\n\t\t/* Check the CMAC */\n\t\tfixed_length = at91_aes_roundup(data_length);\n\t\tcmac = (const unsigned int *)((char *)data + fixed_length);\n\t\tif (!consttime_memequal(cmac, computed_cmac, AT91_AES_BLOCK_SIZE_BYTE))\n\t\t\tgoto exit;\n\t}\n\n\t/* Decrypt the whole file */\n\tif (at91_aes_cbc(data_length, data, data, 0,\n\t\t\t key_size, cipher_key, iv))\n\t\tgoto exit;\n\n\trc = 0;\nexit:\n\t/* Reset periph */\n\tat91_aes_cleanup();\n\n\t/* Reset keys */\n\tmemset(cmac_key, 0, sizeof(cmac_key));\n\tmemset(cipher_key, 0, sizeof(cipher_key));\n\tmemset(iv, 0, sizeof(iv));\n\n\treturn rc;\n}",
+        "code_after_change": "static int secure_decrypt(void *data, unsigned int data_length, int is_signed)\n{\n\tat91_aes_key_size_t key_size;\n\tunsigned int computed_cmac[AT91_AES_BLOCK_SIZE_WORD];\n\tunsigned int fixed_length;\n\tconst unsigned int *cmac;\n\tint rc = -1;\n\n#if defined(CONFIG_AES_KEY_SIZE_128)\n\tkey_size = AT91_AES_KEY_SIZE_128;\n#elif defined(CONFIG_AES_KEY_SIZE_192)\n\tkey_size = AT91_AES_KEY_SIZE_192;\n#elif defined(CONFIG_AES_KEY_SIZE_256)\n\tkey_size = AT91_AES_KEY_SIZE_256;\n#else\n#error \"bad AES key size\"\n#endif\n\n\t/* Init periph */\n\tat91_aes_init();\n\n\t/* Check signature if required */\n\tif (is_signed) {\n\t\t/* Compute the CMAC */\n\t\tif (at91_aes_cmac(data_length, data, computed_cmac,\n\t\t\t\t  key_size, cmac_key))\n\t\t\tgoto exit;\n\n\t\t/* Check the CMAC */\n\t\tfixed_length = at91_aes_roundup(data_length);\n\t\tcmac = (const unsigned int *)((char *)data + fixed_length);\n\t\tif (!consttime_memequal(cmac, computed_cmac, AT91_AES_BLOCK_SIZE_BYTE))\n\t\t\tgoto exit;\n\t}\n\n\t/* Decrypt the whole file */\n\tif (at91_aes_cbc(data_length, data, data, 0,\n\t\t\t key_size, cipher_key, iv))\n\t\tgoto exit;\n\n\trc = 0;\nexit:\n\t/* Reset periph */\n\tat91_aes_cleanup();\n\n\treturn rc;\n}",
+        "modified_lines": {
+            "added": [
+                "static int secure_decrypt(void *data, unsigned int data_length, int is_signed)",
+                "#if defined(CONFIG_AES_KEY_SIZE_128)",
+                "\tkey_size = AT91_AES_KEY_SIZE_128;",
+                "#elif defined(CONFIG_AES_KEY_SIZE_192)",
+                "\tkey_size = AT91_AES_KEY_SIZE_192;",
+                "#elif defined(CONFIG_AES_KEY_SIZE_256)",
+                "\tkey_size = AT91_AES_KEY_SIZE_256;",
+                "#else",
+                "#error \"bad AES key size\"",
+                "#endif",
+                "\treturn rc;",
+                "}"
+            ],
+            "deleted": [
+                "int secure_decrypt(void *data, unsigned int data_length, int is_signed)",
+                "\tunsigned int cmac_key[8], cipher_key[8];",
+                "\tunsigned int iv[AT91_AES_IV_SIZE_WORD];",
+                "\t/* Init keys */",
+                "\tinit_keys(&key_size, cipher_key, cmac_key, iv);",
+                "\treturn rc;"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of sensitive cryptographic keys in memory.",
+        "trigger_condition": "The function exits without securely wiping sensitive keys from memory, allowing potential access by less privileged components.",
+        "specific_code_behavior_causing_vulnerability": "The code initializes and uses encryption and authentication keys within the function but does not ensure these keys are cleared from memory before returning, leading to a risk of key disclosure."
+    }
+]

@@ -1,0 +1,136 @@
+[
+    {
+        "CVE_id": "CVE-2021-41168",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Weak hash function leading to hash collisions in a hash table implementation.",
+            "trigger_condition": "An attacker generates multiple inputs that hash to the same value, causing excessive collisions and degrading performance.",
+            "specific_code_behavior_causing_vulnerability": "The code only checks if the hash matches the reference ID, allowing for multiple entries with the same hash value, which can lead to long retrieval times and denial of service."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to enhance the lookup logic by adding checks for the size of the label and performing a case-insensitive comparison of the label's content with the input name. This ensures that only the correct reference is returned, reducing the impact of hash collisions and improving performance.",
+        "purpose": "\"The function `find_link_ref` retrieves a reference from a hash table based on a hashed identifier derived from a given name.\"",
+        "function": "1. Computes a hash value for the given name using the `hash_link_ref` function. 2. Retrieves a reference from the `references` array based on the computed hash value. 3. Iterates through linked list entries to find a matching reference by comparing IDs. 4. Returns the found reference or NULL if no match is found.",
+        "analysis": "The modification to the `find_link_ref` function is necessary to address the vulnerability described in CVE-2021-41168, which involves a denial of service (DoS) attack due to a weak hash function and the handling of hash collisions in the reference table.\n\nHere are the key reasons why the changes are important:\n\n1. **Weak Hash Function and Collisions**: The original implementation only checked if the `id` of the reference matched the computed hash. This means that if an attacker can generate multiple inputs that hash to the same value (collisions), they can create many entries in the hash table with the same `id`. This leads to longer retrieval times as the function would have to traverse through all the colliding entries in the linked list.\n\n2. **Duplicate Entries**: The original code allowed for duplicate entries with the same hash value, which exacerbated the problem of hash collisions. An attacker could exploit this by inserting many entries that collide, leading to a situation where the function takes a long time to find the correct reference or may even time out.\n\n3. **Enhanced Comparison Logic**: The modification introduces additional checks to ensure that not only does the `id` match the hash, but also that the size of the label matches the expected length and that the actual content of the label matches the input name. This means that even if there are multiple entries with the same hash, the function will only return a reference if it matches the specific name being searched for. This significantly reduces the chances of returning the wrong reference and mitigates the impact of collisions.\n\n4. **Mitigation of DoS Attacks**: By ensuring that both the size and content of the label are checked, the modified code reduces the effectiveness of an attack that relies on generating many colliding hashes. This makes it harder for an attacker to create a situation where the function is forced to traverse a long list of colliding entries, thus improving performance and security.\n\nIn summary, the modifications are necessary to strengthen the integrity of the hash table lookup process, reduce the likelihood of denial of service attacks due to hash collisions, and ensure that the correct reference is returned in a timely manner.",
+        "code_before_change": "find_link_ref(struct link_ref **references, uint8_t *name, size_t length)\n{\n\tunsigned int hash = hash_link_ref(name, length);\n\tstruct link_ref *ref = NULL;\n\n\tref = references[hash % REF_TABLE_SIZE];\n\n\twhile (ref != NULL) {\n\t\tif (ref->id == hash)\n\t\t\treturn ref;\n\n\t\tref = ref->next;\n\t}\n\n\treturn NULL;\n}",
+        "code_after_change": "find_link_ref(struct link_ref **references, uint8_t *name, size_t length)\n{\n\tunsigned int hash = hash_link_ref(name, length);\n\tstruct link_ref *ref = NULL;\n\n\tref = references[hash % REF_TABLE_SIZE];\n\n\twhile (ref != NULL) {\n\t\tif (ref->id == hash && ref->label->size == length) {\n\t\t\tif (strncasecmp((char *)ref->label->data, (char *) name, length) == 0) {\n\t\t\t\treturn ref;\n\t\t\t}\n\t\t}\n\n\t\tref = ref->next;\n\t}\n\n\treturn NULL;\n}",
+        "modified_lines": {
+            "added": [
+                "\t\tif (ref->id == hash && ref->label->size == length) {",
+                "\t\t\tif (strncasecmp((char *)ref->label->data, (char *) name, length) == 0) {",
+                "\t\t\t\treturn ref;",
+                "\t\t\t}",
+                "\t\t}"
+            ],
+            "deleted": [
+                "\t\tif (ref->id == hash)",
+                "\t\t\treturn ref;"
+            ]
+        },
+        "vulnerability_cause_description": "Weak hash function leading to hash collisions in a hash table implementation.",
+        "trigger_condition": "An attacker generates multiple inputs that hash to the same value, causing excessive collisions and degrading performance.",
+        "specific_code_behavior_causing_vulnerability": "The code only checks if the hash matches the reference ID, allowing for multiple entries with the same hash value, which can lead to long retrieval times and denial of service."
+    },
+    {
+        "CVE_id": "CVE-2021-41168",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Use of a weak hash function that is susceptible to hash collisions.",
+            "trigger_condition": "An attacker crafts multiple inputs that produce the same hash value, leading to performance degradation.",
+            "specific_code_behavior_causing_vulnerability": "The hash function computes hash values in a way that allows for predictable collisions, making it easy for an attacker to exploit the hash table's performance characteristics."
+        },
+        "solution": "To mitigate the vulnerability, replace the weak hash function with a stronger, collision-resistant hash function. This ensures that the hash table can handle inputs more securely and efficiently, reducing the risk of denial of service attacks due to hash collisions.",
+        "purpose": "\"The function computes a hash value for a given input byte array, which is used for storing references in a hash table.\"",
+        "function": "1. Computes a hash value for a given input array of bytes (`link_ref`). 2. Iterates through each byte of the input array up to a specified length. 3. Uses a combination of bitwise operations and the `tolower` function to generate a hash value that is susceptible to collisions.",
+        "analysis": "The modification to the `hash_link_ref` function is necessary to address the vulnerability identified as CVE-2021-41168, which involves a denial of service (DoS) attack due to a weak hash function used in the original implementation. Here’s a breakdown of why the changes were made:\n\n1. **Weak Hash Function**: The original hash function used in the code snippet is susceptible to hash collisions. This means that an attacker can craft inputs that produce the same hash value, leading to a high number of collisions in the hash table. When many entries collide, it can degrade the performance of the hash table, resulting in long retrieval times and potentially causing a denial of service.\n\n2. **Denial of Service (DoS) Attack**: The vulnerability allows an attacker to exploit the weak hash function by generating a large number of inputs that hash to the same value. This can cause the hash table to become inefficient, as it would require more time to resolve collisions, leading to increased latency or even service unavailability.\n\n3. **Replacement with a Stronger Hash Function**: The modification replaces the weak hash function with `siphash_nocase`, which is a stronger hash function designed to be more resistant to collision attacks. SipHash is a cryptographic hash function that provides better security properties and is less likely to produce collisions under adversarial conditions.\n\n4. **Removal of Redundant Code**: The original code contained unnecessary complexity with a loop and manual hash computation. By replacing it with a single call to `siphash_nocase`, the code becomes simpler, more maintainable, and more secure.\n\n5. **Case Insensitivity**: The function `siphash_nocase` suggests that it handles case insensitivity, which is likely a requirement for the application (as indicated by the use of `tolower` in the original code). This ensures that the new implementation retains the intended functionality while improving security.\n\nIn summary, the modification is necessary to eliminate the vulnerability associated with the weak hash function, thereby preventing potential denial of service attacks and improving the overall security and performance of the hash table implementation.",
+        "code_before_change": "hash_link_ref(const uint8_t *link_ref, size_t length)\n{\n\tsize_t i;\n\tunsigned int hash = 0;\n\n\tfor (i = 0; i < length; ++i)\n\t\thash = tolower(link_ref[i]) + (hash << 6) + (hash << 16) - hash;\n\n\treturn hash;\n}",
+        "code_after_change": "hash_link_ref(const uint8_t *link_ref, size_t length)\n{\n\treturn siphash_nocase(link_ref, length, sip_hash_key);\n}",
+        "modified_lines": {
+            "added": [
+                "\treturn siphash_nocase(link_ref, length, sip_hash_key);"
+            ],
+            "deleted": [
+                "\tsize_t i;",
+                "\tunsigned int hash = 0;",
+                "\tfor (i = 0; i < length; ++i)",
+                "\t\thash = tolower(link_ref[i]) + (hash << 6) + (hash << 16) - hash;",
+                "\treturn hash;"
+            ]
+        },
+        "vulnerability_cause_description": "Use of a weak hash function that is susceptible to hash collisions.",
+        "trigger_condition": "An attacker crafts multiple inputs that produce the same hash value, leading to performance degradation.",
+        "specific_code_behavior_causing_vulnerability": "The hash function computes hash values in a way that allows for predictable collisions, making it easy for an attacker to exploit the hash table's performance characteristics."
+    },
+    {
+        "CVE_id": "CVE-2021-41168",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Weak hash function leading to hash collisions in a hash table implementation.",
+            "trigger_condition": "An attacker generates a large number of inputs that produce the same hash value, causing excessive collisions and degrading performance.",
+            "specific_code_behavior_causing_vulnerability": "The code allows for duplicate entries in the hash table without checking for existing references, leading to long retrieval times and potential denial of service."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to implement a check for existing entries in the hash table before inserting a new reference. If a matching entry is found, the existing reference should be reused instead of creating a new one. This reduces the number of entries in the hash table and improves performance by preventing excessive collisions.",
+        "purpose": "\"The function `add_link_ref` adds a new reference to a hash table of link references, using a hash of the reference name to determine its position in the table.\"",
+        "function": "1. Allocates memory for a new `link_ref` structure.  \n2. Computes a hash ID for the provided name using the `hash_link_ref` function.  \n3. Inserts the new `link_ref` into a hash table at the index determined by the hash ID.  \n4. Returns a pointer to the newly created `link_ref`.",
+        "analysis": "The modification to the `add_link_ref` function is necessary to address the vulnerability described in CVE-2021-41168, which involves a denial of service (DoS) attack due to a weak hash function and the handling of duplicate entries in the hash table. Here are the key reasons for the changes made:\n\n1. **Handling Duplicate Entries**: The original implementation allowed for duplicate entries in the hash table, which could lead to long retrieval times when an attacker generates many collisions. The modification introduces a loop that checks for existing entries with the same hash value and label before inserting a new entry. If a matching entry is found, it reuses the existing reference instead of creating a new one. This prevents unnecessary growth of the hash table and mitigates the risk of performance degradation due to collisions.\n\n2. **Improved Hash Collision Management**: The modified code checks for existing references in the hash table using the computed hash value. If a reference with the same label already exists, it replaces the existing reference instead of adding a new one. This reduces the number of entries in the hash table and helps maintain efficient access times, even in the presence of hash collisions.\n\n3. **Memory Management**: The modification includes calls to `bufrelease` for the existing reference's label, link, and title before returning it. This ensures that memory is properly managed and prevents memory leaks when reusing existing references.\n\n4. **Prevention of DoS Attacks**: By addressing the issues of duplicate entries and hash collisions, the modified code significantly reduces the risk of denial of service attacks. Attackers can no longer exploit the weak hash function to create numerous collisions that degrade performance, as the function now efficiently handles duplicates and maintains a more stable performance profile.\n\n5. **Robustness and Reliability**: Overall, the changes make the function more robust and reliable. It ensures that the hash table operates correctly under various conditions, including those that could be exploited by an attacker, thus improving the security posture of the application.\n\nIn summary, the modifications are necessary to enhance the security and performance of the `add_link_ref` function by preventing denial of service attacks through better handling of hash collisions and duplicate entries.",
+        "code_before_change": "add_link_ref(\n\tstruct link_ref **references,\n\tconst uint8_t *name, size_t name_size)\n{\n\tstruct link_ref *ref = calloc(1, sizeof(struct link_ref));\n\n\tif (!ref)\n\t\treturn NULL;\n\n\tref->id = hash_link_ref(name, name_size);\n\tref->next = references[ref->id % REF_TABLE_SIZE];\n\n\treferences[ref->id % REF_TABLE_SIZE] = ref;\n\treturn ref;\n}",
+        "code_after_change": "add_link_ref(\n\tstruct link_ref **references,\n\tconst uint8_t *name, size_t name_size)\n{\n\tunsigned int hash;\n\tstruct link_ref *ref;\n\thash = hash_link_ref(name, name_size);\n\tref = references[hash % REF_TABLE_SIZE];\n\twhile (ref != NULL) {\n\t\t/* If a reference with the same label exists already, replace it with the new reference */\n\t\tif (ref->id == hash && ref->label->size == name_size) {\n\t\t\tif (strncasecmp((char *)ref->label->data, (char *) name, name_size) == 0) {\n\t\t\t\tbufrelease(ref->label);\n\t\t\t\tbufrelease(ref->link);\n\t\t\t\tbufrelease(ref->title);\n\t\t\t\treturn ref;\n\t\t\t}\n\t\t}\n\n\t\tref = ref->next;\n\t}\n\tref = calloc(1, sizeof(struct link_ref));\n\tif (!ref)\n\t\treturn NULL;\n\tref->id = hash;\n\tref->next = references[ref->id % REF_TABLE_SIZE];\n\n\treferences[ref->id % REF_TABLE_SIZE] = ref;\n\treturn ref;\n}",
+        "modified_lines": {
+            "added": [
+                "\tunsigned int hash;",
+                "\tstruct link_ref *ref;",
+                "\thash = hash_link_ref(name, name_size);",
+                "\tref = references[hash % REF_TABLE_SIZE];",
+                "\twhile (ref != NULL) {",
+                "\t\t/* If a reference with the same label exists already, replace it with the new reference */",
+                "\t\tif (ref->id == hash && ref->label->size == name_size) {",
+                "\t\t\tif (strncasecmp((char *)ref->label->data, (char *) name, name_size) == 0) {",
+                "\t\t\t\tbufrelease(ref->label);",
+                "\t\t\t\tbufrelease(ref->link);",
+                "\t\t\t\tbufrelease(ref->title);",
+                "\t\t\t\treturn ref;",
+                "\t\t\t}",
+                "\t\t}",
+                "\t\tref = ref->next;",
+                "\t}",
+                "\tref = calloc(1, sizeof(struct link_ref));",
+                "\tref->id = hash;"
+            ],
+            "deleted": [
+                "\tstruct link_ref *ref = calloc(1, sizeof(struct link_ref));",
+                "\tref->id = hash_link_ref(name, name_size);"
+            ]
+        },
+        "vulnerability_cause_description": "Weak hash function leading to hash collisions in a hash table implementation.",
+        "trigger_condition": "An attacker generates a large number of inputs that produce the same hash value, causing excessive collisions and degrading performance.",
+        "specific_code_behavior_causing_vulnerability": "The code allows for duplicate entries in the hash table without checking for existing references, leading to long retrieval times and potential denial of service."
+    },
+    {
+        "CVE_id": "CVE-2022-36021",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Inefficient handling of string matching patterns leading to excessive CPU usage.",
+            "trigger_condition": "An authenticated user submits a specially crafted pattern that exploits the recursive nature of the string matching function, causing it to enter a state of high CPU consumption.",
+            "specific_code_behavior_causing_vulnerability": "The recursive calls within the string matching function do not adequately limit the complexity of the patterns being processed, allowing for a combinatorial explosion of comparisons that can lead to denial-of-service conditions."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to refactor the string matching logic into a separate implementation that includes safeguards against excessive recursion and complexity. This new implementation should handle patterns more efficiently and prevent high CPU usage by avoiding unnecessary comparisons.",
+        "purpose": "\"The function `stringmatchlen` is designed to match a given string against a specified pattern, supporting wildcard characters and case sensitivity.\"",
+        "function": "1. Match a string against a specified pattern with wildcard support.  \n2. Handle special characters in the pattern, such as '*', '?', '[', and '\\\\'.  \n3. Support case-insensitive matching based on the `nocase` parameter.  \n4. Allow for character ranges in the pattern using the '-' character within square brackets.  \n5. Return a match result indicating whether the string matches the pattern or not.",
+        "analysis": "The modification to the `stringmatchlen` function is necessary to address the vulnerability described in CVE-2022-36021, which allows authenticated users to exploit the string matching functionality in Redis to trigger a denial-of-service (DoS) condition. \n\n### Explanation of the Vulnerability\n\n1. **Denial-of-Service (DoS) Risk**: The original implementation of `stringmatchlen` can lead to excessive CPU usage and potential hangs when processing certain patterns, particularly those that involve nested wildcards or complex character classes. This is due to the recursive nature of the function, which can lead to a combinatorial explosion in the number of comparisons made, especially with patterns like `**` or `[a-z]*`.\n\n2. **Infinite Loops or High CPU Usage**: The recursive calls to `stringmatchlen` can result in scenarios where the function keeps trying to match increasingly complex patterns against strings, leading to high CPU consumption and potentially causing the Redis server to become unresponsive.\n\n### Changes Made in the Modification\n\n1. **Refactoring to `stringmatchlen_impl`**: The original function is replaced with a call to a new function, `stringmatchlen_impl`, which presumably contains a more robust implementation that handles the matching logic in a way that avoids the pitfalls of the original recursive approach.\n\n2. **Adding `skipLongerMatches`**: The introduction of the `skipLongerMatches` variable suggests that the new implementation may include logic to skip over certain matches that are determined to be longer than necessary, thereby reducing the number of comparisons and preventing the excessive CPU usage that can lead to a DoS condition.\n\n3. **Simplification of the Interface**: By encapsulating the matching logic in a separate function, the code becomes cleaner and easier to maintain. It also allows for the implementation of additional safeguards against the types of patterns that can cause performance issues.\n\n### Conclusion\n\nThe modification is necessary to mitigate the risk of denial-of-service attacks by ensuring that the string matching logic is handled in a more efficient manner. By refactoring the code and potentially implementing new logic in `stringmatchlen_impl`, the developers can prevent the excessive resource consumption that could be exploited by malicious users. This change is crucial for maintaining the stability and reliability of the Redis server in production environments.",
+        "code_before_change": "int stringmatchlen(const char *pattern, int patternLen,\n        const char *string, int stringLen, int nocase)\n{\n    while(patternLen && stringLen) {\n        switch(pattern[0]) {\n        case '*':\n            while (patternLen && pattern[1] == '*') {\n                pattern++;\n                patternLen--;\n            }\n            if (patternLen == 1)\n                return 1; /* match */\n            while(stringLen) {\n                if (stringmatchlen(pattern+1, patternLen-1,\n                            string, stringLen, nocase))\n                    return 1; /* match */\n                string++;\n                stringLen--;\n            }\n            return 0; /* no match */\n            break;\n        case '?':\n            string++;\n            stringLen--;\n            break;\n        case '[':\n        {\n            int not, match;\n\n            pattern++;\n            patternLen--;\n            not = pattern[0] == '^';\n            if (not) {\n                pattern++;\n                patternLen--;\n            }\n            match = 0;\n            while(1) {\n                if (pattern[0] == '\\\\' && patternLen >= 2) {\n                    pattern++;\n                    patternLen--;\n                    if (pattern[0] == string[0])\n                        match = 1;\n                } else if (pattern[0] == ']') {\n                    break;\n                } else if (patternLen == 0) {\n                    pattern--;\n                    patternLen++;\n                    break;\n                } else if (patternLen >= 3 && pattern[1] == '-') {\n                    int start = pattern[0];\n                    int end = pattern[2];\n                    int c = string[0];\n                    if (start > end) {\n                        int t = start;\n                        start = end;\n                        end = t;\n                    }\n                    if (nocase) {\n                        start = tolower(start);\n                        end = tolower(end);\n                        c = tolower(c);\n                    }\n                    pattern += 2;\n                    patternLen -= 2;\n                    if (c >= start && c <= end)\n                        match = 1;\n                } else {\n                    if (!nocase) {\n                        if (pattern[0] == string[0])\n                            match = 1;\n                    } else {\n                        if (tolower((int)pattern[0]) == tolower((int)string[0]))\n                            match = 1;\n                    }\n                }\n                pattern++;\n                patternLen--;\n            }\n            if (not)\n                match = !match;\n            if (!match)\n                return 0; /* no match */\n            string++;\n            stringLen--;\n            break;\n        }\n        case '\\\\':\n            if (patternLen >= 2) {\n                pattern++;\n                patternLen--;\n            }\n            /* fall through */\n        default:\n            if (!nocase) {\n                if (pattern[0] != string[0])\n                    return 0; /* no match */\n            } else {\n                if (tolower((int)pattern[0]) != tolower((int)string[0]))\n                    return 0; /* no match */\n            }\n            string++;\n            stringLen--;\n            break;\n        }\n        pattern++;\n        patternLen--;\n        if (stringLen == 0) {\n            while(*pattern == '*') {\n                pattern++;\n                patternLen--;\n            }\n            break;\n        }\n    }\n    if (patternLen == 0 && stringLen == 0)\n        return 1;\n    return 0;\n}",
+        "code_after_change": "int stringmatchlen(const char *pattern, int patternLen,\n        const char *string, int stringLen, int nocase) {\n    int skipLongerMatches = 0;\n    return stringmatchlen_impl(pattern,patternLen,string,stringLen,nocase,&skipLongerMatches);\n}",
+        "modified_lines": {
+            "added": [
+                "int stringmatchlen(const char *pattern, int patternLen,",
+                "        const char *string, int stringLen, int nocase) {",
+                "    int skipLongerMatches = 0;",
+                "    return stringmatchlen_impl(pattern,patternLen,string,stringLen,nocase,&skipLongerMatches);",
+                "}"
+            ],
+            "deleted": [
+                "int stringmatchlen(const char *pattern, int patternLen,",
+                "        const char *string, int stringLen, int nocase)",
+                "                if (stringmatchlen(pattern+1, patternLen-1,",
+                "                            string, stringLen, nocase))"
+            ]
+        },
+        "vulnerability_cause_description": "Inefficient handling of string matching patterns leading to excessive CPU usage.",
+        "trigger_condition": "An authenticated user submits a specially crafted pattern that exploits the recursive nature of the string matching function, causing it to enter a state of high CPU consumption.",
+        "specific_code_behavior_causing_vulnerability": "The recursive calls within the string matching function do not adequately limit the complexity of the patterns being processed, allowing for a combinatorial explosion of comparisons that can lead to denial-of-service conditions."
+    }
+]
