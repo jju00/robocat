@@ -39,4 +39,4 @@ val out =
     "flows" -> flows
   )
 
-println("OUTPUT: " + ujson.write(ujson.read(out.toJson), indent = 2))
+ujson.write(ujson.read(out.toJson), indent = 2)

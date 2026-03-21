@@ -15,4 +15,4 @@ val summary =
     "identifiers" -> cpg.identifier.name.l.size
   )
 
-println("OUTPUT: " + ujson.write(ujson.read(summary.toJson), indent = 2))
+ujson.write(ujson.read(summary.toJson), indent = 2)

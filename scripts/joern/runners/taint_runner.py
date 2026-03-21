@@ -1,11 +1,18 @@
 import argparse
+import asyncio
 import json
+import os
 import re
-import time
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import requests
+from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from src.utils.joern_server import JoernClient  # noqa: E402
+
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 _QUERIES_DIR = Path(__file__).resolve().parents[1] / "queries"
 
@@ -15,7 +22,6 @@ class TaintRunner:
         self.config = config
         self.rules = rules
 
-        self.base_url = self._normalize_server_url(config["joern"]["server_url"])
         self.project_name = config["joern"]["workspace_project"]
         self.target_path = config["paths"]["container_source_root"]
         self.taint_dir = Path(config["paths"]["taint_dir"])
@@ -45,18 +51,15 @@ class TaintRunner:
         if not self.sink_sets:
             raise ValueError("No enabled sink categories found.")
 
-    @staticmethod
-    def _normalize_server_url(url: str) -> str:
-        return url.rstrip("/")
+        raw_url = config["joern"]["server_url"].rstrip("/")
+        host_port = raw_url.removeprefix("http://").removeprefix("https://")
+        self._client = JoernClient(url=host_port, timeout=7200)
 
     @staticmethod
     def load_json(path: Path) -> Dict[str, Any]:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    @staticmethod
-    def strip_ansi(text: str) -> str:
-        return re.sub(r"\x1B\[[0-?]*[ -/]*[@-~]", "", text)
+            raw = f.read()
+        return json.loads(os.path.expandvars(raw))
 
     @staticmethod
     def extract_output_marker(stdout: str) -> str | None:
@@ -124,41 +127,6 @@ class TaintRunner:
             return merged
         return parsed
 
-    def submit_query(self, query: str, timeout: int = 60) -> str:
-        res = requests.post(
-            f"{self.base_url}/query",
-            json={"query": query},
-            timeout=timeout,
-        )
-        res.raise_for_status()
-        data = res.json()
-
-        if "uuid" not in data:
-            raise RuntimeError(f"UUID not found in response: {data}")
-
-        return data["uuid"]
-
-    def wait_for_result(
-        self,
-        uuid: str,
-        poll_interval: int = 2,
-        max_wait: int = 7200,
-    ) -> Dict[str, Any]:
-        start = time.time()
-
-        while True:
-            if time.time() - start > max_wait:
-                raise TimeoutError(f"Query timed out: {uuid}")
-
-            res = requests.get(f"{self.base_url}/result/{uuid}", timeout=30)
-            res.raise_for_status()
-            data = res.json()
-
-            if data.get("success") is True:
-                return data
-
-            time.sleep(poll_interval)
-
     def build_import_query(self) -> str:
         template = self.load_scala_template("import_project.scala")
         return self.fill_template(
@@ -219,12 +187,19 @@ class TaintRunner:
             TARGET_PATH=self.escape_for_joern_string(self.target_path),
         )
 
-    def run_json_query(self, query: str) -> Dict[str, Any]:
-        uuid = self.submit_query(query)
-        result = self.wait_for_result(uuid)
+    async def run_json_query(self, query: str) -> Dict[str, Any]:
+        res, valid = await asyncio.to_thread(self._client.query, query)
 
-        stdout = self.strip_ansi(result.get("stdout", ""))
-        stderr = self.strip_ansi(result.get("stderr", ""))
+        if not valid:
+            return {
+                "success": False,
+                "parsed": {"raw_stdout": ""},
+                "stdout": "",
+                "stderr": "request failed (timeout or connection error)",
+            }
+
+        stdout = res.get("stdout", "")
+        stderr = res.get("stderr", "")
 
         json_str = self.extract_output_marker(stdout) or self.extract_res_string(stdout)
         parsed: Any = None
@@ -239,27 +214,24 @@ class TaintRunner:
                     "raw_stdout": stdout,
                 }
         else:
-            parsed = {
-                "raw_stdout": stdout
-            }
+            parsed = {"raw_stdout": stdout}
 
         return {
-            "success": result.get("success", False),
-            "uuid": uuid,
+            "success": res.get("success", False),
             "parsed": parsed,
             "stdout": stdout,
             "stderr": stderr,
         }
 
-    def import_project(self) -> Dict[str, Any]:
+    async def import_project(self) -> Dict[str, Any]:
         print(f"[*] project import start: {self.target_path}")
-        result = self.run_json_query(self.build_import_query())
+        result = await self.run_json_query(self.build_import_query())
         print(f"[+] import complete: {self.project_name}")
         return result
 
-    def run_sink_analysis(self, sink_name: str, sink_regex: str) -> Dict[str, Any]:
+    async def run_sink_analysis(self, sink_name: str, sink_regex: str) -> Dict[str, Any]:
         print(f"[*] sink analysis start: {sink_name}")
-        result = self.run_json_query(self.build_taint_query(sink_name, sink_regex))
+        result = await self.run_json_query(self.build_taint_query(sink_name, sink_regex))
         parsed = result.get("parsed", {})
         flow_count = parsed.get("flow_count") if isinstance(parsed, dict) else None
         print(f"[+] sink analysis complete: {sink_name} | flow_count={flow_count}")
@@ -270,19 +242,23 @@ class TaintRunner:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-    def analyze_all(self) -> Dict[str, Any]:
+    async def analyze_all(self) -> Dict[str, Any]:
+        import_result = await self.import_project()
+
+        tasks = {
+            name: asyncio.create_task(self.run_sink_analysis(name, regex))
+            for name, regex in self.sink_sets.items()
+        }
+        sink_results: Dict[str, Any] = dict(
+            zip(tasks.keys(), await asyncio.gather(*tasks.values()))
+        )
+
         final_result: Dict[str, Any] = {
-            "project": {},
-            "categories": {}
+            "project": import_result,
+            "categories": sink_results,
         }
 
-        import_result = self.import_project()
-        final_result["project"] = import_result
-
-        for sink_name, sink_regex in self.sink_sets.items():
-            sink_result = self.run_sink_analysis(sink_name, sink_regex)
-            final_result["categories"][sink_name] = sink_result
-
+        for sink_name, sink_result in sink_results.items():
             sink_path = self.taint_dir / f"taint_{sink_name}.json"
             self.save_json(sink_path, sink_result)
 
@@ -351,7 +327,7 @@ def main() -> None:
     rules = TaintRunner.load_json(rules_path)
 
     runner = TaintRunner(config=config, rules=rules)
-    all_results = runner.analyze_all()
+    all_results = asyncio.run(runner.analyze_all())
 
     summary = build_summary(all_results)
     print(json.dumps(summary, indent=2, ensure_ascii=False))
