@@ -13,32 +13,7 @@ class JoernClient:
             if url is None:
                 raise ValueError("JOERN_URL is not set")
         self.__url = "http://" + url
-    
-    def restart(self, force: bool = False):
-        try:
-            res = requests.get(self.__url + "/restart", headers={"force": "true" if force else "false"})
-            if res.status_code == 200:
-                return (res.json(), True)
-        except requests.Timeout:
-            logger.warning(f"Joern server restart timeout")
-            return ({}, False)
-        except Exception as e:
-            logger.warning(f"Joern server restart error: {e}")
 
-        return ({}, True)
-    
-    def check_health(self):
-        try:
-            res = requests.get(self.__url + "/check-health")
-            if res.status_code == 200:
-                return (res.json(), True)
-        except requests.Timeout:
-            logger.warning(f"Joern server check health timeout")
-            return ({}, False)
-        except Exception as e:
-            logger.warning(f"Joern server check health error: {e}")
-        return ({}, True)
-    
     def query_colored(self, script, timeout=-1) -> tuple[dict, bool]:
         data = {"query": script}
         timeout = timeout if timeout > 0 else self.__timeout if timeout < 0 else None
