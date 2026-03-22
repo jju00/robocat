@@ -1,20 +1,23 @@
-import argparse
+﻿import argparse
 import asyncio
 import json
 import os
-import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 from dotenv import load_dotenv
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from src.utils.joern_server import JoernClient  # noqa: E402
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_JOERN_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_PROJECT_ROOT))
+sys.path.insert(0, str(_JOERN_DIR))
 
-load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+from src.utils.joern_server import JoernClient           # noqa: E402
+from src.utils.joern_executor import JoernExecutor       # noqa: E402
+from query_builders.taint import TaintQueryBuilder       # noqa: E402
 
-_QUERIES_DIR = Path(__file__).resolve().parents[1] / "queries"
+load_dotenv(_PROJECT_ROOT / ".env")
 
 
 class TaintRunner:
@@ -27,7 +30,7 @@ class TaintRunner:
         self.taint_dir = Path(config["paths"]["taint_dir"])
 
         self.language = config["project"]["language"]
-        self.joern_import = rules.get("joern_import", self.language)
+        joern_import = rules.get("joern_import", self.language)
 
         all_sinks = rules.get("sinks", {})
         enabled = config.get("analysis", {}).get("enabled_sink_categories", [])
@@ -44,16 +47,24 @@ class TaintRunner:
                 for name, value in all_sinks.items()
             }
 
-        self.source_rules = rules.get("sources", [])
+        source_rules = rules.get("sources", [])
 
-        if not self.source_rules:
+        if not source_rules:
             raise ValueError("No source rules found in rules JSON.")
         if not self.sink_sets:
             raise ValueError("No enabled sink categories found.")
 
         raw_url = config["joern"]["server_url"].rstrip("/")
         host_port = raw_url.removeprefix("http://").removeprefix("https://")
-        self._client = JoernClient(url=host_port, timeout=7200)
+
+        self._executor = JoernExecutor(JoernClient(url=host_port, timeout=7200))
+        self._builder = TaintQueryBuilder(
+            project_name=self.project_name,
+            target_path=self.target_path,
+            language=self.language,
+            joern_import=joern_import,
+            source_rules=source_rules,
+        )
 
     @staticmethod
     def load_json(path: Path) -> Dict[str, Any]:
@@ -61,177 +72,15 @@ class TaintRunner:
             raw = f.read()
         return json.loads(os.path.expandvars(raw))
 
-    @staticmethod
-    def extract_output_marker(stdout: str) -> str | None:
-        """Extract JSON from lines prefixed with 'OUTPUT: ' (println-based templates)."""
-        for line in stdout.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("OUTPUT: "):
-                return stripped[len("OUTPUT: "):]
-        return None
-
-    @staticmethod
-    def extract_res_string(stdout: str) -> str | None:
-        """Fallback: extract from Joern REPL val assignment (val resN: String = ...)."""
-        m = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
-        if m:
-            return m[-1]
-
-        m = re.findall(r'val res\d+: String = "(.*)"', stdout, re.DOTALL)
-        if m:
-            raw = m[-1]
-            try:
-                return raw.encode("utf-8").decode("unicode_escape")
-            except Exception:
-                return raw
-
-        return None
-
-    @staticmethod
-    def escape_for_joern_string(value: str) -> str:
-        """Escape a Python string for safe embedding inside a Scala/Joern string literal."""
-        return value.replace("\\", "\\\\").replace('"', '\\"')
-
-    @staticmethod
-    def load_scala_template(name: str) -> str:
-        """Load a .scala query template from the queries directory."""
-        path = _QUERIES_DIR / name
-        if not path.exists():
-            raise FileNotFoundError(f"Scala template not found: {path}")
-        return path.read_text(encoding="utf-8")
-
-    @staticmethod
-    def fill_template(template: str, **kwargs: str) -> str:
-        """Replace $KEY placeholders in a scala template with provided values."""
-        result = template
-        for key, value in kwargs.items():
-            result = result.replace(f"${key}", value)
-        return result
-
-    @staticmethod
-    def normalize_parsed_json(parsed: Any) -> Any:
-        """
-        Joern/ujson output sometimes comes back as a list of single-key objects:
-        [
-          {"methods": 26989},
-          {"calls": 1074204},
-          ...
-        ]
-        Convert that into a flat dict for backward compatibility.
-        """
-        if isinstance(parsed, list):
-            merged: Dict[str, Any] = {}
-            for item in parsed:
-                if isinstance(item, dict):
-                    merged.update(item)
-            return merged
-        return parsed
-
-    def build_import_query(self) -> str:
-        template = self.load_scala_template("import_project.scala")
-        return self.fill_template(
-            template,
-            JOERN_IMPORT=self.joern_import,
-            TARGET_PATH=self.escape_for_joern_string(self.target_path),
-            PROJECT_NAME=self.escape_for_joern_string(self.project_name),
-            LANGUAGE=self.escape_for_joern_string(self.language),
-        )
-
-    def build_source_query_expr(self) -> str:
-        """
-        Support multiple source rule types:
-        - identifier_regex
-        - call_regex
-
-        Result is converted into a common StoredNode iterator so reachableByFlows can use it.
-        """
-        exprs: List[str] = []
-
-        for rule in self.source_rules:
-            rule_type = rule.get("type")
-            value = rule.get("value")
-
-            if not value:
-                continue
-
-            escaped_value = self.escape_for_joern_string(value)
-
-            if rule_type == "identifier_regex":
-                exprs.append(
-                    f'cpg.identifier.code("{escaped_value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
-                )
-            elif rule_type == "call_regex":
-                exprs.append(
-                    f'cpg.call.name("{escaped_value}").cast[io.shiftleft.codepropertygraph.generated.nodes.StoredNode]'
-                )
-            else:
-                raise ValueError(f"Unsupported source rule type: {rule_type}")
-
-        if not exprs:
-            raise ValueError("No valid source expressions were generated.")
-
-        if len(exprs) == 1:
-            return exprs[0]
-
-        return " ++ ".join(f"({expr})" for expr in exprs)
-
-    def build_taint_query(self, sink_name: str, sink_regex: str) -> str:
-        template = self.load_scala_template("tain_flow.scala")
-        return self.fill_template(
-            template,
-            PROJECT_NAME=self.escape_for_joern_string(self.project_name),
-            SOURCE_EXPR=self.build_source_query_expr(),
-            SINK_REGEX=self.escape_for_joern_string(sink_regex),
-            SINK_NAME=self.escape_for_joern_string(sink_name),
-            LANGUAGE=self.escape_for_joern_string(self.language),
-            TARGET_PATH=self.escape_for_joern_string(self.target_path),
-        )
-
-    async def run_json_query(self, query: str) -> Dict[str, Any]:
-        res, valid = await asyncio.to_thread(self._client.query, query)
-
-        if not valid:
-            return {
-                "success": False,
-                "parsed": {"raw_stdout": ""},
-                "stdout": "",
-                "stderr": "request failed (timeout or connection error)",
-            }
-
-        stdout = res.get("stdout", "")
-        stderr = res.get("stderr", "")
-
-        json_str = self.extract_output_marker(stdout) or self.extract_res_string(stdout)
-        parsed: Any = None
-
-        if json_str:
-            try:
-                parsed = json.loads(json_str)
-                parsed = self.normalize_parsed_json(parsed)
-            except json.JSONDecodeError:
-                parsed = {
-                    "raw_json_string": json_str,
-                    "raw_stdout": stdout,
-                }
-        else:
-            parsed = {"raw_stdout": stdout}
-
-        return {
-            "success": res.get("success", False),
-            "parsed": parsed,
-            "stdout": stdout,
-            "stderr": stderr,
-        }
-
     async def import_project(self) -> Dict[str, Any]:
         print(f"[*] project import start: {self.target_path}")
-        result = await self.run_json_query(self.build_import_query())
+        result = await self._executor.run_query(self._builder.build_import_query())
         print(f"[+] import complete: {self.project_name}")
         return result
 
     async def run_sink_analysis(self, sink_name: str, sink_regex: str) -> Dict[str, Any]:
         print(f"[*] sink analysis start: {sink_name}")
-        result = await self.run_json_query(self.build_taint_query(sink_name, sink_regex))
+        result = await self._executor.run_query(self._builder.build_taint_query(sink_name, sink_regex))
         parsed = result.get("parsed", {})
         flow_count = parsed.get("flow_count") if isinstance(parsed, dict) else None
         print(f"[+] sink analysis complete: {sink_name} | flow_count={flow_count}")
@@ -289,7 +138,7 @@ def build_summary(all_results: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "project_summary": project_summary,
-        "category_summary": category_summary
+        "category_summary": category_summary,
     }
 
 
