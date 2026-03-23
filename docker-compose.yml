@@ -8,3 +8,15 @@ services:
       - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
       - ${HOST_WORKSPACE_ROOT}:${CONTAINER_WORKSPACE_ROOT}
     command: ["--server", "--server-host", "0.0.0.0", "--server-port", "9000"]
+
+  clang:
+    build:
+      context: .
+      dockerfile: docker/builder/Dockerfile
+    container_name: ast-builder
+    tty: true
+    stdin_open: true
+    volumes:
+      - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
+      - ${HOST_WORKSPACE_ROOT}:${CONTAINER_WORKSPACE_ROOT}
+    working_dir: ${CONTAINER_SOURCE_ROOT}
