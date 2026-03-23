@@ -4,14 +4,8 @@ NLD MCP Server
 Codex CLI 가 취약점 판단 시 호출하는 MCP tool server.
 
 실행 방법:
-    python -m src.mcp.server          # stdio transport (Codex CLI 연결용)
-    python src/mcp/server.py          # 직접 실행 (동일)
-
-Codex CLI 연결 설정 (~/.codex/config.toml 또는 codex 실행 플래그):
-    [[mcp_servers]]
-    name = "nld"
-    command = ["python", "src/mcp/server.py"]
-    transport = "stdio"
+    python3 -m src.mcp.server          # stdio transport (Codex CLI 연결용)
+    python3 src/mcp/server.py          # 직접 실행 (동일)
 
 Tools:
   1. get_retrieved_knowledge   - 사전 계산된 retriever 결과 조회
@@ -33,14 +27,22 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-import httpx
+from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 경로 설정
-# ──────────────────────────────────────────────────────────────────────────────
+# ── 경로 설정은 상수 정의 전에 먼저 수행 ──────────────────────────────────────
 _ROOT = Path(__file__).resolve().parents[2]   # src/mcp/server.py → NLD/
+load_dotenv(_ROOT / ".env")
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "scripts" / "joern"))
 
+from src.utils.joern_server import JoernClient           # noqa: E402
+from src.utils.joern_executor import JoernExecutor       # noqa: E402
+from query_builders.call_context import CallContextQueryBuilder  # noqa: E402  # type: ignore[import]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 경로 / 환경변수 설정
+# ──────────────────────────────────────────────────────────────────────────────
 RETRIEVER_OUTPUT_PATH = Path(
     os.getenv("RETRIEVER_OUTPUT_PATH", str(_ROOT / "data" / "retriever" / "retriever_output.json"))
 )
@@ -48,9 +50,69 @@ DIFF_RETRIEVER_PATH = Path(
     os.getenv("DIFF_RETRIEVER_PATH", str(_ROOT / "data" / "diff" / "diff_retriever.json"))
 )
 
+# 기본값 fallback (env에서 동적으로 나중에 읽어서 overwrite)
 JOERN_HOST = os.getenv("JOERN_HOST", "localhost")
-JOERN_PORT = int(os.getenv("JOERN_PORT", "8080"))
-JOERN_BASE_URL = f"http://{JOERN_HOST}:{JOERN_PORT}"
+JOERN_PORT = int(os.getenv("JOERN_PORT", "9000"))
+
+# ── 타겟별 Joern 설정: JOERN_CONFIG 로 runner config 파일을 선택 ───────────────
+_CONFIGS_DIR = _ROOT / "scripts" / "joern" / "runners" / "configs"
+
+
+def _load_runner_config() -> dict[str, Any]:
+    """
+    JOERN_CONFIG 환경변수로 지정한 runner config JSON을 로드하고 반환.
+
+    지정 방법:
+        JOERN_CONFIG=lighttpd           # configs/ 디렉토리 기준 이름 (확장자 생략 가능)
+        JOERN_CONFIG=lighttpd.json      # 동일
+        JOERN_CONFIG=/abs/path/foo.json # 절대경로
+
+    값이 없거나 파일이 없으면 빈 dict 반환.
+    """
+    name = os.getenv("JOERN_CONFIG", "")
+    if not name:
+        return {}
+
+    path = Path(name)
+    if not path.is_absolute():
+        # configs 디렉토리 기준 탐색, 확장자 없으면 .json 추가
+        path = _CONFIGS_DIR / (name if "." in name else f"{name}.json")
+
+    if not path.exists():
+        print(f"[NLD-MCP] WARNING: JOERN_CONFIG not found: {path}", file=sys.stderr)
+        return {}
+
+    raw = path.read_text(encoding="utf-8")
+    return json.loads(os.path.expandvars(raw))
+
+
+_runner_cfg = _load_runner_config()
+
+JOERN_PROJECT_NAME = _runner_cfg.get("joern",  {}).get("workspace_project",    "")
+JOERN_LANGUAGE     = _runner_cfg.get("project", {}).get("language",            "php")
+JOERN_TARGET_PATH  = _runner_cfg.get("paths",   {}).get("container_source_root", "/app/source")
+
+# ── Joern executor / builder (lazy singleton) ─────────────────────────────────
+_executor: JoernExecutor | None = None
+_call_context_builder: CallContextQueryBuilder | None = None
+
+
+def _get_executor() -> JoernExecutor:
+    global _executor
+    if _executor is None:
+        _executor = JoernExecutor(JoernClient(url=f"{JOERN_HOST}:{JOERN_PORT}"))
+    return _executor
+
+
+def _get_call_context_builder() -> CallContextQueryBuilder:
+    global _call_context_builder
+    if _call_context_builder is None:
+        _call_context_builder = CallContextQueryBuilder(
+            project_name=JOERN_PROJECT_NAME,
+            language=JOERN_LANGUAGE,
+            target_path=JOERN_TARGET_PATH,
+        )
+    return _call_context_builder
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 전역 캐시 (서버 기동 시 1회 로드)
@@ -97,47 +159,18 @@ def _load_retriever_cache() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Joern REST 헬퍼
+# Joern 결과 포맷 헬퍼
 # ──────────────────────────────────────────────────────────────────────────────
-def _joern_query(cpgql: str, timeout: int = 30) -> dict[str, Any]:
+def _fmt_executor(result: dict[str, Any]) -> str:
     """
-    Joern REST server 에 CPGQL 쿼리를 전송하고 응답을 반환한다.
+    executor.run_query() 결과를 Codex 가 읽기 좋은 문자열로 정규화.
 
-    Joern 서버 시작:
-        joern --server               # 기본 포트 8080
-
-    반환 예시:
-        {"success": true, "stdout": "...", "stderr": ""}
+    JSON 파싱에 실패한 인라인 DSL 쿼리(Tool 3/4)는 stdout 원문을 그대로 반환.
     """
-    url = f"{JOERN_BASE_URL}/v1/query"
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            response = client.post(url, json={"query": cpgql})
-            response.raise_for_status()
-            return response.json()
-    except httpx.ConnectError:
-        return {
-            "success": False,
-            "error": f"Joern REST server 에 연결할 수 없습니다. ({JOERN_BASE_URL})\n"
-                     "joern --server 명령으로 서버를 먼저 시작하세요.",
-            "stdout": "",
-            "stderr": "",
-        }
-    except Exception as exc:
-        return {
-            "success": False,
-            "error": str(exc),
-            "stdout": "",
-            "stderr": "",
-        }
-
-
-def _fmt_joern(raw: dict[str, Any]) -> str:
-    """Joern 응답을 Codex 가 읽기 좋은 문자열로 정규화."""
-    if not raw.get("success"):
-        err = raw.get("error") or raw.get("stderr") or "Unknown Joern error"
+    if not result.get("success"):
+        err = result.get("stderr") or "Unknown Joern error"
         return f"[Joern ERROR] {err}"
-    out = raw.get("stdout", "").strip()
+    out = result.get("stdout", "").strip()
     return out if out else "(no results)"
 
 
@@ -224,75 +257,57 @@ def get_retrieved_knowledge(
 # Tool 2: get_cpg_summary
 # ──────────────────────────────────────────────────────────────────────────────
 @mcp.tool()
-def get_cpg_summary(
+async def get_cpg_summary(
     file_path: str,
     function_name: str,
 ) -> str:
     """
     Joern CPG(Code Property Graph) 에서 대상 함수의 구조/호출 흐름 요약을 반환한다.
 
+    method_call_context.scala 쿼리를 사용하여 단일 요청으로 callee/caller 전체를 조회한다.
+
     포함 정보:
-      - 함수 시그니처 (파라미터 이름/타입)
-      - 직접 호출하는 함수 목록 (callees)
-      - 이 함수를 호출하는 함수 목록 (callers)
-      - 함수 내 식별된 잠재적 sink 호출 목록
+      - 함수 시그니처 (full name, 파일, 라인)
+      - 직접 호출하는 함수 목록 (callees): call_name, callee_full_name, call_code, line
+      - 이 함수를 호출하는 함수 목록 (callers): caller_method_name, call_code, line
 
     Args:
         file_path:     CPG 에 로드된 프로젝트 내 파일 경로
                        (예: "libraries/classes/Advisor.php")
-        function_name: 분석할 함수 이름 (예: "evaluateRuleExpression")
+        function_name: 분석할 함수 이름.
+                       "ClassName::method" 형식이면 메서드명만 자동 파싱.
+                       (예: "Advisor::evaluateRuleExpression" 또는 "evaluateRuleExpression")
 
     Returns:
-        JSON 문자열 with keys: signature, parameters, callees, callers, potential_sinks
+        JSON 문자열 with keys: result_count, results (method_name, signature,
+        callee_count, caller_count, callees, callers)
     """
-    # 함수 파라미터
-    q_params = (
-        f'cpg.method.filename("{file_path}").name("{function_name}")'
-        f'.parameter.map(p => s"${{p.order}}: ${{p.name}} [${{p.typeFullName}}]").l'
-    )
-    # callees (호출하는 함수)
-    q_callees = (
-        f'cpg.method.filename("{file_path}").name("{function_name}")'
-        f'.callee.name.dedup.l'
-    )
-    # callers (호출하는 함수)
-    q_callers = (
-        f'cpg.method.filename("{file_path}").name("{function_name}")'
-        f'.caller.name.dedup.l'
-    )
-    # potential sinks: eval, exec, include, require, system, unserialize 등
-    SINK_NAMES = [
-        "eval", "exec", "system", "passthru", "shell_exec",
-        "include", "require", "unserialize", "call_user_func",
-        "preg_replace", "assert",
-    ]
-    sink_filter = "|".join(SINK_NAMES)
-    q_sinks = (
-        f'cpg.method.filename("{file_path}").name("{function_name}")'
-        f'.call.name("({sink_filter})").map(c => s"${{c.name}} @ line ${{c.lineNumber}}").l'
-    )
+    query = _get_call_context_builder().build_call_context_query(file_path, function_name)
+    result = await _get_executor().run_query(query)
 
-    params_raw   = _joern_query(q_params)
-    callees_raw  = _joern_query(q_callees)
-    callers_raw  = _joern_query(q_callers)
-    sinks_raw    = _joern_query(q_sinks)
+    parsed = result.get("parsed", {})
 
-    result = {
-        "file_path":       file_path,
-        "function":        function_name,
-        "parameters":      _fmt_joern(params_raw),
-        "callees":         _fmt_joern(callees_raw),
-        "callers":         _fmt_joern(callers_raw),
-        "potential_sinks": _fmt_joern(sinks_raw),
-    }
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    if not result.get("success"):
+        return json.dumps(
+            {"error": _fmt_executor(result), "file_path": file_path, "function": function_name},
+            ensure_ascii=False, indent=2,
+        )
+
+    if "raw_stdout" in parsed:
+        return json.dumps(
+            {"error": "CPG 쿼리 파싱 실패", "raw_stdout": parsed["raw_stdout"],
+             "file_path": file_path, "function": function_name},
+            ensure_ascii=False, indent=2,
+        )
+
+    return json.dumps(parsed, ensure_ascii=False, indent=2)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Tool 3: find_dataflow
 # ──────────────────────────────────────────────────────────────────────────────
 @mcp.tool()
-def find_dataflow(
+async def find_dataflow(
     file_path: str,
     function_name: str,
     sink_kind: str = "eval",
@@ -311,11 +326,8 @@ def find_dataflow(
         JSON 문자열 with keys:
           - sink_kind: 추적한 sink
           - paths_found: 발견된 경로 수
-          - paths: 경로 요약 목록 (각 항목은 source → ... → sink 형태 문자열)
           - raw_output: Joern 원본 출력
     """
-    # source: HTTP 요청 파라미터 계열 식별자 ($_ 변수, 파라미터 등)
-    # Joern taint tracking (CPGQL dataflow API)
     q_dataflow = (
         f'val src = cpg.method.filename("{file_path}").name("{function_name}")'
         f'.parameter.l\n'
@@ -323,19 +335,18 @@ def find_dataflow(
         f'sink.reachableByFlows(src).p'
     )
 
-    raw = _joern_query(q_dataflow)
-    output = _fmt_joern(raw)
+    raw = await _get_executor().run_query(q_dataflow)
+    output = _fmt_executor(raw)
 
-    # 경로 수 추정 (줄 수 기반 휴리스틱)
-    lines = [l for l in output.splitlines() if l.strip()]
-    paths_found = sum(1 for l in lines if "→" in l or "Flow" in l or "Parameter" in l)
+    lines = [ln for ln in output.splitlines() if ln.strip()]
+    paths_found = sum(1 for ln in lines if "→" in ln or "Flow" in ln or "Parameter" in ln)
 
     result = {
-        "file_path":    file_path,
-        "function":     function_name,
-        "sink_kind":    sink_kind,
-        "paths_found":  paths_found,
-        "raw_output":   output,
+        "file_path":   file_path,
+        "function":    function_name,
+        "sink_kind":   sink_kind,
+        "paths_found": paths_found,
+        "raw_output":  output,
     }
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -344,7 +355,7 @@ def find_dataflow(
 # Tool 4: find_sanitizer_or_guard
 # ──────────────────────────────────────────────────────────────────────────────
 @mcp.tool()
-def find_sanitizer_or_guard(
+async def find_sanitizer_or_guard(
     file_path: str,
     function_name: str,
 ) -> str:
@@ -397,16 +408,17 @@ def find_sanitizer_or_guard(
             f'.call.name("({pattern})").map(c => s"${{c.name}} @ line ${{c.lineNumber}}").l'
         )
 
-    san_raw   = _joern_query(_build_query(SANITIZER_FUNCS))
-    guard_raw = _joern_query(_build_query(GUARD_FUNCS))
-    auth_raw  = _joern_query(_build_query(AUTH_FUNCS))
-    err_raw   = _joern_query(_build_query(ERROR_FUNCS))
+    executor = _get_executor()
+    san_raw   = await executor.run_query(_build_query(SANITIZER_FUNCS))
+    guard_raw = await executor.run_query(_build_query(GUARD_FUNCS))
+    auth_raw  = await executor.run_query(_build_query(AUTH_FUNCS))
+    err_raw   = await executor.run_query(_build_query(ERROR_FUNCS))
 
     def _parse(raw: dict) -> list[str]:
-        out = _fmt_joern(raw)
+        out = _fmt_executor(raw)
         if out.startswith("[Joern ERROR]") or out == "(no results)":
             return []
-        return [l.strip() for l in out.splitlines() if l.strip()]
+        return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
     san_calls   = _parse(san_raw)
     guard_calls = _parse(guard_raw)
