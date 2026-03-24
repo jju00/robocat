@@ -6,5 +6,18 @@ services:
       - "${JOERN_PORT}:9000"
     volumes:
       - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
-      - ${HOST_WORKSPACE_ROOT}:${CONTAINER_WORKSPACE_ROOT}
+      - ${HOST_WORKSPACE_ROOT}/joern:/app/workspace
     command: ["--server", "--server-host", "0.0.0.0", "--server-port", "9000"]
+
+  clang:
+    build:
+      context: .
+      dockerfile: docker/clang/Dockerfile
+    container_name: clang-builder
+    tty: true
+    stdin_open: true
+    volumes:
+      - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
+      - ${HOST_WORKSPACE_ROOT}/clang:/app/workspace
+      - ./scripts:/app/workspace/scripts:ro
+    working_dir: ${CONTAINER_SOURCE_ROOT}
