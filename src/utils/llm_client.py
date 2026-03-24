@@ -70,6 +70,12 @@ class BaseLLMClient:
         """
         raise NotImplementedError("Subclasses must implement generate_text method")
 
+    def generate_embeddings(self, texts: List[str], model: str = "text-embedding-ada-002") -> List[List[float]]:
+        """
+        임베딩 생성 메서드 (하위 클래스에서 구현)
+        """
+        raise NotImplementedError("Subclasses must implement generate_embeddings method")
+
 
 class OpenAIClient(BaseLLMClient):
     """OpenAI API 클라이언트"""
@@ -114,6 +120,19 @@ class OpenAIClient(BaseLLMClient):
         except Exception as e:
             raise RuntimeError(f"OpenAI API call failed: {str(e)}")
 
+    def generate_embeddings(self, texts: List[str], model: str = "text-embedding-ada-002") -> List[List[float]]:
+        """
+        텍스트 리스트에 대한 임베딩 생성
+        """
+        try:
+            response = self.client.embeddings.create(
+                input=texts,
+                model=model
+            )
+            return [data.embedding for data in response.data]
+        except Exception as e:
+            raise RuntimeError(f"OpenAI Embeddings API call failed: {str(e)}")
+
 
 class DummyClient(BaseLLMClient):
     """
@@ -137,6 +156,11 @@ class DummyClient(BaseLLMClient):
             },
             "solution": "Add input validation and sanitization."
         })
+
+    def generate_embeddings(self, texts: List[str], model: str = "text-embedding-ada-002") -> List[List[float]]:
+        """테스트용 더미 임베딩 (고정 크기 1536)"""
+        import random
+        return [[random.random() for _ in range(1536)] for _ in texts]
 
 
 def get_llm_client(model_name: str) -> BaseLLMClient:
