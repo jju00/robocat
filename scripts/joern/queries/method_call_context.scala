@@ -1,8 +1,6 @@
 import ujson._
 
-open("$PROJECT_NAME")
-
-val targetFile = "$FILE_PATH"
+val targetFile     = "$FILE_PATH"
 val targetFunction = "$FUNCTION_NAME"
 
 val targetMethods =
@@ -12,54 +10,51 @@ val targetMethods =
     .filter(m => m.filename == targetFile)
     .l
 
-val results =
+val resultsJson: ujson.Arr = ujson.Arr.from(
   targetMethods.map { m =>
-    val callees =
-      m.callOut.map { call =>
-        Map(
-          "call_name" -> call.name,
-          "callee_method_name" -> call.callee.name.headOption.getOrElse(""),
-          "callee_full_name" -> call.methodFullName,
-          "call_code" -> call.code,
-          "line" -> call.lineNumber,
-          "file" -> call.file.name.headOption.getOrElse("")
+
+    val calleesJson: ujson.Arr = ujson.Arr.from(
+      m.call.map { c =>
+        ujson.Obj(
+          "call_name"        -> c.name,
+          "callee_full_name" -> c.methodFullName,
+          "call_code"        -> c.code.take(120),
+          "line"             -> c.lineNumber.getOrElse(-1)
         )
       }.l
+    )
 
-    val callers =
-      m.callIn.map { call =>
-        Map(
-          "call_name" -> call.name,
-          "caller_method_name" -> call.method.name,
-          "caller_full_name" -> call.method.fullName,
-          "call_code" -> call.code,
-          "line" -> call.lineNumber,
-          "file" -> call.file.name.headOption.getOrElse("")
+    val callersJson: ujson.Arr = ujson.Arr.from(
+      m.callIn.map { c =>
+        ujson.Obj(
+          "caller_method_name" -> c.method.name,
+          "caller_full_name"   -> c.method.fullName,
+          "call_code"          -> c.code.take(120),
+          "line"               -> c.lineNumber.getOrElse(-1)
         )
       }.l
+    )
 
-    Map(
-      "method_name" -> m.name,
+    ujson.Obj(
+      "method_name"      -> m.name,
       "method_full_name" -> m.fullName,
-      "signature" -> m.signature,
-      "file" -> m.filename,
-      "line" -> m.lineNumber,
-      "callee_count" -> callees.size,
-      "caller_count" -> callers.size,
-      "callees" -> callees,
-      "callers" -> callers
+      "signature"        -> m.signature,
+      "file"             -> m.filename,
+      "line"             -> m.lineNumber.getOrElse(-1),
+      "callee_count"     -> calleesJson.arr.size,
+      "caller_count"     -> callersJson.arr.size,
+      "callees"          -> calleesJson,
+      "callers"          -> callersJson
     )
   }
+)
 
-val out =
-  Map(
-    "project_name" -> "$PROJECT_NAME",
-    "language" -> "$LANGUAGE",
-    "target_path" -> "$TARGET_PATH",
-    "query_file_path" -> targetFile,
-    "query_function_name" -> targetFunction,
-    "result_count" -> results.size,
-    "results" -> results
-  )
+val outJson = ujson.Obj(
+  "project_name"        -> "$PROJECT_NAME",
+  "query_file_path"     -> targetFile,
+  "query_function_name" -> targetFunction,
+  "result_count"        -> targetMethods.size,
+  "results"             -> resultsJson
+)
 
-println("OUTPUT: " + ujson.write(ujson.read(out.toJson), indent = 2))
+println("OUTPUT: " + ujson.write(outJson))
