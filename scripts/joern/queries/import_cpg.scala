@@ -1,29 +1,22 @@
 import ujson._
 
-// workspace에 이미 있으면 importCode 생략, open만 실행
-val alreadyLoaded = workspace.projects.map(_.name).contains("$PROJECT_NAME")
-
-if (!alreadyLoaded) {
+// ── CPG HEADER ────────────────────────────────────────────────────────────────
+if (workspace.projects.isEmpty) {
   importCode.$JOERN_IMPORT("$TARGET_PATH", "$PROJECT_NAME")
+
+  // importCode 실패 감지: 실행 후에도 workspace 가 비어 있으면 명시적 에러
+  if (workspace.projects.isEmpty) {
+    throw new Exception(
+      s"[NLD] importCode.$JOERN_IMPORT failed: workspace still empty. " +
+      s"Check that '$TARGET_PATH' exists inside the Joern container and contains source files."
+    )
+  }
+} else {
+  open(workspace.projects.head.name)
 }
 
-open("$PROJECT_NAME")
-
-// taint 분석이 필요한 경우에만 ossdataflow 실행 ($RUN_DATAFLOW = "true" | "false")
+// taint 분석이 필요한 경우에만 ossdataflow 실행
 if ("$RUN_DATAFLOW" == "true") {
   run.ossdataflow
 }
-
-val summary = Map(
-  "project_name"   -> "$PROJECT_NAME",
-  "language"       -> "$LANGUAGE",
-  "target_path"    -> "$TARGET_PATH",
-  "already_loaded" -> alreadyLoaded.toString,
-  "ran_dataflow"   -> "$RUN_DATAFLOW",
-  "files"          -> cpg.file.name.l.size,
-  "methods"        -> cpg.method.name.l.size,
-  "calls"          -> cpg.call.name.l.size,
-  "identifiers"    -> cpg.identifier.name.l.size
-)
-
-ujson.write(ujson.read(summary.toJson), indent = 2)
+// ── END CPG HEADER ────────────────────────────────────────────────────────────
