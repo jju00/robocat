@@ -45,29 +45,51 @@ class JoernExecutor:
 
     @staticmethod
     def extract_output_marker(stdout: str) -> str | None:
-        """'OUTPUT: ' 접두어로 시작하는 줄에서 JSON 문자열 추출 (println 방식)."""
+        """
+        Joern REPL stdout 에서 JSON 문자열을 추출.
+
+        우선순위:
+          1) val __OUTPUT__: String = "..."  — 템플릿 마지막 바인딩 방식
+          2) val __OUTPUT__: String = \"\"\"...\"\"\"  — 멀티라인(indent) 방식
+          3) val resN: String = \"\"\"...\"\"\"  — taint_flow 등 마지막 resN 트리플-쿼트
+          4) (레거시) OUTPUT:  접두어 줄
+        """
+        # 1) & 2) __OUTPUT__ 명시 바인딩 — 트리플쿼트
+        m = re.search(r'val __OUTPUT__: String = """(.*?)"""', stdout, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+
+        # 1) __OUTPUT__ 싱글쿼트 — escape 디코딩 필요
+        m = re.search(r'val __OUTPUT__: String = "((?:[^"\\]|\\.)*)"', stdout)
+        if m:
+            return JoernExecutor._decode_scala_string(m.group(1))
+
+        # 3) resN 트리플쿼트 (마지막 매치)
+        matches = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
+        if matches:
+            return matches[-1].strip()
+
+        # 4) 레거시 println 방식
         for line in stdout.splitlines():
             stripped = line.strip()
             if stripped.startswith("OUTPUT: "):
                 return stripped[len("OUTPUT: "):]
+
         return None
 
     @staticmethod
     def extract_res_string(stdout: str) -> str | None:
-        """Joern REPL val 바인딩(val resN: String = ...) 에서 JSON 문자열 추출."""
-        m = re.findall(r'val res\d+: String = """(.*?)"""', stdout, re.DOTALL)
-        if m:
-            return m[-1]
+        """이전 버전 호환: extract_output_marker 로 위임."""
+        return JoernExecutor.extract_output_marker(stdout)
 
-        m = re.findall(r'val res\d+: String = "(.*)"', stdout, re.DOTALL)
-        if m:
-            raw = m[-1]
-            try:
-                return raw.encode("utf-8").decode("unicode_escape")
-            except Exception:
-                return raw
-
-        return None
+    @staticmethod
+    def _decode_scala_string(s: str) -> str:
+        """Scala/Java 문자열 이스케이프(\\", \\n, \\\\…)를 Python str 로 디코딩."""
+        import json as _json
+        try:
+            return _json.loads(f'"{s}"')
+        except Exception:
+            return s
 
     @staticmethod
     def normalize_parsed_json(parsed: Any) -> Any:
