@@ -15,12 +15,15 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
+    python3-clang \
     git \
     curl \
     pkg-config \
     php-cli \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir libclang
 
 WORKDIR /app
 
