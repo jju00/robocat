@@ -25,6 +25,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # 패키지 내 import (python -m) / 직접 실행 (python src/...) 양쪽 지원
 try:
     from ...utils.bm25_retriever import BM25Retriever
+    from ...utils.dense_retriever import DenseRetriever
+    from ...utils.llm_client import get_llm_client, OpenAIClient
+    from ...utils.embedding_cache import EmbeddingCache
     from ...dto.retriever_output_dto import (
         RetrievedKnowledgeDTO,
         VulnerabilityBehaviorDTO,
@@ -35,6 +38,9 @@ except ImportError:
     if str(_ROOT) not in sys.path:
         sys.path.insert(0, str(_ROOT))
     from src.utils.bm25_retriever import BM25Retriever
+    from src.utils.dense_retriever import DenseRetriever
+    from src.utils.llm_client import get_llm_client, OpenAIClient
+    from src.utils.embedding_cache import EmbeddingCache
     from src.dto.retriever_output_dto import (
         RetrievedKnowledgeDTO,
         VulnerabilityBehaviorDTO,
@@ -44,8 +50,11 @@ except ImportError:
 # ─── 전역 캐시 ──────────────────────────────────────────────────────────────
 GLOBAL_KNOWLEDGE_DATA: Optional[List[dict]] = None
 
-RETRIEVER_PURPOSE: Optional[BM25Retriever] = None
-RETRIEVER_FUNCTION: Optional[BM25Retriever] = None
+# EMBEDDING_CACHE: Optional[EmbeddingCache] = None
+# LLM_CLIENT: Optional[OpenAIClient] = None
+
+RETRIEVER_PURPOSE: Optional[DenseRetriever] = None
+RETRIEVER_FUNCTION: Optional[DenseRetriever] = None
 RETRIEVER_CODE_BEFORE: Optional[BM25Retriever] = None
 
 _ACTIVE_FIELDS: Dict[str, bool] = {
@@ -75,49 +84,102 @@ def parse_args():
 
 
 # ─── retriever initialization ───────────────────────────────────────────────
-def _build_retriever(corpus: List[str], name: str) -> Tuple[BM25Retriever, bool]:
+# ─── Embedding Helper ────────────────────────────────────────────────────────
+def _get_embeddings_with_cache(texts: List[str], cache: EmbeddingCache, client: OpenAIClient) -> List[List[float]]:
     """
-    코퍼스로 BM25Retriever를 빌드하고, 유효 항목이 있는지 여부를 함께 반환.
+    텍스트 리스트에 대해 캐시를 확인하고 대량으로 임베딩을 생성한다.
     """
-    log(f"[BUILD:{name}] corpus size = {len(corpus)}")
+    results = [None] * len(texts)
+    to_fetch_indices = []
+    to_fetch_texts = []
+
+    for i, text in enumerate(texts):
+        cached = cache.get(text)
+        if cached:
+            results[i] = cached
+        else:
+            to_fetch_indices.append(i)
+            to_fetch_texts.append(text)
+
+    if to_fetch_texts:
+        log(f"[EMB] fetching {len(to_fetch_texts)} new embeddings from OpenAI")
+        # OpenAI API limit: 보통 한 번에 2048개 정도까지 가능하지만 안전하게 100개씩 처리
+        chunk_size = 100
+        for i in range(0, len(to_fetch_texts), chunk_size):
+            chunk = to_fetch_texts[i : i + chunk_size]
+            chunk_indices = to_fetch_indices[i : i + chunk_size]
+            log(f"[EMB]   chunk {i//chunk_size + 1}/{(len(to_fetch_texts)-1)//chunk_size + 1}")
+            embeddings = client.generate_embeddings(chunk)
+            for idx, emb in zip(chunk_indices, embeddings):
+                results[idx] = emb
+                cache.set(texts[idx], emb)
+        
+        log("[EMB] saving cache")
+        cache.save_cache()
+
+    return results  # type: ignore
+
+
+# ─── retriever initialization ───────────────────────────────────────────────
+def _build_bm25_retriever(corpus: List[str], name: str) -> Tuple[BM25Retriever, bool]:
+    log(f"[BUILD:BM25:{name}] corpus size = {len(corpus)}")
     is_active = any(text.strip() for text in corpus)
-    log(f"[BUILD:{name}] active = {is_active}")
-
+    log(f"[BUILD:BM25:{name}] active = {is_active}")
     retriever = BM25Retriever()
-    log(f"[BUILD:{name}] BM25Retriever created")
-
     retriever.set_corpus(corpus)
-    log(f"[BUILD:{name}] set_corpus done")
-
     return retriever, is_active
+
+
+def _build_dense_retriever(corpus: List[str], name: str, cache: EmbeddingCache, client: OpenAIClient) -> Tuple[DenseRetriever, bool]:
+    log(f"[BUILD:DENSE:{name}] corpus size = {len(corpus)}")
+    is_active = any(text.strip() for text in corpus)
+    log(f"[BUILD:DENSE:{name}] active = {is_active}")
+    
+    if not is_active:
+        return DenseRetriever(), False
+
+    embeddings = _get_embeddings_with_cache(corpus, cache, client)
+    retriever = DenseRetriever()
+    retriever.set_corpus(embeddings, corpus)
+    return retriever, True
 
 
 def init_retriever(knowledge_dir: str):
     """
-    knowledge JSON 파일들을 로드하고 3개의 BM25 인덱스를 생성한다.
+    knowledge JSON 파일들을 로드하고 Hybrid(Dense + BM25) 인덱스를 생성한다.
     """
     global GLOBAL_KNOWLEDGE_DATA
     global RETRIEVER_PURPOSE, RETRIEVER_FUNCTION, RETRIEVER_CODE_BEFORE
     global _ACTIVE_FIELDS
+    # global LLM_CLIENT, EMBEDDING_CACHE
 
     log("[INIT] init_retriever entered")
+
+    # Utilities initialization
+    llm_client = get_llm_client("gpt-4o-mini")
+    if not isinstance(llm_client, OpenAIClient):
+        raise ValueError("OpenAIClient is required for Dense retrieval")
+    
+    _ROOT = Path(__file__).resolve().parents[3]
+    cache_dir = _ROOT / "data" / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    embedding_cache = EmbeddingCache(str(cache_dir / "embeddings.json"))
 
     GLOBAL_KNOWLEDGE_DATA = []
     knowledge_dir_path = Path(knowledge_dir)
 
     if not knowledge_dir_path.exists():
         raise FileNotFoundError(f"knowledge_dir does not exist: {knowledge_dir_path}")
-    if not knowledge_dir_path.is_dir():
-        raise NotADirectoryError(f"knowledge_dir is not a directory: {knowledge_dir_path}")
 
-    json_files = sorted(knowledge_dir_path.glob("*.json"))
+    # CWE 하위 디렉토리까지 모두 탐색
+    json_files = sorted(knowledge_dir_path.rglob("*.json"))
     log(f"[INIT] knowledge files found = {len(json_files)}")
 
     for idx, json_file in enumerate(json_files, start=1):
-        log(f"[INIT] loading ({idx}/{len(json_files)}): {json_file.name}")
+        if idx % 10 == 0 or idx == len(json_files):
+            log(f"[INIT] loading ({idx}/{len(json_files)}): {json_file.name}")
         with open(json_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-
         if isinstance(data, list):
             GLOBAL_KNOWLEDGE_DATA.extend(data)
         elif isinstance(data, dict):
@@ -129,53 +191,66 @@ def init_retriever(knowledge_dir: str):
     function_corpus = [item.get("function", "") or "" for item in GLOBAL_KNOWLEDGE_DATA]
     code_before_corpus = [item.get("code_before_change", "") or "" for item in GLOBAL_KNOWLEDGE_DATA]
 
-    log("[INIT] building PURPOSE retriever")
-    RETRIEVER_PURPOSE, _ACTIVE_FIELDS["purpose"] = _build_retriever(purpose_corpus, "purpose")
+    log("[INIT] building PURPOSE dense retriever")
+    RETRIEVER_PURPOSE, _ACTIVE_FIELDS["purpose"] = _build_dense_retriever(purpose_corpus, "purpose", embedding_cache, llm_client)
 
-    log("[INIT] building FUNCTION retriever")
-    RETRIEVER_FUNCTION, _ACTIVE_FIELDS["function"] = _build_retriever(function_corpus, "function")
+    log("[INIT] building FUNCTION dense retriever")
+    RETRIEVER_FUNCTION, _ACTIVE_FIELDS["function"] = _build_dense_retriever(function_corpus, "function", embedding_cache, llm_client)
 
-    log("[INIT] building CODE_BEFORE retriever")
-    RETRIEVER_CODE_BEFORE, _ACTIVE_FIELDS["code_before"] = _build_retriever(code_before_corpus, "code_before")
+    log("[INIT] building CODE_BEFORE bm25 retriever")
+    RETRIEVER_CODE_BEFORE, _ACTIVE_FIELDS["code_before"] = _build_bm25_retriever(code_before_corpus, "code_before")
 
     log("[INIT] init_retriever done")
 
 
-# ─── Stage 1: Rank Sum ──────────────────────────────────────────────────────
-def _compute_rank_sum(
+# ─── Stage 1: RRF (Reciprocal Rank Fusion) ──────────────────────────────────
+def _compute_rrf_scores(
     query_purpose: Optional[str],
     query_function_summary: Optional[str],
     query_full_code: Optional[str],
-) -> List[int]:
+    k: int = 60,
+) -> List[float]:
     """
-    활성화된 각 필드에 대해 BM25 검색을 수행하고
-    item별 rank sum 배열을 반환한다 (값이 낮을수록 관련성 높음).
+    각 필드에 대해 검색을 수행하고 RRF (Reciprocal Rank Fusion) 점수를 계산한다.
+    점수가 높을수록 관련성이 높음.
     """
     n = len(GLOBAL_KNOWLEDGE_DATA)
-    rank_sum = [0] * n
+    rrf_scores = [0.0] * n
 
-    field_queries = [
-        ("purpose", query_purpose, RETRIEVER_PURPOSE),
-        ("function", query_function_summary, RETRIEVER_FUNCTION),
-        ("code_before", query_full_code, RETRIEVER_CODE_BEFORE),
+    # Utils for dense query
+    llm_client = get_llm_client("gpt-4o-mini")
+    if not isinstance(llm_client, OpenAIClient):
+        raise ValueError("OpenAIClient is required for Dense retrieval")
+
+    field_configs = [
+        ("purpose", query_purpose, RETRIEVER_PURPOSE, "dense"),
+        ("function", query_function_summary, RETRIEVER_FUNCTION, "dense"),
+        ("code_before", query_full_code, RETRIEVER_CODE_BEFORE, "bm25"),
     ]
 
-    for field_name, query_text, retriever in field_queries:
+    for field_name, query_text, retriever, r_type in field_configs:
         if not _ACTIVE_FIELDS[field_name]:
-            log(f"[RANK] skip inactive field: {field_name}")
             continue
         if not query_text or not query_text.strip():
-            log(f"[RANK] skip empty query field: {field_name}")
             continue
 
-        log(f"[RANK] searching field={field_name}")
-        sorted_idxs = retriever.search(query_text, top_n=-1)
+        log(f"[RANK] searching field={field_name} (type={r_type})")
+        
+        if r_type == "dense":
+            # query_text에 대한 임베딩 생성 (캐시 안 함 - 쿼리는 매번 다를 수 있으므로)
+            query_emb = llm_client.generate_embeddings([query_text])[0]
+            sorted_idxs = retriever.search(query_emb, top_n=-1) # type: ignore
+        else:
+            sorted_idxs = retriever.search(query_text, top_n=-1) # type: ignore
+            
         log(f"[RANK] search done field={field_name}, returned={len(sorted_idxs)}")
 
         for rank, idx in enumerate(sorted_idxs):
-            rank_sum[idx] += rank + 1
+            # RRF formula: 1 / (k + rank)
+            # rank는 0-based이므로 1을 더해줌 (elasticsearch 등과 맞춤)
+            rrf_scores[idx] += 1.0 / (k + rank + 1)
 
-    return rank_sum
+    return rrf_scores
 
 
 # ─── Stage 2: CVE별 best item 선택 → top-k ────────────────────────────────
@@ -186,24 +261,27 @@ def retrieve_top_k(
     top_k: int,
 ) -> List[RetrievedKnowledgeDTO]:
     """
-    Stage 1: rank sum으로 전체 item 정렬
-    Stage 2: CVE_id별로 rank sum이 가장 낮은 item 1개 선택 (best representative)
+    Stage 1: RRF 점수로 전체 item 정렬 (높을수록 좋음)
+    Stage 2: CVE_id별로 RRF 점수가 가장 높은 item 1개 선택 (best representative)
              → 상위 top_k CVE를 RetrievedKnowledgeDTO 리스트로 반환
     """
-    rank_sum = _compute_rank_sum(query_purpose, query_function_summary, query_full_code)
+    # rrf_scores: 높은 점수가 더 관련성 높음
+    rrf_scores = _compute_rrf_scores(query_purpose, query_function_summary, query_full_code)
 
-    sorted_indices = sorted(range(len(GLOBAL_KNOWLEDGE_DATA)), key=lambda i: rank_sum[i])
+    # 점수 내림차순 정렬
+    sorted_indices = sorted(range(len(GLOBAL_KNOWLEDGE_DATA)), key=lambda i: rrf_scores[i], reverse=True)
 
-    seen_cves: Dict[str, Tuple[int, int]] = {}
+    seen_cves: Dict[str, Tuple[int, float]] = {}
     for idx in sorted_indices:
         cve_id = GLOBAL_KNOWLEDGE_DATA[idx].get("CVE_id")
         if cve_id and cve_id not in seen_cves:
-            seen_cves[cve_id] = (idx, rank_sum[idx])
+            seen_cves[cve_id] = (idx, rrf_scores[idx])
 
-    top_cves = sorted(seen_cves.values(), key=lambda t: t[1])[:top_k]
+    # CVE 대표 item을 점수 기준 재정렬(내림차순) 후 top-k 선택
+    top_cves = sorted(seen_cves.values(), key=lambda t: t[1], reverse=True)[:top_k]
 
     results: List[RetrievedKnowledgeDTO] = []
-    for item_idx, _ in top_cves:
+    for item_idx, score in top_cves:
         item = GLOBAL_KNOWLEDGE_DATA[item_idx]
         vb = item.get("vulnerability_behavior", {})
 
