@@ -57,4 +57,4 @@ val outJson = ujson.Obj(
   "results"             -> resultsJson
 )
 
-println("OUTPUT: " + ujson.write(outJson))
+val __OUTPUT__ = ujson.write(outJson)
