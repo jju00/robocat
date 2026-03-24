@@ -62,4 +62,4 @@ val out =
     "results" -> results
   )
 
-println("OUTPUT: " + ujson.write(ujson.read(out.toJson), indent = 2))
+println("OUTPUT: " + ujson.write(ujson.read(out.toJson)))
