@@ -40,6 +40,20 @@
       "regex": "(fopen|open|freopen|ifstream|ofstream|fstream)"
     }
   },
+  "sanitizers": [
+    "std::getline",
+    "std::string::substr",
+    "std::string::erase",
+    "std::remove_if",
+    "std::isalnum",
+    "std::isdigit",
+    "std::isalpha",
+    "std::stoi",
+    "std::stol",
+    "std::stod",
+    "std::regex_match",
+    "std::regex_replace"
+  ],
   "sink_priority_weight": {
     "command": 1.0,
     "memory": 0.95,

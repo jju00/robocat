@@ -35,6 +35,19 @@
       "regex": "(fopen|open|freopen)"
     }
   },
+  "sanitizers": [
+    "fgets",
+    "snprintf",
+    "strncpy",
+    "strlcpy",
+    "strlcat",
+    "isalpha",
+    "isdigit",
+    "isalnum",
+    "isspace",
+    "toupper",
+    "tolower"
+  ],
   "sink_priority_weight": {
     "command": 1.0,
     "memory": 0.95,

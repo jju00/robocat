@@ -26,6 +26,15 @@
       "regex": "(echo|print)"
     }
   },
+  "sanitizers": [
+    "htmlspecialchars",
+    "htmlentities",
+    "strip_tags",
+    "mysqli_real_escape_string",
+    "intval",
+    "filter_var",
+    "preg_match"
+  ],
   "sink_priority_weight": {
     "command": 1.0,
     "include": 0.9,

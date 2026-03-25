@@ -112,3 +112,18 @@ class TaintQueryBuilder:
             LANGUAGE=self.escape(self.language),
             TARGET_PATH=self.escape(self.target_path),
         )
+
+    def build_protection_query(self, sink_name: str, sink_regex: str, sanitizers: List[str]) -> str:
+        """check_protection.scala 템플릿을 로드하여 보호 기법 판단 쿼리를 생성"""
+        sanitizer_regex = "|".join(sanitizers) if sanitizers else "NEVER_MATCH_ANYTHING"
+        
+        return self._fill(
+            self._load_template("check_protection.scala"),
+            PROJECT_NAME=self.escape(self.project_name),
+            SOURCE_EXPR=self.build_source_query_expr(),
+            SINK_REGEX=self.escape(sink_regex),
+            SINK_NAME=self.escape(sink_name),
+            SANITIZER_REGEX=self.escape(sanitizer_regex),
+            LANGUAGE=self.escape(self.language),
+            TARGET_PATH=self.escape(self.target_path),
+        )
