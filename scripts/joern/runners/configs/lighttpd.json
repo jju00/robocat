@@ -25,13 +25,5 @@
         "format",
         "file"
       ]
-    },
-    "build": {
-      "build_system": "autotools",
-      "source_dir": "/app/source",
-      "build_dir": "/app/workspace/lighttpd/build",
-      "configure_cmd": "./autogen.sh && ./configure",
-      "build_cmd": "make -j16",
-      "compile_db_mode": "bear"
     }
   }
