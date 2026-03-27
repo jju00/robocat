@@ -1,478 +1,491 @@
-import argparse
-import json
-import os
-import re
 import subprocess
+import re
+import json
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Set
+from typing import List, Optional, Set
 
 
-# -----------------------------
-# Git helpers
-# -----------------------------
-def run_git(repo_path: str, args: List[str]) -> str:
-    res = subprocess.run(
-        ["git"] + args,
-        cwd=repo_path,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    if res.returncode != 0:
-        raise RuntimeError(
-            f"Git command failed: git {' '.join(args)}\n"
-            f"stdout:\n{res.stdout}\n\nstderr:\n{res.stderr}"
-        )
-    return res.stdout
-
-
-def git_show_file(repo_path: str, version: str, file_path: str) -> str:
-    try:
-        return run_git(repo_path, ["show", f"{version}:{file_path}"])
-    except Exception:
-        return ""
-
-
-def git_changed_files(repo_path: str, old_ver: str, new_ver: str) -> List[str]:
-    out = run_git(repo_path, ["diff", "--name-only", old_ver, new_ver])
-    return [x.strip() for x in out.splitlines() if x.strip()]
-
-
-def git_diff_file(repo_path: str, old_ver: str, new_ver: str, file_path: str, unified: int = 3) -> str:
-    return run_git(repo_path, ["diff", f"-U{unified}", old_ver, new_ver, "--", file_path])
-
-
-# -----------------------------
-# Diff parsing
-# -----------------------------
-HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-
-
-@dataclass(frozen=True)
-class TouchedLines:
-    new_lines: Set[int]
-    old_lines: Set[int]
-
-
-def parse_touched_lines(diff_text: str) -> TouchedLines:
-    new_lines: Set[int] = set()
-    old_lines: Set[int] = set()
-
-    cur_old = 0
-    cur_new = 0
-
-    for raw in diff_text.splitlines():
-
-        if raw.startswith("@@"):
-            m = HUNK_RE.match(raw)
-            if m:
-                cur_old = int(m.group(1))
-                cur_new = int(m.group(3))
-            continue
-
-        if raw.startswith("+") and not raw.startswith("+++"):
-            new_lines.add(cur_new)
-            cur_new += 1
-            continue
-
-        if raw.startswith("-") and not raw.startswith("---"):
-            old_lines.add(cur_old)
-            cur_old += 1
-            continue
-
-        if raw.startswith(" "):
-            cur_old += 1
-            cur_new += 1
-            continue
-
-    return TouchedLines(new_lines=new_lines, old_lines=old_lines)
-
-
-# -----------------------------
-# PHP function span extraction
-# -----------------------------
-PHP_CLASS_RE = re.compile(r"^\s*(?:final\s+|abstract\s+)?class\s+([A-Za-z_]\w*)\b")
-
-PHP_FUNCTION_RE = re.compile(
-    r"""^\s*
-        (?:(?:public|protected|private|static|final|abstract)\s+)*
-        function\s+&?\s*([A-Za-z_]\w*)\s*\(
-    """,
-    re.VERBOSE,
-)
-
-
-def strip_strings_rough(line: str) -> str:
-    line = re.sub(r"'.*?(?<!\\)'", "''", line)
-    line = re.sub(r'".*?(?<!\\)"', '""', line)
-    return line
-
-
-def count_braces_rough(line: str) -> Tuple[int, int]:
-    s = strip_strings_rough(line)
-    return s.count("{"), s.count("}")
-
+# =========================
+# DATA STRUCTURE
+# =========================
 
 @dataclass
 class FunctionSpan:
-    full_name: str
-    short_name: str
-    start_line: int
-    end_line: int
+    name: str
+    start: int
+    end: int
+    code: str
 
 
-def extract_php_function_spans(code: str) -> List[FunctionSpan]:
+# =========================
+# GIT
+# =========================
 
-    if not code:
-        return []
+def git_show(repo, version, path):
+    result = subprocess.run(
+        ["git", "show", f"{version}:{path}"],
+        cwd=repo,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout
 
+
+# =========================
+# LANGUAGE DETECTOR
+# =========================
+
+def detect_language(path: str):
+    if path.endswith(".php"):
+        return "php"
+    if path.endswith(".py"):
+        return "python"
+    if path.endswith(".js") or path.endswith(".ts"):
+        return "javascript"
+    if path.endswith(".java"):
+        return "java"
+    if path.endswith(".cs"):
+        return "csharp"
+    if path.endswith(".c"):
+        return "c"
+    if path.endswith(".cpp") or path.endswith(".cc") or path.endswith(".hpp"):
+        return "cpp"
+    return "unknown"
+
+
+# =========================
+# PHP EXTRACTOR
+# =========================
+
+PHP_FUNC_RE = re.compile(
+    r"^\s*(public|protected|private|static|\s)*\s*function\s+&?\s*([a-zA-Z_]\w*)\s*\(",
+    re.MULTILINE
+)
+
+PHP_CLASS_RE = re.compile(
+    r"^\s*(class|trait|interface)\s+([a-zA-Z_]\w*)",
+    re.MULTILINE
+)
+
+def extract_php(code: str):
     lines = code.splitlines()
-    spans: List[FunctionSpan] = []
-
-    brace_depth = 0
-    class_stack: List[Tuple[str, int]] = []
-    pending_class: Optional[str] = None
+    spans = []
+    class_name = None
 
     i = 0
     while i < len(lines):
-
         line = lines[i]
-        line_no = i + 1
 
-        cm = PHP_CLASS_RE.match(strip_strings_rough(line))
+        cm = PHP_CLASS_RE.match(line)
         if cm:
-            pending_class = cm.group(1)
+            class_name = cm.group(2)
 
-        opens, closes = count_braces_rough(line)
-
-        if pending_class and opens > 0:
-            class_stack.append((pending_class, brace_depth))
-            pending_class = None
-
-        current_class = class_stack[-1][0] if class_stack else None
-
-        fm = PHP_FUNCTION_RE.match(strip_strings_rough(line))
-
+        fm = PHP_FUNC_RE.match(line)
         if fm:
-            fname = fm.group(1)
-            func_sig_line = line_no
-            func_class = current_class
+            fname = fm.group(2)
+            full = f"{class_name}::{fname}" if class_name else fname
 
+            start = i + 1
+            brace = 0
             j = i
-            found_body = False
-            body_line = None
+            found = False
 
             while j < len(lines):
-
-                s = strip_strings_rough(lines[j])
-
-                if "{" in s:
-                    found_body = True
-                    body_line = j + 1
-                    break
-
-                if ";" in s and "{" not in s:
-                    break
-
+                if "{" in lines[j]:
+                    brace += lines[j].count("{")
+                    found = True
+                if "}" in lines[j]:
+                    brace -= lines[j].count("}")
+                    if found and brace == 0:
+                        end = j + 1
+                        code_block = "\n".join(lines[start-1:end]) + "\n"
+                        spans.append(FunctionSpan(full, start, end, code_block))
+                        break
                 j += 1
 
-            if not found_body:
-                i += 1
-                brace_depth += opens
-                brace_depth -= closes
-                continue
-
-            func_depth = 0
-            started = False
-            end_line = body_line
-
-            k = body_line - 1
-
-            while k < len(lines):
-
-                s = strip_strings_rough(lines[k])
-
-                for ch in s:
-
-                    if ch == "{":
-                        func_depth += 1
-                        started = True
-
-                    elif ch == "}":
-                        if started:
-                            func_depth -= 1
-                            if func_depth == 0:
-                                end_line = k + 1
-                                k = len(lines)
-                                break
-
-                if k < len(lines):
-                    end_line = k + 1
-
-                k += 1
-
-            full_name = f"{func_class}::{fname}" if func_class else fname
-
-            spans.append(
-                FunctionSpan(
-                    full_name=full_name,
-                    short_name=fname,
-                    start_line=func_sig_line,
-                    end_line=end_line,
-                )
-            )
-
-        brace_depth += opens
-        brace_depth -= closes
-
-        if brace_depth < 0:
-            brace_depth = 0
-
-        while class_stack and brace_depth <= class_stack[-1][1]:
-            class_stack.pop()
-
-        i += 1
+            i = j
+        else:
+            i += 1
 
     return spans
 
 
-# -----------------------------
-# span lookup (IMPROVED)
-# -----------------------------
-def find_enclosing_span(spans: List[FunctionSpan], line_no: int) -> Optional[FunctionSpan]:
+# =========================
+# PYTHON EXTRACTOR
+# =========================
 
-    for sp in spans:
-
-        if sp.start_line - 3 <= line_no <= sp.end_line:
-            return sp
-
-    return None
-
-
-def slice_lines(code: str, start_line: int, end_line: int) -> str:
-
+def extract_python(code: str):
     lines = code.splitlines()
+    spans = []
 
-    s = max(0, start_line - 1)
-    e = min(len(lines), end_line)
+    for i, line in enumerate(lines):
+        m = re.match(r"^\s*def\s+([a-zA-Z_]\w*)\s*\(", line)
+        if m:
+            fname = m.group(1)
+            start = i + 1
+            indent = len(line) - len(line.lstrip())
 
-    return ("\n".join(lines[s:e]).rstrip() + "\n") if s < e else ""
+            j = i + 1
+            while j < len(lines):
+                if lines[j].strip() == "":
+                    j += 1
+                    continue
+
+                cur_indent = len(lines[j]) - len(lines[j].lstrip())
+                if cur_indent <= indent:
+                    break
+                j += 1
+
+            end = j
+            code_block = "\n".join(lines[start-1:end]) + "\n"
+            spans.append(FunctionSpan(fname, start, end, code_block))
+
+    return spans
 
 
-# -----------------------------
-# GLOBAL snippet
-# -----------------------------
-def extract_global_snippet(code: str, touched_lines: Set[int], context: int = 8) -> str:
+# =========================
+# JAVASCRIPT EXTRACTOR
+# =========================
 
-    if not code or not touched_lines:
-        return ""
+JS_FUNC_RE = re.compile(
+    r"(function\s+([a-zA-Z_]\w*)\s*\(|([a-zA-Z_]\w*)\s*=\s*\(.*?\)\s*=>)",
+    re.MULTILINE
+)
 
+def extract_js(code: str):
     lines = code.splitlines()
-    n = len(lines)
+    spans = []
 
-    ranges = []
+    for i, line in enumerate(lines):
+        m = JS_FUNC_RE.search(line)
+        if m:
+            fname = m.group(2) or m.group(3) or "anonymous"
+            start = i + 1
 
-    for l in sorted(touched_lines):
+            brace = 0
+            j = i
+            found = False
 
-        a = max(1, l - context)
-        b = min(n, l + context)
+            while j < len(lines):
+                if "{" in lines[j]:
+                    brace += lines[j].count("{")
+                    found = True
+                if "}" in lines[j]:
+                    brace -= lines[j].count("}")
+                    if found and brace == 0:
+                        end = j + 1
+                        code_block = "\n".join(lines[start-1:end]) + "\n"
+                        spans.append(FunctionSpan(fname, start, end, code_block))
+                        break
+                j += 1
 
-        ranges.append((a, b))
+    return spans
 
-    merged = []
 
-    for a, b in ranges:
+# =========================
+# C / C++ EXTRACTOR
+# =========================
 
-        if not merged or a > merged[-1][1] + 1:
-            merged.append([a, b])
+C_FUNC_RE = re.compile(
+    r"^\s*([a-zA-Z_][\w\s\*\&]+)\s+([a-zA-Z_]\w*)\s*\([^;]*\)\s*\{",
+    re.MULTILINE
+)
+
+def extract_c(code: str):
+    lines = code.splitlines()
+    spans = []
+
+    for i, line in enumerate(lines):
+        m = C_FUNC_RE.match(line)
+        if m:
+            fname = m.group(2)
+            start = i + 1
+
+            brace = 0
+            j = i
+            found = False
+
+            while j < len(lines):
+                if "{" in lines[j]:
+                    brace += lines[j].count("{")
+                    found = True
+                if "}" in lines[j]:
+                    brace -= lines[j].count("}")
+                    if found and brace == 0:
+                        end = j + 1
+                        code_block = "\n".join(lines[start-1:end]) + "\n"
+                        spans.append(FunctionSpan(fname, start, end, code_block))
+                        break
+                j += 1
+
+    return spans
+
+
+# =========================
+# JAVA EXTRACTOR
+# =========================
+
+JAVA_FUNC_RE = re.compile(
+    r"^\s*(public|protected|private|static|\s)*\s+[a-zA-Z_<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(",
+    re.MULTILINE
+)
+
+JAVA_CLASS_RE = re.compile(r"class\s+([A-Za-z_]\w*)")
+
+def extract_java(code: str):
+    lines = code.splitlines()
+    spans = []
+    class_name = None
+
+    for i, line in enumerate(lines):
+        cm = JAVA_CLASS_RE.search(line)
+        if cm:
+            class_name = cm.group(1)
+
+        fm = JAVA_FUNC_RE.match(line)
+        if fm:
+            fname = fm.group(2)
+            full = f"{class_name}::{fname}" if class_name else fname
+
+            start = i + 1
+            brace = 0
+            j = i
+            found = False
+
+            while j < len(lines):
+                if "{" in lines[j]:
+                    brace += lines[j].count("{")
+                    found = True
+                if "}" in lines[j]:
+                    brace -= lines[j].count("}")
+                    if found and brace == 0:
+                        end = j + 1
+                        code_block = "\n".join(lines[start-1:end]) + "\n"
+                        spans.append(FunctionSpan(full, start, end, code_block))
+                        break
+                j += 1
+
+    return spans
+
+
+# =========================
+# C# EXTRACTOR
+# =========================
+
+CS_FUNC_RE = re.compile(
+    r"^\s*(public|private|protected|static|\s)+\s+[a-zA-Z_<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(",
+    re.MULTILINE
+)
+
+CS_CLASS_RE = re.compile(r"class\s+([A-Za-z_]\w*)")
+
+def extract_csharp(code: str):
+    lines = code.splitlines()
+    spans = []
+    class_name = None
+
+    for i, line in enumerate(lines):
+        cm = CS_CLASS_RE.search(line)
+        if cm:
+            class_name = cm.group(1)
+
+        fm = CS_FUNC_RE.match(line)
+        if fm:
+            fname = fm.group(2)
+            full = f"{class_name}::{fname}" if class_name else fname
+
+            start = i + 1
+            brace = 0
+            j = i
+            found = False
+
+            while j < len(lines):
+                if "{" in lines[j]:
+                    brace += lines[j].count("{")
+                    found = True
+                if "}" in lines[j]:
+                    brace -= lines[j].count("}")
+                    if found and brace == 0:
+                        end = j + 1
+                        code_block = "\n".join(lines[start-1:end]) + "\n"
+                        spans.append(FunctionSpan(full, start, end, code_block))
+                        break
+                j += 1
+
+    return spans
+
+
+# =========================
+# EXTRACTOR REGISTRY
+# =========================
+
+def get_extractor(lang):
+    return {
+        "php": extract_php,
+        "python": extract_python,
+        "javascript": extract_js,
+        "java": extract_java,
+        "c": extract_c,
+        "cpp": extract_c,
+        "csharp": extract_csharp
+    }.get(lang)
+
+
+# =========================
+# DIFF PARSER
+# =========================
+
+def parse_diff(diff_text):
+    files = []
+    current = None
+    new_line = 0
+    old_line = 0
+
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git"):
+            if current:
+                files.append(current)
+
+            path = line.split(" b/")[-1]
+            current = {
+                "file_path": path,
+                "added": [],
+                "deleted": []
+            }
+
+        elif line.startswith("@@"):
+            m = re.search(r"\-(\d+),?\d*\s+\+(\d+)", line)
+            if m:
+                old_line = int(m.group(1))
+                new_line = int(m.group(2))
+
+        elif line.startswith("+") and not line.startswith("+++"):
+            current["added"].append(new_line)
+            new_line += 1
+
+        elif line.startswith("-") and not line.startswith("---"):
+            current["deleted"].append(old_line)
+            old_line += 1
+
         else:
-            merged[-1][1] = max(merged[-1][1], b)
+            old_line += 1
+            new_line += 1
 
-    chunks = []
+    if current:
+        files.append(current)
 
-    for a, b in merged:
-
-        chunk = "\n".join(lines[a - 1 : b]).rstrip()
-
-        chunks.append(f"/* lines {a}-{b} */\n{chunk}\n")
-
-    return "\n".join(chunks).rstrip() + "\n"
+    return files
 
 
-# -----------------------------
-# PHPDoc-only filter
-# -----------------------------
-def is_phpdoc_only_change(before: str, after: str) -> bool:
+# =========================
+# MAPPING
+# =========================
 
-    combined = before + "\n" + after
-
-    lines = [l.strip() for l in combined.splitlines() if l.strip()]
-
-    if not lines:
-        return True
-
-    phpdoc_tokens = (
-        "/**",
-        "*/",
-        "* @",
-        "@param",
-        "@return",
-        "@var",
-        "@throws",
-    )
-
-    for line in lines:
-
-        if not any(t in line for t in phpdoc_tokens):
-            return False
-
-    return True
+def find_function(spans, line):
+    for sp in spans:
+        if sp.start <= line <= sp.end:
+            return sp.name
+    return "<global>"
 
 
-# -----------------------------
+# =========================
 # MAIN
-# -----------------------------
-def build_function_diff_json(
-    repo_path: str,
-    old_ver: str,
-    new_ver: str,
-    only_ext: Optional[Set[str]] = None,
-):
+# =========================
 
-    files = git_changed_files(repo_path, old_ver, new_ver)
+def run(repo, old, new):
+    diff = subprocess.run(
+        ["git", "diff", old, new],
+        cwd=repo,
+        capture_output=True,
+        text=True
+    ).stdout
 
-    out = {
-        "project": "phpmyadmin",
-        "from_version": old_ver,
-        "test_version": new_ver,
-        "files": [],
+    parsed = parse_diff(diff)
+
+    result = {
+        "project": repo,
+        "from_version": old,
+        "test_version": new,
+        "files": []
     }
 
-    for fp in files:
+    for file in parsed:
+        path = file["file_path"]
 
-        if only_ext:
-            ext = os.path.splitext(fp)[1].lower()
-            if ext not in only_ext:
-                continue
-
-        diff_text = git_diff_file(repo_path, old_ver, new_ver, fp)
-
-        if not diff_text.strip():
+        if "vendor" in path or path.endswith(".min.js"):
             continue
 
-        touched = parse_touched_lines(diff_text)
+        lang = detect_language(path)
+        extractor = get_extractor(lang)
 
-        before_file = git_show_file(repo_path, old_ver, fp)
-        after_file = git_show_file(repo_path, new_ver, fp)
+        if extractor is None:
+            continue
 
-        spans_old = extract_php_function_spans(before_file)
-        spans_new = extract_php_function_spans(after_file)
+        before_code = git_show(repo, old, path)
+        after_code = git_show(repo, new, path)
 
-        touched_funcs: Dict[str, Dict[str, str]] = {}
+        before_funcs = extractor(before_code)
+        after_funcs = extractor(after_code)
 
-        global_new_lines = set()
-        global_old_lines = set()
+        changed_funcs: Set[str] = set()
 
-        for ln in touched.new_lines:
+        for ln in file["added"]:
+            changed_funcs.add(find_function(after_funcs, ln))
 
-            sp = find_enclosing_span(spans_new, ln)
+        for ln in file["deleted"]:
+            changed_funcs.add(find_function(before_funcs, ln))
 
-            if sp:
-                touched_funcs.setdefault(sp.full_name, {})[
-                    "after_span"
-                ] = f"{sp.start_line}:{sp.end_line}"
+        func_list = []
 
-            else:
-                global_new_lines.add(ln)
+        for fname in changed_funcs:
+            bf = next((f for f in before_funcs if f.name == fname), None)
+            af = next((f for f in after_funcs if f.name == fname), None)
 
-        for ln in touched.old_lines:
+            before_code = bf.code if bf else ""
+            after_code = af.code if af else ""
 
-            sp = find_enclosing_span(spans_old, ln)
+            # 🔥 필터링
+            if fname == "<global>" and not before_code and not after_code:
+                continue
+            if not before_code and not after_code:
+                continue
+            if before_code.strip() == after_code.strip():
+                continue
 
-            if sp:
-                touched_funcs.setdefault(sp.full_name, {})[
-                    "before_span"
-                ] = f"{sp.start_line}:{sp.end_line}"
+            func_list.append({
+                "function": fname,
+                "code_before_change": before_code,
+                "code_after_change": after_code
+            })
 
-            else:
-                global_old_lines.add(ln)
+        if func_list:
+            result["files"].append({
+                "file_path": path,
+                "lang": lang,
+                "functions": func_list
+            })
 
-        file_entry = {"file_path": fp, "functions": []}
-
-        for func_full_name, meta in touched_funcs.items():
-
-            before_span = meta.get("before_span")
-            after_span = meta.get("after_span")
-
-            before_code = ""
-            after_code = ""
-
-            if before_span and before_file:
-                a, b = before_span.split(":")
-                before_code = slice_lines(before_file, int(a), int(b))
-
-            if after_span and after_file:
-                a, b = after_span.split(":")
-                after_code = slice_lines(after_file, int(a), int(b))
-
-            file_entry["functions"].append(
-                {
-                    "function": func_full_name,
-                    "code_before_change": before_code,
-                    "code_after_change": after_code,
-                }
-            )
-
-        if global_new_lines or global_old_lines:
-
-            before_global = extract_global_snippet(before_file, global_old_lines)
-            after_global = extract_global_snippet(after_file, global_new_lines)
-
-            if not is_phpdoc_only_change(before_global, after_global):
-
-                file_entry["functions"].append(
-                    {
-                        "function": "<global>",
-                        "code_before_change": before_global,
-                        "code_after_change": after_global,
-                    }
-                )
-
-        if file_entry["functions"]:
-            out["files"].append(file_entry)
-
-    return out
+    return result
 
 
-# -----------------------------
+# =========================
 # CLI
-# -----------------------------
-def main():
-
-    ap = argparse.ArgumentParser()
-
-    ap.add_argument("--repo", required=True)
-    ap.add_argument("--old", required=True)
-    ap.add_argument("--new", required=True)
-    ap.add_argument("--out", default="diff_functions.json")
-    ap.add_argument("--php-only", action="store_true")
-
-    args = ap.parse_args()
-
-    only_ext = {".php"} if args.php_only else None
-
-    result = build_function_diff_json(
-        repo_path=args.repo,
-        old_ver=args.old,
-        new_ver=args.new,
-        only_ext=only_ext,
-    )
-
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-
-    print(f"[+] wrote {args.out}")
-
+# =========================
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo", required=True)
+    parser.add_argument("--old", required=True)
+    parser.add_argument("--new", required=True)
+    parser.add_argument("--out", default="diff_functions.json")
+
+    args = parser.parse_args()
+
+    output = run(args.repo, args.old, args.new)
+
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+
+    print("[+] Done →", args.out)

@@ -96,6 +96,12 @@ JOERN_TARGET_PATH  = _runner_cfg.get("paths",   {}).get("container_source_root",
 _executor: JoernExecutor | None = None
 _call_context_builder: CallContextQueryBuilder | None = None
 
+# CPG 로드 / ossdataflow 실행 여부 (프로세스 수명 동안 1회만 실행)
+_cpg_ready: bool = False
+_dataflow_ready: bool = False
+# import_cpg.scala 가 반환한 실제 workspace 프로젝트 이름 (설정값과 다를 수 있음)
+_actual_project_name: str = ""
+
 
 def _get_executor() -> JoernExecutor:
     global _executor
@@ -106,13 +112,50 @@ def _get_executor() -> JoernExecutor:
 
 def _get_call_context_builder() -> CallContextQueryBuilder:
     global _call_context_builder
-    if _call_context_builder is None:
+    # _actual_project_name 이 세팅된 뒤에 호출되므로 실제 workspace 이름을 사용
+    project_name = _actual_project_name or JOERN_PROJECT_NAME
+    if _call_context_builder is None or _call_context_builder.project_name != project_name:
         _call_context_builder = CallContextQueryBuilder(
-            project_name=JOERN_PROJECT_NAME,
+            project_name=project_name,
             language=JOERN_LANGUAGE,
             target_path=JOERN_TARGET_PATH,
         )
     return _call_context_builder
+
+
+def _import_cpg_kwargs(run_dataflow: bool = False) -> dict[str, str]:
+    """import_cpg.scala 에 전달할 템플릿 변수 dict."""
+    return {
+        "JOERN_IMPORT":  JOERN_LANGUAGE,
+        "TARGET_PATH":   JOERN_TARGET_PATH,
+        "PROJECT_NAME":  JOERN_PROJECT_NAME,
+        "LANGUAGE":      JOERN_LANGUAGE,
+        "RUN_DATAFLOW":  "true" if run_dataflow else "false",
+    }
+
+
+def _build_cpg_header(run_dataflow: bool = False) -> str:
+    """
+    import_cpg.scala 를 로드·치환하여 CPG setup 헤더 문자열을 반환.
+
+    Joern /query-sync 는 요청 간 state를 유지하지 않으므로,
+    모든 CPG 쿼리는 이 헤더를 앞에 붙여 단일 요청으로 전송한다.
+    """
+    executor = _get_executor()
+    template = executor.load_scala_template("import_cpg.scala")
+    return executor.fill_template(template, **_import_cpg_kwargs(run_dataflow=run_dataflow))
+
+
+async def _run_cpg_query(query: str, run_dataflow: bool = False) -> dict[str, Any]:
+    """
+    CPG 헤더(import + open) + 실제 쿼리를 단일 Joern 요청으로 실행.
+
+    Joern REST 서버가 요청 간 REPL state를 유지하지 않는 환경에서도
+    매 요청마다 CPG가 열려 있음을 보장한다.
+    """
+    header = _build_cpg_header(run_dataflow=run_dataflow)
+    combined = header + "\n\n" + query
+    return await _get_executor().run_query(combined)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 전역 캐시 (서버 기동 시 1회 로드)
@@ -194,6 +237,44 @@ mcp = FastMCP(
         "  5. 1~4 결과를 종합하여 취약(YES) / 안전(NO) / 불확실(-1) 판정"
     ),
 )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Tool 0: check_cpg_status  (진단용)
+# ──────────────────────────────────────────────────────────────────────────────
+@mcp.tool()
+async def check_cpg_status() -> str:
+    """
+    Joern workspace 의 현재 상태를 반환한다 (진단용).
+
+    CPG 쿼리 전에 호출하면 프로젝트가 로드됐는지, 어떤 이름으로 저장됐는지 확인할 수 있다.
+    CPG import 헤더 없이 순수 Joern 상태를 조회한다.
+
+    Returns:
+        JSON 문자열 with keys:
+          - workspace_projects: workspace 에 저장된 프로젝트 이름 목록
+          - active_cpg_root:    현재 활성 CPG 의 root 경로 (없으면 "none")
+          - joern_version:      Joern 버전 문자열
+    """
+    q = """
+import ujson._
+
+val projects = workspace.projects.map(_.name).l
+val activeRoot = try {
+  cpg.metaData.l.headOption.map(_.root).getOrElse("(empty cpg)")
+} catch {
+  case _: Throwable => "none"
+}
+
+val out = Map(
+  "workspace_projects" -> projects,
+  "active_cpg_root"    -> activeRoot
+)
+
+println("OUTPUT: " + ujson.write(ujson.read(out.toJson)))
+"""
+    result = await _get_executor().run_query(q)
+    return _fmt_executor(result)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -283,7 +364,7 @@ async def get_cpg_summary(
         callee_count, caller_count, callees, callers)
     """
     query = _get_call_context_builder().build_call_context_query(file_path, function_name)
-    result = await _get_executor().run_query(query)
+    result = await _run_cpg_query(query)
 
     parsed = result.get("parsed", {})
 
@@ -335,7 +416,7 @@ async def find_dataflow(
         f'sink.reachableByFlows(src).p'
     )
 
-    raw = await _get_executor().run_query(q_dataflow)
+    raw = await _run_cpg_query(q_dataflow, run_dataflow=True)
     output = _fmt_executor(raw)
 
     lines = [ln for ln in output.splitlines() if ln.strip()]
@@ -408,11 +489,10 @@ async def find_sanitizer_or_guard(
             f'.call.name("({pattern})").map(c => s"${{c.name}} @ line ${{c.lineNumber}}").l'
         )
 
-    executor = _get_executor()
-    san_raw   = await executor.run_query(_build_query(SANITIZER_FUNCS))
-    guard_raw = await executor.run_query(_build_query(GUARD_FUNCS))
-    auth_raw  = await executor.run_query(_build_query(AUTH_FUNCS))
-    err_raw   = await executor.run_query(_build_query(ERROR_FUNCS))
+    san_raw   = await _run_cpg_query(_build_query(SANITIZER_FUNCS))
+    guard_raw = await _run_cpg_query(_build_query(GUARD_FUNCS))
+    auth_raw  = await _run_cpg_query(_build_query(AUTH_FUNCS))
+    err_raw   = await _run_cpg_query(_build_query(ERROR_FUNCS))
 
     def _parse(raw: dict) -> list[str]:
         out = _fmt_executor(raw)

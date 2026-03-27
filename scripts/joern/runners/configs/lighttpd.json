@@ -1,6 +1,6 @@
 {
     "project": {
-      "name": "lighttpd1.4",
+      "name": "lighttpd",
       "language": "c"
     },
     "paths": {
