@@ -16,9 +16,7 @@ from .diff_extractor import (
 )
 
 from .tvc_extractor import (
-    extract_test_version_functions,
-    extract_function_block,
-    git_show
+    extract_test_version_functions
 )
 
 __all__ = [
@@ -34,7 +32,5 @@ __all__ = [
     'run_git',
     'slice_lines',
     'extract_global_snippet',
-    'extract_test_version_functions',
-    'extract_function_block',
-    'git_show'
+    'extract_test_version_functions'
 ]
