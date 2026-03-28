@@ -1,0 +1,17 @@
+rules:
+  - id: c-memory-risk
+    languages: [c]
+    severity: WARNING
+    message: "Potential memory or arithmetic risk"
+
+    pattern-either:
+      - pattern: memcpy(...)
+      - pattern: memmove(...)
+      - pattern: strcpy(...)
+      - pattern: strncpy(...)
+      - pattern: malloc(...)
+      - pattern: realloc(...)
+      - pattern: free(...)
+      - pattern: $X * $Y
+      - pattern: $X + $Y
+      - pattern: $ARR[$IDX]
