@@ -1,5 +1,5 @@
 """
-Hybrid Retriever + GPT Top2 Selector
+Hybrid Retriever + GPT Top1 Selector + DTO Enrichment
 ====================================
 Stage 1:
 - purpose           ↔ DenseRetriever (LangChain OpenAIEmbeddings)
@@ -9,13 +9,13 @@ Stage 1:
 
 Stage 2:
 - top 20 후보를 ChatOpenAI(gpt-4o-mini)에 전달
-- 가장 가능성 높은 취약점 2개 선정
+- 가장 가능성 높은 취약점 1개 선정 후 DTO enrichment
 
 입력:
 - diff_retriever.json
 
 출력:
-- retriever_output_top2.json (하나의 merged json 파일)
+- retriever_output.json (하나의 merged json 파일)
 """
 
 import json
@@ -30,6 +30,8 @@ try:
     from ...utils.bm25_retriever import BM25Retriever
     from ...utils.dense_retriever import DenseRetriever
     from ...utils.embedding_cache import EmbeddingCache
+    from ...dto.output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
+    from ...dto.memory_corruption_patterns import enrich_memory_corruption_result
     from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 except ImportError:
     _ROOT = Path(__file__).resolve().parents[3]
@@ -38,6 +40,8 @@ except ImportError:
     from src.utils.bm25_retriever import BM25Retriever
     from src.utils.dense_retriever import DenseRetriever
     from src.utils.embedding_cache import EmbeddingCache
+    from src.dto.output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
+    from src.dto.memory_corruption_patterns import enrich_memory_corruption_result
     from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
 
@@ -75,6 +79,58 @@ def safe_text(value: Any) -> str:
     return str(value)
 
 
+def safe_list_of_str(value: Any, limit: Optional[int] = None) -> List[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        items = [safe_text(v).strip() for v in value if safe_text(v).strip()]
+    else:
+        items = [safe_text(value).strip()] if safe_text(value).strip() else []
+
+    seen = set()
+    deduped: List[str] = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            deduped.append(item)
+
+    if limit is not None:
+        return deduped[:limit]
+    return deduped
+
+
+def build_output_dto(item_id: int, query_full_code: str, top_vulnerabilities: List[dict]) -> Dict[str, Any]:
+    dto_items: List[TopVulnerabilityDTO] = []
+
+    for vuln in top_vulnerabilities:
+        enriched = enrich_memory_corruption_result({
+            "name": safe_text(vuln.get("name")).strip(),
+            "reason": safe_text(vuln.get("reason")).strip(),
+            "supporting_cve_ids": safe_list_of_str(vuln.get("supporting_cve_ids"), limit=3),
+        })
+
+        dto_items.append(
+            TopVulnerabilityDTO(
+                name=safe_text(enriched.get("name")).strip(),
+                reason=safe_text(enriched.get("reason")).strip(),
+                supporting_cve_ids=safe_list_of_str(enriched.get("supporting_cve_ids"), limit=3),
+                representative_pattern=(safe_text(enriched.get("representative_pattern")).strip() or None),
+                memory_corruption_category=(safe_text(enriched.get("memory_corruption_category")).strip() or None),
+                cwe_ids=safe_list_of_str(enriched.get("cwe_ids")),
+                representative_code_examples=safe_list_of_str(enriched.get("representative_code_examples")),
+                common_indicators=safe_list_of_str(enriched.get("common_indicators")),
+            )
+        )
+
+    output = RetrievalOutputDTO(
+        id=int(item_id),
+        full_code=query_full_code,
+        top_vulnerabilities=dto_items,
+    )
+    return output.to_dict()
+
+
 # ─────────────────────────────────────────────────────────────
 # CLI
 # ─────────────────────────────────────────────────────────────
@@ -85,11 +141,11 @@ def parse_args():
     p.add_argument(
         "--output-path",
         type=str,
-        default="data/retriever_output_top2.json",
+        default="data/retriever_output.json",
         help="Path to save merged results"
     )
     p.add_argument("--candidate-k", type=int, default=20, help="Number of retrieval candidates before GPT selection")
-    p.add_argument("--final-k", type=int, default=2, help="Number of final vulnerability types selected by GPT")
+    p.add_argument("--final-k", type=int, default=1, help="Number of final vulnerability types selected by GPT")
     p.add_argument("--workers", type=int, default=8, help="Number of parallel workers")
     p.add_argument("--limit", type=int, default=0, help="앞에서부터 N개 item만 처리 (0이면 전체)")
     return p.parse_args()
@@ -355,7 +411,7 @@ def retrieve_top_k_candidates(
 
 
 # ─────────────────────────────────────────────────────────────
-# Stage 2: GPT selects top 2
+# Stage 2: GPT selects top 1 + enriches with DTO/pattern dictionary
 # ─────────────────────────────────────────────────────────────
 def _build_candidate_summary(candidates: List[dict]) -> str:
     lines: List[str] = []
@@ -380,7 +436,7 @@ def select_top_vulnerabilities_with_gpt(
     query_function_summary: str,
     query_full_code: str,
     candidates: List[dict],
-    final_k: int = 2,
+    final_k: int = 1,
 ) -> List[dict]:
     if CHAT_MODEL is None:
         raise ValueError("CHAT_MODEL is not initialized.")
@@ -389,13 +445,13 @@ def select_top_vulnerabilities_with_gpt(
 
     system_prompt = (
         "You are a security analysis assistant.\n"
-        "Your job is to read retrieved vulnerability candidates and identify the most likely vulnerability TYPES.\n"
+        "Your job is to read retrieved vulnerability candidates and identify the single most likely vulnerability TYPE.\n"
         "Return ONLY valid JSON.\n"
         "Do not include markdown fences.\n"
     )
 
     user_prompt = f"""
-Given the query information and the retrieved candidates, choose the {final_k} most likely vulnerability types.
+Given the query information and the retrieved candidates, choose the single most likely vulnerability type.
 
 [Query]
 PURPOSE: {query_purpose}
@@ -420,8 +476,10 @@ Return JSON in this exact schema:
 Rules:
 - Return exactly {final_k} items.
 - Focus on vulnerability TYPES, not specific CVEs.
-- Use concise names like "Buffer Overflow", "Use-After-Free", "Null Pointer Dereference", "Integer Overflow".
-- supporting_cve_ids should contain the most relevant candidate CVE IDs.
+- Return exactly 1 item even if evidence is weak.
+- Focus on the single best vulnerability TYPE, not specific CVEs.
+- Use concise canonical names like "Buffer Overflow", "Use-After-Free", "Null Pointer Dereference", "Integer Overflow", "Format String Bug".
+- supporting_cve_ids must contain at most 3 of the most relevant candidate CVE IDs.
 - Return JSON only.
 """.strip()
 
@@ -438,16 +496,15 @@ Rules:
         top_vulns = parsed.get("top_vulnerabilities", [])
         if not isinstance(top_vulns, list):
             raise ValueError("top_vulnerabilities is not a list")
-
         cleaned = []
-        for item in top_vulns[:final_k]:
+        for item in top_vulns[:1]:
             cleaned.append({
-                "name": safe_text(item.get("name")),
-                "reason": safe_text(item.get("reason")),
-                "supporting_cve_ids": item.get("supporting_cve_ids", []),
+                "name": safe_text(item.get("name")).strip(),
+                "reason": safe_text(item.get("reason")).strip(),
+                "supporting_cve_ids": safe_list_of_str(item.get("supporting_cve_ids"), limit=3),
             })
 
-        while len(cleaned) < final_k:
+        if not cleaned:
             cleaned.append({
                 "name": "",
                 "reason": "GPT output parsing fallback",
@@ -459,11 +516,17 @@ Rules:
     except Exception as e:
         log(f"[GPT] parse failed: {e}")
         fallback = []
-        for item in candidates[:final_k]:
+        for item in candidates[:1]:
             fallback.append({
-                "name": item.get("vulnerability_cause_description", "")[:80],
+                "name": safe_text(item.get("vulnerability_cause_description", "")[:80]).strip(),
                 "reason": "Fallback due to GPT JSON parse failure",
-                "supporting_cve_ids": [item.get("cve_id", "")] if item.get("cve_id") else [],
+                "supporting_cve_ids": safe_list_of_str(item.get("cve_id"), limit=3),
+            })
+        if not fallback:
+            fallback.append({
+                "name": "",
+                "reason": "Fallback due to empty candidates",
+                "supporting_cve_ids": [],
             })
         return fallback
 
@@ -500,11 +563,11 @@ def process_function(item: dict, args) -> Optional[dict]:
     )
     log(f"[ITEM {item_id:04d}] final top vulnerabilities = {len(top_vulnerabilities)}")
 
-    return {
-        "id": item_id,
-        "full_code": query_full_code,
-        "top_vulnerabilities": top_vulnerabilities,
-    }
+    return build_output_dto(
+        item_id=item_id,
+        query_full_code=query_full_code,
+        top_vulnerabilities=top_vulnerabilities,
+    )
 
 
 # ─────────────────────────────────────────────────────────────
