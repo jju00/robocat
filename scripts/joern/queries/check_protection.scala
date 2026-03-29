@@ -1,5 +1,6 @@
 import io.shiftleft.codepropertygraph.generated.nodes._
 import io.shiftleft.semanticcpg.language._
+import io.joern.dataflowengineoss.language.*
 import overflowdb.traversal._
 
 val sources = $SOURCE_EXPR
