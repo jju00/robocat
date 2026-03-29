@@ -23,6 +23,15 @@ Your task is to analyze source code and identify **memory corruption vulnerabili
 
 ---
 
+## 🔍 Analysis Scope (IMPORTANT)
+
+Prioritize analysis on the functions provided as input (e.g., diff-based functions).  
+Treat each function as the primary unit of analysis.  
+Do not broadly scan unrelated code unless needed to confirm data flow, validation, or memory behavior.  
+Only expand analysis beyond the current function when necessary to confirm exploitability.
+
+---
+
 ## 🧠 Analysis Rules
 
 ### 1. Deep Semantic Understanding
@@ -147,7 +156,7 @@ Use MCP tools when necessary to determine whether the pointer can be NULL, stale
 
 DO NOT GUESS.
 
-- If size is unknown → infer from code
+- If size is unknown → infer from code or trace it
 - If allocation unclear → trace it
 - If uncertain → DO NOT report
 - If deeper reasoning is needed and MCP tools are available, use them to verify the claim before reporting
