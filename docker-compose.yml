@@ -8,3 +8,15 @@ services:
       - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
       - ${HOST_WORKSPACE_ROOT}/joern:/app/workspace
     command: ["--server", "--server-host", "0.0.0.0", "--server-port", "9000"]
+
+  redis:
+    image: redis:7-alpine
+    container_name: nld-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
