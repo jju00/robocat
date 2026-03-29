@@ -81,7 +81,12 @@ def map_sarif(diff_path: str, sarif_path: str, output_path="diff_sarif.json"):
     diff_data = json.load(open(diff_path))
     sarif_index = load_sarif(sarif_path)
 
-    output = {"files": []}
+    output = {
+        "project": diff_data.get("project"),
+        "from_version": diff_data.get("from_version"),
+        "test_version": diff_data.get("test_version"),
+        "files": []
+    }
 
     for file_entry in diff_data.get("files", []):
         file_path = file_entry["file_path"]
@@ -128,6 +133,7 @@ def map_sarif(diff_path: str, sarif_path: str, output_path="diff_sarif.json"):
             hits = sorted(set(hits))
 
             new_functions.append({
+                "id": func.get("id"),
                 "function": name,
                 "code_before_change": before,
                 "code_after_change": after,

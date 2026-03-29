@@ -212,10 +212,16 @@ def find_function(spans: List[FunctionSpan], line: int) -> Optional[FunctionSpan
 # =========================
 
 def run(repo, old, new):
+    id_counter = 1
     diff = save_diff(repo, old, new)
     parsed = parse_diff(diff)
 
-    result = {"files": []}
+    result = {
+        "project": os.path.basename(repo),
+        "from_version": old,
+        "test_version": new,
+        "files": []
+    }
 
     for f in parsed:
         path = f["file_path"]
@@ -257,12 +263,14 @@ def run(repo, old, new):
                 continue
 
             funcs.append({
+                "id":id_counter,
                 "function": name,
                 "start": before_sp.start if before_sp else after_sp.start,
                 "end": before_sp.end if before_sp else after_sp.end,
                 "code_before_change": before_code,
                 "code_after_change": after_code
             })
+            id_counter += 1
 
         if funcs:
             result["files"].append({
