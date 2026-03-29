@@ -1,0 +1,62 @@
+rules:
+  - id: php-sqli-query
+    languages: [php]
+    severity: WARNING
+    message: "Possible SQL injection"
+
+    pattern-either:
+      - pattern: $DB->query($Q)
+      - pattern: $DB->realQuery($Q)
+      - pattern: $DB->executeQuery($Q)
+      - pattern: mysqli_query($CONN, $Q)
+      - pattern: $PDO->query($Q)
+
+  - id: php-command-exec
+    languages: [php]
+    severity: ERROR
+    message: "Possible command injection"
+
+    pattern-either:
+      - pattern: exec(...)
+      - pattern: system(...)
+      - pattern: shell_exec(...)
+      - pattern: passthru(...)
+      - pattern: popen(...)
+      - pattern: proc_open(...)
+
+  - id: php-file-include
+    languages: [php]
+    severity: ERROR
+    message: "Possible file inclusion"
+
+    pattern-either:
+      - pattern: include $X;
+      - pattern: include_once $X;
+      - pattern: require $X;
+      - pattern: require_once $X;
+
+  - id: php-unserialize
+    languages: [php]
+    severity: ERROR
+    message: "Possible unsafe unserialize"
+
+    pattern: unserialize(...)
+
+  - id: php-ssrf
+    languages: [php]
+    severity: WARNING
+    message: "Possible SSRF"
+
+    pattern-either:
+      - pattern: file_get_contents($URL)
+      - pattern: curl_setopt($CH, CURLOPT_URL, $URL)
+
+  - id: php-xss-echo
+    languages: [php]
+    severity: WARNING
+    message: "Possible XSS"
+
+    pattern-either:
+      - pattern: echo $_GET[$X];
+      - pattern: echo $_POST[$X];
+      - pattern: echo $_REQUEST[$X];
