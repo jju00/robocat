@@ -99,11 +99,14 @@ class JoernExecutor:
         예) [{"methods": 1}, {"calls": 0}] → {"methods": 1, "calls": 0}
         """
         if isinstance(parsed, list):
-            merged: dict[str, Any] = {}
-            for item in parsed:
-                if isinstance(item, dict):
+            if all(
+                isinstance(item, dict) and len(item) == 1
+                for item in parsed
+            ):
+                merged: dict[str, Any] = {}
+                for item in parsed:
                     merged.update(item)
-            return merged
+                return merged
         return parsed
 
     # ── Execution ─────────────────────────────────────────────────────────────

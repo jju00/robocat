@@ -91,7 +91,7 @@ class TaintQueryBuilder:
 
     # ── Full query builders ───────────────────────────────────────────────────
 
-    def build_import_query(self) -> str:
+    def build_import_query(self, run_dataflow: bool = False) -> str:
         """import_cpg.scala 템플릿을 로드하여 프로젝트 임포트 쿼리를 생성."""
         return self._fill(
             self._load_template("import_cpg.scala"),
@@ -99,6 +99,7 @@ class TaintQueryBuilder:
             TARGET_PATH=self.escape(self.target_path),
             PROJECT_NAME=self.escape(self.project_name),
             LANGUAGE=self.escape(self.language),
+            RUN_DATAFLOW="true" if run_dataflow else "false",
         )
 
     def build_taint_query(self, sink_name: str, sink_regex: str) -> str:
@@ -113,7 +114,14 @@ class TaintQueryBuilder:
             TARGET_PATH=self.escape(self.target_path),
         )
 
-    def build_protection_query(self, sink_name: str, sink_regex: str, sanitizers: List[str]) -> str:
+    def build_protection_query(
+        self,
+        sink_name: str,
+        sink_regex: str,
+        sanitizers: List[str],
+        file_path: str = ".*",
+        function_name: str = ".*",
+    ) -> str:
         """check_protection.scala 템플릿을 로드하여 보호 기법 판단 쿼리를 생성"""
         sanitizer_regex = "|".join(sanitizers) if sanitizers else "NEVER_MATCH_ANYTHING"
         
@@ -124,6 +132,8 @@ class TaintQueryBuilder:
             SINK_REGEX=self.escape(sink_regex),
             SINK_NAME=self.escape(sink_name),
             SANITIZER_REGEX=self.escape(sanitizer_regex),
+            FILE_PATH=self.escape(file_path),
+            FUNCTION_NAME=self.escape(function_name),
             LANGUAGE=self.escape(self.language),
             TARGET_PATH=self.escape(self.target_path),
         )

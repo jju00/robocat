@@ -3,8 +3,23 @@ import io.shiftleft.semanticcpg.language._
 import io.joern.dataflowengineoss.language.*
 import overflowdb.traversal._
 
-val sources = $SOURCE_EXPR
-val sinks = cpg.call.name("$SINK_REGEX").l
+val scopedMethods =
+  cpg.method
+    .filename("$FILE_PATH")
+    .name("$FUNCTION_NAME")
+    .l
+
+val scopedAstNodeIds = scopedMethods.iterator.flatMap(_.ast.id.l).toSet
+
+val sources =
+  $SOURCE_EXPR
+    .l
+    .filter(node => scopedAstNodeIds.contains(node.id))
+
+val sinks =
+  scopedMethods.iterator
+    .flatMap(_.call.name("$SINK_REGEX").l)
+    .toList
 
 val flows = sinks.reachableByFlows(sources).l
 
