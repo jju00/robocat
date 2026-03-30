@@ -1,802 +1,552 @@
-diff --git a/ANNOUNCE b/ANNOUNCE
-index 1b8bc1915..59f7e25bf 100644
---- a/ANNOUNCE
-+++ b/ANNOUNCE
-@@ -1,5 +1,5 @@
- 
--Libpng 1.7.0beta88 - August 6, 2017
-+Libpng 1.7.0beta89 - August 19, 2017
- 
- This is not intended to be a public release.  It will be replaced
- within a few weeks by a public version or by another test version.
-@@ -9,20 +9,20 @@ Files available for download:
- Source files with LF line endings (for Unix/Linux) and with a
- "configure" script
- 
--   1.7.0beta88.tar.xz (LZMA-compressed, recommended)
--   1.7.0beta88.tar.gz
-+   1.7.0beta89.tar.xz (LZMA-compressed, recommended)
-+   1.7.0beta89.tar.gz
- 
- Source files with CRLF line endings (for Windows), without the
- "configure" script
- 
--   /scratch/glennrp/Libpng17/lp170b88.7z  (LZMA-compressed, recommended)
--   /scratch/glennrp/Libpng17/lp170b88.zip
-+   /scratch/glennrp/Libpng17/lp170b89.7z  (LZMA-compressed, recommended)
-+   /scratch/glennrp/Libpng17/lp170b89.zip
- 
- Other information:
- 
--   1.7.0beta88-README.txt
--   1.7.0beta88-LICENSE.txt
--   libpng-1.7.0beta88-*.asc (armored detached GPG signatures)
-+   1.7.0beta89-README.txt
-+   1.7.0beta89-LICENSE.txt
-+   libpng-1.7.0beta89-*.asc (armored detached GPG signatures)
- 
- Changes since the last public release (1.6.0):
- 
-@@ -1431,10 +1431,14 @@ Version 1.7.0beta87 [April 1, 2017]
-     makefile.linux and makefile.solaris-x86 (Cosmin).
-   Merged some recent changes from libpng-1.6.30beta01.
- 
--Version 1.7.0beta88 [August 6, 2017]
-+Version 1.7.0beta88 [August 7. 2017]
-   Added private png_check_chunk_name() and png_check_chunk_length()
-     functions.
- 
-+Version 1.7.0beta89 [August 19, 2017]
-+  Check for 0 return from png_get_rowbytes() in contrib/pngminus/*.c to stop
-+    some Coverity issues (162705, 162706, and 162707).
-+
- Send comments/corrections/commendations to png-mng-implement at lists.sf.net
- (subscription required; visit
- https://lists.sourceforge.net/lists/listinfo/png-mng-implement
-diff --git a/CHANGES b/CHANGES
-index 4538d0073..575c74d81 100644
---- a/CHANGES
-+++ b/CHANGES
-@@ -5731,11 +5731,15 @@ Version 1.7.0beta87 [April 1, 2017]
-     makefile.linux and makefile.solaris-x86 (Cosmin).
-   Merged some recent changes from libpng-1.6.30beta01.
- 
--Version 1.7.0beta88 [August 6, 2017]
-+Version 1.7.0beta88 [August 7, 2017]
-   Initialized btoa[] in pngstest.c
-   Added private png_check_chunk_name() and png_check_chunk_length()
-     functions.
- 
-+Version 1.7.0beta89 [August 19, 2017]
-+  Check for 0 return from png_get_rowbytes() in contrib/pngminus/*.c to stop
-+    some Coverity issues (162705, 162706, and 162707).
-+
- Send comments/corrections/commendations to png-mng-implement at lists.sf.net
- (subscription required; visit
- https://lists.sourceforge.net/lists/listinfo/png-mng-implement
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 67407099..32695aab 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -30,7 +30,7 @@ jobs:
+         platform: ['x64']
+         compiler: ['gcc']
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - name: Install packages
+         run: |
+           sudo apt-get update
+@@ -63,7 +63,7 @@ jobs:
+         platform: ['x64']
+         compiler: ['clang']
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - name: Install packages
+         run: |
+           sudo apt-get update
+@@ -90,7 +90,7 @@ jobs:
+   macOS:
+     runs-on: macos-latest
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - name: Install packages
+         run: |
+           brew install -q meson ninja pkg-config pcre2 perl \
+@@ -110,7 +110,7 @@ jobs:
+   DragonflyBSD:
+     runs-on: ubuntu-latest
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: vmactions/dragonflybsd-vm@v1
+         with:
+           usesh: true
+@@ -125,7 +125,7 @@ jobs:
+   FreeBSD:
+     runs-on: ubuntu-latest
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: vmactions/freebsd-vm@v1
+         with:
+           usesh: true
+@@ -148,7 +148,7 @@ jobs:
+   NetBSD:
+     runs-on: ubuntu-latest
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: vmactions/netbsd-vm@v1
+         with:
+           #usesh: true
+@@ -174,7 +174,7 @@ jobs:
+   OpenBSD:
+     runs-on: ubuntu-latest
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: vmactions/openbsd-vm@v1
+         with:
+           usesh: true
+@@ -197,7 +197,7 @@ jobs:
+   Solaris:
+     runs-on: ubuntu-latest
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: vmactions/solaris-vm@v1
+         with:
+           release: "11.4-gcc"
+@@ -246,7 +246,7 @@ jobs:
+       CYGWIN: winsymlinks:native
+     steps:
+       - run: git config --global core.autocrlf input
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - name: Set up env and create cache dir
+         id: env
+         shell: pwsh
+@@ -302,7 +302,7 @@ jobs:
+     #env:
+     #  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: ilammy/msvc-dev-cmd@v1
+       #- name: Install dependencies
+       #  run: vcpkg install --triplet ${{matrix.platform}}-windows openssl pcre2 zlib
+@@ -326,7 +326,7 @@ jobs:
+         #platform: ['mingw32', 'mingw64', 'ucrt64', 'clang32', 'clang64']
+     steps:
+       - run: git config --global core.autocrlf input
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: msys2/setup-msys2@v2
+         with:
+           msystem: ${{matrix.platform}}
+@@ -361,7 +361,7 @@ jobs:
+       matrix:
+         platform: ['x86_64']
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: jirutka/setup-alpine@v1
+         with:
+           branch: latest-stable
+@@ -399,7 +399,7 @@ jobs:
+       matrix:
+         platform: ['x86','armhf','armv7','aarch64','ppc64le','riscv64','s390x']
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5
+       - uses: jirutka/setup-alpine@v1
+         with:
+           # riscv64 currently requires 'edge'
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 09f698017..151b90e7c 100644
+index 80c75627..9776dd64 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -729,7 +729,7 @@ endif(NOT WIN32 OR CYGWIN OR MINGW)
- # SET UP LINKS
- if(PNG_SHARED)
-   set_target_properties(png PROPERTIES
--#   VERSION 17.${PNGLIB_RELEASE}.1.7.0beta88
-+#   VERSION 17.${PNGLIB_RELEASE}.1.7.0beta89
-     VERSION 17.${PNGLIB_RELEASE}.0
-     SOVERSION 17
-     CLEAN_DIRECT_OUTPUT 1)
-diff --git a/LICENSE b/LICENSE
-index 7735d655b..62ee15efc 100644
---- a/LICENSE
-+++ b/LICENSE
-@@ -10,7 +10,7 @@ this sentence.
+@@ -1,6 +1,6 @@
+ cmake_minimum_required(VERSION 3.7.0 FATAL_ERROR)
  
- This code is released under the libpng license.
+-project(lighttpd VERSION 1.4.81 LANGUAGES C)
++project(lighttpd VERSION 1.4.82 LANGUAGES C)
  
--libpng versions 1.0.7, July 1, 2000 through 1.7.0beta88, August 6, 2017 are
-+libpng versions 1.0.7, July 1, 2000 through 1.7.0beta89, August 19, 2017 are
- Copyright (c) 2000-2002, 2004, 2006-2017 Glenn Randers-Pehrson, are
- derived from libpng-1.0.6, and are distributed according to the same
- disclaimer and license as libpng-1.0.6 with the following individuals
-@@ -127,4 +127,4 @@ any encryption software.  See the EAR, paragraphs 734.3(b)(3) and
+ # use C11 with CMake >= 3.1
+ set(CMAKE_C_STANDARD 11)
+diff --git a/NEWS b/NEWS
+index 44c14f37..1d55498e 100644
+--- a/NEWS
++++ b/NEWS
+@@ -3,6 +3,16 @@
+ NEWS
+ ====
  
- Glenn Randers-Pehrson
- glennrp at users.sourceforge.net
--August 6, 2017
-+August 19, 2017
-diff --git a/README b/README
-index c33f5f6e2..e314ec4b4 100644
---- a/README
-+++ b/README
-@@ -1,4 +1,4 @@
--README for libpng version 1.7.0beta88 - August 6, 2017 (shared library 17.0)
-+README for libpng version 1.7.0beta89 - August 19, 2017 (shared library 17.0)
- See the note about version numbers near the top of png.h
++- 1.4.82 - 2025-09-12
++  * [core] restrict request trailers to configured list
++  * [core] fix logic inversion in "toupper:" modifier
++  * [mod_redirect,mod_rewrite] ${url.authority.noport} token
++  * [cmake,mod_mbedtls] mbedx509 mbedcrypto order
++  * [mod_mbedtls] psa_crypto_init() for MBEDTLS_USE_PSA_CRYPTO (fixes #3288)
++  * [build] mod_mbedtls: use tfpsacrypto if found
++  * [ci] Bump actions/checkout from 4 to 5
++  * [core] avoid chunk mem reallocation on read/recv
++
+ - 1.4.81 - 2025-08-17
+   * [core] security: fix to reject disallowed trailers
  
- See INSTALL for instructions on how to install libpng.
+diff --git a/SConstruct b/SConstruct
+index a50c87b1..d8c0913f 100644
+--- a/SConstruct
++++ b/SConstruct
+@@ -12,7 +12,7 @@ except NameError:
+ 	string_types = str
+ 
+ package = 'lighttpd'
+-version = '1.4.81'
++version = '1.4.82'
+ 
+ underscorify_reg = re.compile('[^A-Z0-9]')
+ def underscorify(id):
+@@ -640,13 +640,22 @@ if 1:
+ 	if env['with_mbedtls']:
+ 		if not autoconf.CheckLibWithHeader('mbedtls', 'mbedtls/ssl.h', 'C'):
+ 			fail("Couldn't find mbedtls")
+-		autoconf.env.Append(
+-			CPPFLAGS = [ '-DHAVE_LIBMBEDCRYPTO' ],
+-			LIBMBEDTLS = 'mbedtls',
+-			LIBMBEDX509 = 'mbedx509',
+-			LIBMBEDCRYPTO = 'mbedcrypto',
+-			LIBCRYPTO = 'mbedcrypto',
+-		)
++		if autoconf.CheckLibWithHeader('tfpsacrypto', 'tf-psa-crypto/version.h', 'C'):
++			autoconf.env.Append(
++				CPPFLAGS = [ '-DHAVE_LIBMBEDCRYPTO' ],
++				LIBMBEDTLS = 'mbedtls',
++				LIBMBEDX509 = 'mbedx509',
++				LIBMBEDCRYPTO = 'tfpsacrypto',
++				LIBCRYPTO = 'tfpsacrypto',
++			)
++		else:
++			autoconf.env.Append(
++				CPPFLAGS = [ '-DHAVE_LIBMBEDCRYPTO' ],
++				LIBMBEDTLS = 'mbedtls',
++				LIBMBEDX509 = 'mbedx509',
++				LIBMBEDCRYPTO = 'mbedcrypto',
++				LIBCRYPTO = 'mbedcrypto',
++			)
+ 
+ 	if env['with_nettle']:
+ 		if not autoconf.CheckLibWithHeader('nettle', 'nettle/nettle-types.h', 'C'):
 diff --git a/configure.ac b/configure.ac
-index b6979ddb3..dd7d2b6ea 100644
+index b1d70ce0..3a513629 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -26,7 +26,7 @@ AC_PREREQ([2.68])
+@@ -14,7 +14,7 @@ dnl - if an argument uses more than one line and is not a single
+ dnl   function call, the argument should be on different lines than the
+ dnl   wrapping braces
+ AC_PREREQ([2.60])
+-AC_INIT([lighttpd],[1.4.81],[https://redmine.lighttpd.net/projects/lighttpd/boards/2],[lighttpd],[https://www.lighttpd.net/])
++AC_INIT([lighttpd],[1.4.82],[https://redmine.lighttpd.net/projects/lighttpd/boards/2],[lighttpd],[https://www.lighttpd.net/])
+ AC_CONFIG_SRCDIR([src/server.c])
+ AC_CONFIG_HEADERS([config.h])
+ AC_CONFIG_MACRO_DIR([m4])
+@@ -742,17 +742,29 @@ AM_CONDITIONAL(BUILD_WITH_MBEDTLS, test ! $WITH_MBEDTLS = no)
+ if test "x$use_mbedtls" = "xyes"; then
+   AC_CHECK_HEADERS([mbedtls/ssl.h])
+   OLDLIBS="$LIBS"
+-  AC_CHECK_LIB(mbedcrypto, mbedtls_base64_encode,
++  AC_CHECK_LIB(tfpsacrypto, mbedtls_base64_encode,
+     [AC_CHECK_LIB(mbedx509, mbedtls_x509_get_name,
+       [AC_CHECK_LIB(mbedtls, mbedtls_ssl_init,
+-        [MTLS_LIBS="-lmbedtls -lmbedx509 -lmbedcrypto"
+-         CRYPTO_LIB="-lmbedcrypto"
++        [MTLS_LIBS="-lmbedtls -lmbedx509 -ltfpsacrypto"
++         CRYPTO_LIB="-ltfpsacrypto"
+          AC_DEFINE(HAVE_LIBMBEDTLS, [1], [Have libmbedtls library])
+          AC_DEFINE(HAVE_LIBMBEDX509, [1], [Have libmbedx509 library])
+          AC_DEFINE(HAVE_LIBMBEDCRYPTO, [1], [Have libmbedcrypto library]) ],
+-        [],[-lmbedx509 -lmbedcrypto "$DL_LIB"])
+-      ],[],[-lmbedcrypto "$DL_LIB"])
+-    ],[],[])
++        [],[-lmbedx509 -ltfpsacrypto "$DL_LIB"])
++      ],[],[-ltfpsacrypto "$DL_LIB"])
++    ],
++    [AC_CHECK_LIB(mbedcrypto, mbedtls_base64_encode,
++      [AC_CHECK_LIB(mbedx509, mbedtls_x509_get_name,
++        [AC_CHECK_LIB(mbedtls, mbedtls_ssl_init,
++          [MTLS_LIBS="-lmbedtls -lmbedx509 -lmbedcrypto"
++           CRYPTO_LIB="-lmbedcrypto"
++           AC_DEFINE(HAVE_LIBMBEDTLS, [1], [Have libmbedtls library])
++           AC_DEFINE(HAVE_LIBMBEDX509, [1], [Have libmbedx509 library])
++           AC_DEFINE(HAVE_LIBMBEDCRYPTO, [1], [Have libmbedcrypto library]) ],
++          [],[-lmbedx509 -lmbedcrypto "$DL_LIB"])
++        ],[],[-lmbedcrypto "$DL_LIB"])
++      ],[],[])
++    ],[])
+   LIBS="$OLDLIBS"
+   AC_SUBST(MTLS_LIBS)
+   AC_SUBST(CRYPTO_LIB)
+diff --git a/meson.build b/meson.build
+index 0312d5fc..b41a5517 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1,7 +1,7 @@
+ project(
+   'lighttpd',
+   'c',
+-  version: '1.4.81',
++  version: '1.4.82',
+   license: 'BSD-3-Clause',
+   default_options: [
+     'buildtype=debugoptimized',
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index f59467c0..5f0305de 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -470,13 +470,23 @@ endif()
+ if(WITH_MBEDTLS)
+ 	check_include_files(mbedtls/ssl.h HAVE_MBEDTLS_SSL_H)
+ 	if(HAVE_MBEDTLS_SSL_H)
+-		check_library_exists(mbedcrypto mbedtls_base64_encode "" HAVE_LIBMBEDCRYPTO)
++		check_library_exists(tfpsacrypto mbedtls_base64_encode "" HAVE_LIBMBEDCRYPTO)
+ 		if(HAVE_LIBMBEDCRYPTO)
+-			set(CRYPTO_LIBRARY mbedcrypto)
++			set(CRYPTO_LIBRARY tfpsacrypto)
++			set(HAVE_LIBTFPSACRYPTO 1)
+ 			check_library_exists(mbedtls mbedtls_ssl_init "" HAVE_LIBMBEDTLS)
+ 			if(HAVE_LIBMBEDTLS)
+ 			    check_library_exists(mbedx509 mbedtls_x509_get_name "" HAVE_LIBMBEDX509)
+ 			endif()
++		else()
++			check_library_exists(mbedcrypto mbedtls_base64_encode "" HAVE_LIBMBEDCRYPTO)
++			if(HAVE_LIBMBEDCRYPTO)
++				set(CRYPTO_LIBRARY mbedcrypto)
++				check_library_exists(mbedtls mbedtls_ssl_init "" HAVE_LIBMBEDTLS)
++				if(HAVE_LIBMBEDTLS)
++				    check_library_exists(mbedx509 mbedtls_x509_get_name "" HAVE_LIBMBEDX509)
++				endif()
++			endif()
+ 		endif()
+ 	endif()
+ else()
+@@ -1213,7 +1223,11 @@ endif()
  
- dnl Version number stuff here:
+ if(HAVE_LIBMBEDTLS AND HAVE_LIBMEDCRYPTO AND HAVE_LIBMEDX509)
+ 	add_and_install_library(mod_mbedtls "mod_mbedtls.c")
+-	set(L_MOD_MBEDTLS ${L_MOD_MBEDTLS} mbedtls mbedcrypto mbedx509)
++	if(HAVE_LIBTFPSACRYPTO)
++		set(L_MOD_MBEDTLS ${L_MOD_MBEDTLS} mbedtls mbedx509 tfpsacrypto)
++	else()
++		set(L_MOD_MBEDTLS ${L_MOD_MBEDTLS} mbedtls mbedx509 mbedcrypto)
++	endif()
+ 	target_link_libraries(mod_mbedtls ${L_MOD_MBEDTLS})
+ endif()
  
--AC_INIT([libpng],[1.7.0beta88],[png-mng-implement@lists.sourceforge.net])
-+AC_INIT([libpng],[1.7.0beta89],[png-mng-implement@lists.sourceforge.net])
- AC_CONFIG_MACRO_DIR([scripts])
+diff --git a/src/chunk.c b/src/chunk.c
+index 162fc81c..bff90b95 100644
+--- a/src/chunk.c
++++ b/src/chunk.c
+@@ -714,7 +714,7 @@ char * chunkqueue_get_memory(chunkqueue * const restrict cq, size_t * const rest
+ 	}
  
- # libpng does not follow GNU file name conventions (hence 'foreign')
-@@ -48,7 +48,7 @@ dnl automake, so the following is not necessary (and is not defined anyway):
- dnl AM_PREREQ([1.11.2])
- dnl stop configure from automagically running automake
- 
--PNGLIB_VERSION=1.7.0beta88
-+PNGLIB_VERSION=1.7.0beta89
- PNGLIB_MAJOR=1
- PNGLIB_MINOR=7
- PNGLIB_RELEASE=0
-diff --git a/contrib/pngminus/png2pnm.c b/contrib/pngminus/png2pnm.c
-index aa9513ddc..39a9f4673 100644
---- a/contrib/pngminus/png2pnm.c
-+++ b/contrib/pngminus/png2pnm.c
-@@ -1,8 +1,11 @@
- /*
-  *  png2pnm.c --- conversion from PNG-file to PGM/PPM-file
-- *  copyright (C) 1999 by Willem van Schaik <willem@schaik.com>
-+ *  copyright (C) 1999,2017 by Willem van Schaik <willem at schaik.com>
-  *
-  *  version 1.0 - 1999.10.15 - First version.
-+ *          1.1 - 2017.04.22 - Add buffer-size check (Glenn Randers-Pehrson)
-+ *          1.2 - 2017.08.24 - Fix potential overflow in buffer-size check
-+                               (Glenn Randers-Pehrson)
-  *
-  *  Permission to use, copy, modify, and distribute this software and
-  *  its documentation for any purpose and without fee is hereby granted,
-@@ -52,7 +55,8 @@
- 
- int  main (int argc, char *argv[]);
- void usage ();
--BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL alpha);
-+BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw,
-+   BOOL alpha);
- 
- /*
-  *  main
-@@ -85,7 +89,8 @@ int main(int argc, char *argv[])
-           if ((fp_al = fopen (argv[argi], "wb")) == NULL)
-           {
-             fprintf (stderr, "PNM2PNG\n");
--            fprintf (stderr, "Error:  can not create alpha-channel file %s\n", argv[argi]);
-+            fprintf (stderr, "Error:  can not create alpha-channel file %s\n",
-+               argv[argi]);
-             exit (1);
-           }
-           break;
-@@ -176,9 +181,11 @@ void usage()
-   fprintf (stderr, "Usage:  png2pnm [options] <file>.png [<file>.pnm]\n");
-   fprintf (stderr, "   or:  ... | png2pnm [options]\n");
-   fprintf (stderr, "Options:\n");
--  fprintf (stderr, "   -r[aw]   write pnm-file in binary format (P4/P5/P6) (default)\n");
-+  fprintf (stderr,
-+     "   -r[aw]   write pnm-file in binary format (P4/P5/P6) (default)\n");
-   fprintf (stderr, "   -n[oraw] write pnm-file in ascii format (P1/P2/P3)\n");
--  fprintf (stderr, "   -a[lpha] <file>.pgm write PNG alpha channel as pgm-file\n");
-+  fprintf (stderr,
-+     "   -a[lpha] <file>.pgm write PNG alpha channel as pgm-file\n");
-   fprintf (stderr, "   -h | -?  print this help-information\n");
+ 	/* allocate new chunk */
+-	b = chunkqueue_append_buffer_open_sz(cq, sz);
++	b = chunkqueue_append_buffer_open_sz(cq, sz+1);
+ 	*len = buffer_string_space(b);
+ 	return b->ptr;
  }
- 
-@@ -186,7 +193,8 @@ void usage()
-  *  png2pnm
-  */
- 
--BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL alpha)
-+BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file,
-+    volatile BOOL raw, BOOL alpha)
- {
-   png_struct    *png_ptr = NULL;
-   png_info        *info_ptr = NULL;
-@@ -218,7 +226,7 @@ BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL a
- 
-   /* create png and info structures */
- 
--  png_ptr = png_create_read_struct (PNG_LIBPNG_VER_STRING,
-+  png_ptr = png_create_read_struct (png_get_libpng_ver(NULL),
-     NULL, NULL, NULL);
-   if (!png_ptr)
-     return FALSE;   /* out of memory */
-@@ -261,7 +269,7 @@ BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL a
-     png_set_expand (png_ptr);
- 
- #ifdef NJET
--  /* downgrade 16-bit images to 8 bit */
-+  /* downgrade 16-bit images to 8-bit */
-   if (bit_depth == 16)
-     png_set_strip_16 (png_ptr);
-   /* transform grayscale images into full-color */
-@@ -315,12 +323,21 @@ BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL a
-   /* row_bytes is the width x number of channels x (bit-depth / 8) */
-   row_bytes = png_get_rowbytes (png_ptr, info_ptr);
- 
--  if ((png_pixels = (png_byte *) malloc (row_bytes * height * sizeof (png_byte))) == NULL) {
-+  if ((row_bytes == 0 || (size_t)height > ((size_t)(-1))/(size_t)row_bytes))
-+  {
-+    /* too big */ 
-+    png_destroy_read_struct (&png_ptr, &info_ptr, NULL);
-+    return FALSE;
-+  }
-+  if ((png_pixels = (png_byte *)
-+     malloc ((size_t)row_bytes * (size_t)height * sizeof (png_byte))) == NULL)
-+  {
-     png_destroy_read_struct (&png_ptr, &info_ptr, NULL);
-     return FALSE;
-   }
- 
--  if ((row_pointers = (png_byte **) malloc (height * sizeof (png_bytep))) == NULL)
-+  if ((row_pointers = (png_byte **)
-+     malloc ((size_t)height * sizeof (png_bytep))) == NULL)
-   {
-     png_destroy_read_struct (&png_ptr, &info_ptr, NULL);
-     free (png_pixels);
-@@ -329,7 +346,7 @@ BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL a
-   }
- 
-   /* set the individual row_pointers to point at the correct offsets */
--  for (i = 0; i < (height); i++)
-+  for (i = 0; i < ((int) height); i++)
-     row_pointers[i] = png_pixels + i * row_bytes;
- 
-   /* now we can go ahead and just read the whole image */
-@@ -372,9 +389,9 @@ BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL a
-   /* write data to PNM file */
-   pix_ptr = png_pixels;
- 
--  for (row = 0; row < height; row++)
-+  for (row = 0; row < (int) height; row++)
-   {
--    for (col = 0; col < width; col++)
-+    for (col = 0; col < (int) width; col++)
-     {
-       for (i = 0; i < (channels - alpha_present); i++)
-       {
-@@ -401,7 +418,8 @@ BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL a
-           if (raw)
-             fputc ((int) *pix_ptr++ , alpha_file);
-           else
--            if (bit_depth == 16){
-+            if (bit_depth == 16)
-+            {
-               dep_16 = (long) *pix_ptr++;
-               fprintf (alpha_file, "%ld ", (dep_16 << 8) + (long) *pix_ptr++);
+diff --git a/src/configfile.c b/src/configfile.c
+index 039305f6..e97b91cf 100644
+--- a/src/configfile.c
++++ b/src/configfile.c
+@@ -18,6 +18,7 @@
+ #include "configfile.h"
+ #include "plugin.h"
+ #include "reqpool.h"
++#include "request.h"
+ #include "sock_addr.h"
+ #include "stat_cache.h"
+ #include "sys-crypto.h"
+@@ -917,6 +918,15 @@ static int config_insert_srvconf(server *srv) {
+                   config_plugin_value_to_bool(
+                     array_get_element_klen(cpv->v.a,
+                       CONST_STR_LEN("server.absolute-dir-redirect")), 0);
++                {
++                    const data_unset *du =
++                      array_get_element_klen(cpv->v.a,
++                        CONST_STR_LEN("request.trailer-whitelist"));
++                    if (du && du->type == TYPE_STRING) {
++                        buffer *trailer_whitelist = &((data_string *)du)->value;
++                        http_request_trailer_set_whitelist(trailer_whitelist);
++                    }
++                }
+                 break;
+               default:/* should not happen */
+                 break;
+diff --git a/src/h1.c b/src/h1.c
+index 9eae4b37..a0937ffb 100644
+--- a/src/h1.c
++++ b/src/h1.c
+@@ -643,6 +643,8 @@ h1_chunked_trailers (request_st * const restrict r, char * restrict t, uint32_t
+             if (NULL == v) break; /*(final blank line; v already validated)*/
+             uint32_t klen = (uint32_t)(v - k);
+             do { ++v; } while (*v == ' ' || *v == '\t');
++            if (!http_request_trailer_check_whitelist(k, klen))
++                continue;
+             /*(checked in http_request_trailers_check())*/
+             /*if (*v == '\r' || *v == '\n') continue;*/
+             enum http_header_e id = http_header_hkey_get(k, klen);
+diff --git a/src/keyvalue.c b/src/keyvalue.c
+index d84910ea..a93ff966 100644
+--- a/src/keyvalue.c
++++ b/src/keyvalue.c
+@@ -270,7 +270,7 @@ static int pcre_keyvalue_buffer_subst_ext(buffer *b, const char *pattern, const
+                 p+=6;
              }
-@@ -425,6 +443,7 @@ BOOL png2pnm (FILE *png_file, FILE *pnm_file, FILE *alpha_file, BOOL raw, BOOL a
-   if (png_pixels != (unsigned char*) NULL)
-     free (png_pixels);
- 
-+  PNG_UNUSED(raw) /* to quiet a Coverity defect */
-   return TRUE;
- 
- } /* end of source */
-diff --git a/contrib/pngminus/pnm2png.c b/contrib/pngminus/pnm2png.c
-index 2c4bdd88b..1b550b8cf 100644
---- a/contrib/pngminus/pnm2png.c
-+++ b/contrib/pngminus/pnm2png.c
-@@ -1,9 +1,12 @@
- /*
-  *  pnm2png.c --- conversion from PBM/PGM/PPM-file to PNG-file
-- *  copyright (C) 1999,2015 by Willem van Schaik <willem@schaik.com>
-+ *  copyright (C) 1999,2015,2017 by Willem van Schaik <willem at schaik.com>
-  *
-  *  version 1.0 - 1999.10.15 - First version.
-  *  version 1.1 - 2015.07.29 - Fixed leaks (Glenn Randers-Pehrson)
-+ *  version 1.2 - 2017.04.22 - Add buffer-size check
-+ *          1.3 - 2017.08.24 - Fix potential overflow in buffer-size check
-+ *                             (Glenn Randers-Pehrson)
-  *
-  *  Permission to use, copy, modify, and distribute this software and
-  *  its documentation for any purpose and without fee is hereby granted,
-@@ -370,9 +373,14 @@ BOOL pnm2png (FILE *pnm_file, FILE *png_file, FILE *alpha_file, BOOL interlace,
-     row_bytes = (width * channels * bit_depth + 7) / 8;
-   else
- #endif
--    /* row_bytes is the width x number of channels x (bit-depth / 8) */
-+  /* row_bytes is the width x number of channels x (bit-depth / 8) */
-     row_bytes = width * channels * ((bit_depth <= 8) ? 1 : 2);
- 
-+  if ((row_bytes == 0 || (size_t)height > ((size_t)(-1))/(size_t)row_bytes)
-+  {
-+    /* too big */ 
-+    return FALSE;
-+  }
-   if ((png_pixels = (png_byte *)
-      malloc (row_bytes * height * sizeof (png_byte))) == NULL)
-     return FALSE;
-@@ -383,7 +391,8 @@ BOOL pnm2png (FILE *pnm_file, FILE *png_file, FILE *alpha_file, BOOL interlace,
-   for (row = 0; row < (int) height; row++)
-   {
- #if defined(PNG_WRITE_INVERT_SUPPORTED) || defined(PNG_WRITE_PACK_SUPPORTED)
--    if (packed_bitmap) {
-+    if (packed_bitmap)
-+    {
-       for (i = 0; i < (int) row_bytes; i++)
-         /* png supports this format natively so no conversion is needed */
-         *pix_ptr++ = get_data (pnm_file, 8);
-@@ -504,6 +513,8 @@ BOOL pnm2png (FILE *pnm_file, FILE *png_file, FILE *alpha_file, BOOL interlace,
-   if (png_pixels != (unsigned char*) NULL)
-     free (png_pixels);
- 
-+  PNG_UNUSED(raw) /* Quiet a Coverity defect */
+             else if (0 == strncmp((const char *)p, "upper:", 6)) {
+-                flags |= BURL_TOLOWER;
++                flags |= BURL_TOUPPER;
+                 p+=6;
+             }
+             else { /* skip unrecognized to... */
+@@ -309,6 +309,19 @@ static int pcre_keyvalue_buffer_subst_ext(buffer *b, const char *pattern, const
+                     burl_append(b, BUF_PTR_LEN(burl->query), flags);
+                 p+=5;
+             }
++            else if (0 == strncmp((const char *)p, "authority.noport}", 17)) {
++                /*(note: specific to authority;
++                 * not implemented as "noport:" BURL_* token)*/
++                if (burl->authority) {
++                    const char * const colon = strrchr(burl->authority->ptr, ':');
++                    uint32_t len = buffer_clen(burl->authority);
++                    const char * const ptr = burl->authority->ptr;
++                    if (colon && ptr[len-1] != ']')
++                        len = (uint32_t)(colon - ptr);
++                    burl_append(b, ptr, len, flags);
++                }
++                p+=16;
++            }
+             else { /* skip unrecognized url.* */
+                 p = (const unsigned char *)strchr((const char *)p, '}');
+                 if (NULL == p) return -1;
+diff --git a/src/meson.build b/src/meson.build
+index 54922327..d81a604c 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -379,12 +379,30 @@ if get_option('with_mbedtls')
+ 	if not(libmbedx509.found())
+ 	  libmbedx509 = [ compiler.find_library('mbedx509') ]
+ 	endif
+-	libmbedcrypto = dependency('mbedcrypto', required: false)
++	libmbedcrypto = dependency('tfpsacrypto', required: false)
++	if not(libmbedcrypto.found())
++	  libmbedcrypto = compiler.find_library('tfpsacrypto', required: false, disabler: true)
++	  if (libmbedcrypto.found())
++	    libmbedcrypto = [ libmbedcrypto ]
++	  endif
++	endif
++	if not(libmbedcrypto.found())
++	  libmbedcrypto = dependency('mbedcrypto', required: false)
++	endif
+ 	if not(libmbedcrypto.found())
+ 	  libmbedcrypto = [ compiler.find_library('mbedcrypto') ]
+ 	endif
+ 	if compiler.get_define('FORCE_GNUTLS_CRYPTO') == '' and compiler.get_define('FORCE_OPENSSL_CRYPTO') == '' and compiler.get_define('FORCE_WOLFSSL_CRYPTO') == ''
+-	  libcrypto = dependency('mbedcrypto', required: false)
++	  libcrypto = dependency('tfpsacrypto', required: false)
++	  if not(libcrypto.found())
++	    libcrypto = compiler.find_library('tfpsacrypto', required: false, disabler: true)
++	    if (libcrypto.found())
++	      libcrypto = [ libcrypto ]
++	    endif
++	  endif
++	  if not(libcrypto.found())
++	    libcrypto = dependency('mbedcrypto', required: false)
++	  endif
+ 	  if not(libcrypto.found())
+ 	    libcrypto = [ compiler.find_library('mbedcrypto') ]
+ 	  endif
+diff --git a/src/mod_mbedtls.c b/src/mod_mbedtls.c
+index 36a25ab2..52f92045 100644
+--- a/src/mod_mbedtls.c
++++ b/src/mod_mbedtls.c
+@@ -1229,6 +1229,11 @@ __attribute_noinline__
+ static void *
+ network_mbedtls_load_pemfile (server *srv, const buffer *pemfile, const buffer *privkey)
+ {
++  #if defined(MBEDTLS_USE_PSA_CRYPTO)
++    if (!mod_mbedtls_init_once_mbedtls(srv))
++        return NULL;
++  #endif
 +
-   return TRUE;
- } /* end of pnm2png */
+     mod_mbedtls_kp * const kp = mod_mbedtls_kp_init();
+     int rc;
  
-@@ -520,7 +531,8 @@ void get_token(FILE *pnm_file, char *token)
-   do
-   {
-     ret = fgetc(pnm_file);
--    if (ret == '#') {
-+    if (ret == '#')
-+    {
-       /* the rest of this line is a comment */
-       do
-       {
-diff --git a/libpng-manual.txt b/libpng-manual.txt
-index 5794f6557..cb38e6502 100644
---- a/libpng-manual.txt
-+++ b/libpng-manual.txt
-@@ -1,6 +1,6 @@
- libpng-manual.txt - A description on how to use and modify libpng
- 
-- libpng version 1.7.0beta88 - August 6, 2017
-+ libpng version 1.7.0beta89 - August 19, 2017
-  Updated and distributed by Glenn Randers-Pehrson
-  <glennrp at users.sourceforge.net>
-  Copyright (c) 1998-2017 Glenn Randers-Pehrson
-@@ -11,7 +11,7 @@ libpng-manual.txt - A description on how to use and modify libpng
- 
-  Based on:
- 
-- libpng versions 0.97, January 1998, through 1.7.0beta88 - August 6, 2017
-+ libpng versions 0.97, January 1998, through 1.7.0beta89 - August 19, 2017
-  Updated and distributed by Glenn Randers-Pehrson
-  Copyright (c) 1998-2015 Glenn Randers-Pehrson
- 
-@@ -5367,7 +5367,7 @@ Since the PNG Development group is an ad-hoc body, we can't make
- an official declaration.
- 
- This is your unofficial assurance that libpng from version 0.71 and
--upward through 1.7.0beta88 are Y2K compliant.  It is my belief that earlier
-+upward through 1.7.0beta89 are Y2K compliant.  It is my belief that earlier
- versions were also Y2K compliant.
- 
- Libpng only has two year fields.  One is a 2-byte unsigned integer
-diff --git a/libpng.3 b/libpng.3
-index f33e5d2b2..479be0795 100644
---- a/libpng.3
-+++ b/libpng.3
-@@ -1,6 +1,6 @@
--.TH LIBPNG 3 "August 6, 2017"
-+.TH LIBPNG 3 "August 19, 2017"
- .SH NAME
--libpng \- Portable Network Graphics (PNG) Reference Library 1.7.0beta88
-+libpng \- Portable Network Graphics (PNG) Reference Library 1.7.0beta89
- .SH SYNOPSIS
- \fB
- #include <png.h>\fP
-@@ -500,7 +500,7 @@ Following is a copy of the libpng-manual.txt file that accompanies libpng.
- .SH LIBPNG.TXT
- libpng-manual.txt - A description on how to use and modify libpng
- 
-- libpng version 1.7.0beta88 - August 6, 2017
-+ libpng version 1.7.0beta89 - August 19, 2017
-  Updated and distributed by Glenn Randers-Pehrson
-  <glennrp at users.sourceforge.net>
-  Copyright (c) 1998-2017 Glenn Randers-Pehrson
-@@ -511,7 +511,7 @@ libpng-manual.txt - A description on how to use and modify libpng
- 
-  Based on:
- 
-- libpng versions 0.97, January 1998, through 1.7.0beta88 - August 6, 2017
-+ libpng versions 0.97, January 1998, through 1.7.0beta89 - August 19, 2017
-  Updated and distributed by Glenn Randers-Pehrson
-  Copyright (c) 1998-2015 Glenn Randers-Pehrson
- 
-@@ -5867,7 +5867,7 @@ Since the PNG Development group is an ad-hoc body, we can't make
- an official declaration.
- 
- This is your unofficial assurance that libpng from version 0.71 and
--upward through 1.7.0beta88 are Y2K compliant.  It is my belief that earlier
-+upward through 1.7.0beta89 are Y2K compliant.  It is my belief that earlier
- versions were also Y2K compliant.
- 
- Libpng only has two year fields.  One is a 2-byte unsigned integer
-@@ -6026,7 +6026,7 @@ possible without all of you.
- 
- Thanks to Frank J. T. Wojcik for helping with the documentation.
- 
--Libpng version 1.7.0beta88 - August 6, 2017:
-+Libpng version 1.7.0beta89 - August 19, 2017:
- Initially created in 1995 by Guy Eric Schalnat, then of Group 42, Inc.
- Currently maintained by Glenn Randers-Pehrson (glennrp at users.sourceforge.net).
- 
-@@ -6051,7 +6051,7 @@ this sentence.
- 
- This code is released under the libpng license.
- 
--libpng versions 1.0.7, July 1, 2000 through 1.7.0beta88, August 6, 2017 are
-+libpng versions 1.0.7, July 1, 2000 through 1.7.0beta89, August 19, 2017 are
- Copyright (c) 2000-2002, 2004, 2006-2017 Glenn Randers-Pehrson, are
- derived from libpng-1.0.6, and are distributed according to the same
- disclaimer and license as libpng-1.0.6 with the following individuals
-@@ -6176,7 +6176,7 @@ files "pngbar.png" and "pngbar.jpg (88x31) and "pngnow.png" (98x31).
- 
- Glenn Randers-Pehrson
- glennrp at users.sourceforge.net
--August 6, 2017
-+August 19, 2017
- 
- .\" end of man page
- 
-diff --git a/libpngpf.3 b/libpngpf.3
-index 4053c656d..86c13b95e 100644
---- a/libpngpf.3
-+++ b/libpngpf.3
-@@ -1,6 +1,6 @@
--.TH LIBPNGPF 3 "August 6, 2017"
-+.TH LIBPNGPF 3 "August 19, 2017"
- .SH NAME
--libpng \- Portable Network Graphics (PNG) Reference Library 1.7.0beta88
-+libpng \- Portable Network Graphics (PNG) Reference Library 1.7.0beta89
- (private functions)
- .SH SYNOPSIS
- \fB#include \fI"pngpriv.h"
-diff --git a/png.5 b/png.5
-index 40a450f65..b48ec9a77 100644
---- a/png.5
-+++ b/png.5
-@@ -1,4 +1,4 @@
--.TH PNG 5 "August 6, 2017"
-+.TH PNG 5 "August 19, 2017"
- .SH NAME
- png \- Portable Network Graphics (PNG) format
- .SH DESCRIPTION
-diff --git a/png.c b/png.c
-index 68f5bbd26..fb4af5d84 100644
---- a/png.c
-+++ b/png.c
-@@ -15,7 +15,7 @@
- #define PNG_SRC_FILE PNG_SRC_FILE_png
- 
- /* Generate a compiler error if there is an old png.h in the search path. */
--typedef png_libpng_version_1_7_0beta88 Your_png_h_is_not_version_1_7_0beta88;
-+typedef png_libpng_version_1_7_0beta89 Your_png_h_is_not_version_1_7_0beta89;
- 
- /* Tells libpng that we have already handled the first "num_bytes" bytes
-  * of the PNG file signature.  If the PNG data is embedded into another
-@@ -705,14 +705,14 @@ png_get_copyright(png_const_structrp png_ptr)
- #else
- #  ifdef __STDC__
-    return PNG_STRING_NEWLINE \
--     "libpng version 1.7.0beta88 - August 6, 2017" PNG_STRING_NEWLINE \
-+     "libpng version 1.7.0beta89 - August 19, 2017" PNG_STRING_NEWLINE \
-      "Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson" \
-      PNG_STRING_NEWLINE \
-      "Copyright (c) 1996-1997 Andreas Dilger" PNG_STRING_NEWLINE \
-      "Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc." \
-      PNG_STRING_NEWLINE;
- #  else
--      return "libpng version 1.7.0beta88 - August 6, 2017\
-+      return "libpng version 1.7.0beta89 - August 19, 2017\
-       Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson\
-       Copyright (c) 1996-1997 Andreas Dilger\
-       Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.";
-diff --git a/png.h b/png.h
-index 7f3af6c4c..bf74eff38 100644
---- a/png.h
-+++ b/png.h
-@@ -1,7 +1,7 @@
- 
- /* png.h - header file for PNG reference library
-  *
-- * libpng version 1.7.0beta88, August 6, 2017
-+ * libpng version 1.7.0beta89, August 19, 2017
-  *
-  * Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson
-  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
-@@ -12,7 +12,7 @@
-  * Authors and maintainers:
-  *   libpng versions 0.71, May 1995, through 0.88, January 1996: Guy Schalnat
-  *   libpng versions 0.89, June 1996, through 0.96, May 1997: Andreas Dilger
-- *   libpng versions 0.97, January 1998, through 1.7.0beta88, August 6, 2017:
-+ *   libpng versions 0.97, January 1998, through 1.7.0beta89, August 19, 2017:
-  *     Glenn Randers-Pehrson.
-  *   See also "Contributing Authors", below.
-  */
-@@ -25,7 +25,7 @@
-  *
-  * This code is released under the libpng license.
-  *
-- * libpng versions 1.0.7, July 1, 2000 through 1.7.0beta88, August 6, 2017 are
-+ * libpng versions 1.0.7, July 1, 2000 through 1.7.0beta89, August 19, 2017 are
-  * Copyright (c) 2000-2002, 2004, 2006-2017 Glenn Randers-Pehrson, are
-  * derived from libpng-1.0.6, and are distributed according to the same
-  * disclaimer and license as libpng-1.0.6 with the following individuals
-@@ -241,13 +241,13 @@
-  * Y2K compliance in libpng:
-  * =========================
-  *
-- *    August 6, 2017
-+ *    August 19, 2017
-  *
-  *    Since the PNG Development group is an ad-hoc body, we can't make
-  *    an official declaration.
-  *
-  *    This is your unofficial assurance that libpng from version 0.71 and
-- *    upward through 1.7.0beta88 are Y2K compliant.  It is my belief that
-+ *    upward through 1.7.0beta89 are Y2K compliant.  It is my belief that
-  *    earlier versions were also Y2K compliant.
-  *
-  *    Libpng only has two year fields.  One is a 2-byte unsigned integer
-@@ -309,8 +309,8 @@
-  */
- 
- /* Version information for png.h - this should match the version in png.c */
--#define PNG_LIBPNG_VER_STRING "1.7.0beta88"
--#define PNG_HEADER_VERSION_STRING " libpng version 1.7.0beta88 - August 6, 2017\n"
-+#define PNG_LIBPNG_VER_STRING "1.7.0beta89"
-+#define PNG_HEADER_VERSION_STRING " libpng version 1.7.0beta89 - August 19, 2017\n"
- 
- #define PNG_LIBPNG_VER_SONUM   17
- #define PNG_LIBPNG_VER_DLLNUM  17
-@@ -324,7 +324,7 @@
-  * PNG_LIBPNG_VER_STRING, omitting any leading zero:
-  */
- 
--#define PNG_LIBPNG_VER_BUILD  88
-+#define PNG_LIBPNG_VER_BUILD  89
- 
- /* Release Status */
- #define PNG_LIBPNG_BUILD_ALPHA    1
-@@ -584,7 +584,7 @@ extern "C" {
- /* This triggers a compiler error in png.c, if png.c and png.h
-  * do not agree upon the version number.
-  */
--typedef char* png_libpng_version_1_7_0beta88;
-+typedef char* png_libpng_version_1_7_0beta89;
- 
- /* Basic control structions.  Read libpng-manual.txt or libpng.3 for more info.
-  *
-diff --git a/pngconf.h b/pngconf.h
-index 21f15fe8d..155bfbc42 100644
---- a/pngconf.h
-+++ b/pngconf.h
-@@ -1,7 +1,7 @@
- 
- /* pngconf.h - machine configurable file for libpng
-  *
-- * libpng version 1.7.0beta88, August 6, 2017
-+ * libpng version 1.7.0beta89, August 19, 2017
-  *
-  * Copyright (c) 1998-2002,2004,2006-2016 Glenn Randers-Pehrson
-  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
-diff --git a/pngrutil.c b/pngrutil.c
-index 0d41e715d..0190793b7 100644
---- a/pngrutil.c
-+++ b/pngrutil.c
-@@ -4432,7 +4432,7 @@ png_read_process_IDAT(png_structrp png_ptr, png_bytep transformed_row,
-          impossible("bad row state");
-    } /* forever switch */
- 
--   PNG_UNUSED(save_row); /* May not be used above */
-+   PNG_UNUSED(save_row) /* May not be used above */
+@@ -2115,9 +2120,9 @@ SETDEFAULTS_FUNC(mod_mbedtls_set_defaults)
+                 __attribute_fallthrough__
+               case 2: /* ssl.ca-file */
+               case 3: /* ssl.ca-dn-file */
+-               #if 0 /* defer; not necessary for pemfile parsing */
++               #if defined(MBEDTLS_USE_PSA_CRYPTO)
+                 if (!mod_mbedtls_init_once_mbedtls(srv)) return HANDLER_ERROR;
+-               #endif
++               #endif /* else defer; not necessary for pemfile parsing */
+                 if (!buffer_is_blank(cpv->v.b)) {
+                     mbedtls_x509_crt *cacert = ck_calloc(1, sizeof(*cacert));
+                     mbedtls_x509_crt_init(cacert);
+diff --git a/src/request.c b/src/request.c
+index b4f011ff..15d542f9 100644
+--- a/src/request.c
++++ b/src/request.c
+@@ -558,7 +558,8 @@ static int http_request_parse_single_trailer(request_st * const restrict r, cons
+         /* note: Trailer header (if set) is left set as info for backends.
+          * To remove Trailer, would have to check for trailer merging into
+          * headers after all trailers processed */
+-        http_header_request_append(r, id, k, klen, v, vlen);
++        if (http_request_trailer_check_whitelist(k, klen))
++            http_header_request_append(r, id, k, klen, v, vlen);
+     }
+     else {
+         /* trailers currently ignored if streaming request,
+@@ -1445,6 +1446,37 @@ http_request_headers_process_h2 (request_st * const restrict r, const int scheme
  }
  
- void /* PRIVATE */
-diff --git a/pngtest.c b/pngtest.c
-index 33f61044b..7f0486db6 100644
---- a/pngtest.c
-+++ b/pngtest.c
-@@ -2083,4 +2083,4 @@ main(void)
- #endif
  
- /* Generate a compiler error if there is an old png.h in the search path. */
--typedef png_libpng_version_1_7_0beta88 Your_png_h_is_not_version_1_7_0beta88;
-+typedef png_libpng_version_1_7_0beta89 Your_png_h_is_not_version_1_7_0beta89;
-diff --git a/pngtrans.c b/pngtrans.c
-index 0aec804d9..3b6274983 100644
---- a/pngtrans.c
-+++ b/pngtrans.c
-@@ -2697,7 +2697,7 @@ png_do_invert_all(png_transformp *transform, png_transform_controlp tc)
-    while (png_upcast(void*,dp) < dp_end)
-       *dp++ = ~*sp++;
++static buffer *trailer_whitelist;
++
++
++__attribute_cold__
++void
++http_request_trailer_set_whitelist (buffer *b)
++{
++    if (buffer_string_is_empty(b))
++        b = NULL;
++    else if (b->ptr[buffer_clen(b)-1] != ',')
++        buffer_append_char(b, ','); /*see http_request_trailer_check_whitelist*/
++    trailer_whitelist = b;
++}
++
++
++__attribute_cold__
++__attribute_pure__
++int
++http_request_trailer_check_whitelist (const char *k, const uint32_t klen)
++{
++    if (!trailer_whitelist) return 0;
++    const char *s = trailer_whitelist->ptr;
++    for (const char *comma; (comma = strchr(s, ',')); s = comma+1) {
++        uint32_t n = (uint32_t)(comma - s);
++        if (n == klen && buffer_eq_icase_ssn(k, s, n))
++            return 1;
++    }
++    return 0;
++}
++
++
+ __attribute_cold__
+ int
+ http_request_trailer_check (request_st * const restrict r, http_trailer_parse_ctx * const restrict tpctx)
+@@ -1467,7 +1499,7 @@ http_request_trailer_check (request_st * const restrict r, http_trailer_parse_ct
+     if (__builtin_expect( (id != HTTP_HEADER_OTHER), 1)) {
+         /*(recognizing label name establishes label name
+          * does not contain bad whitespace or CTL chars)*/
+-        /* explicitly reject certain field names disallows in trailers
++        /* explicitly reject certain field names disallowed in trailers
+          * (XXX: list can be expanded further)
+          * https://datatracker.ietf.org/doc/html/rfc7230#section-4.1.2
+          * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Trailer
+@@ -1501,6 +1533,7 @@ http_request_trailer_check (request_st * const restrict r, http_trailer_parse_ct
+               |light_bshift(HTTP_HEADER_TE)
+               |light_bshift(HTTP_HEADER_TRANSFER_ENCODING)
+               |light_bshift(HTTP_HEADER_UPGRADE)
++              |light_bshift(HTTP_HEADER_USER_AGENT)
+               |light_bshift(HTTP_HEADER_VARY)
+               |light_bshift(HTTP_HEADER_WWW_AUTHENTICATE)))
+             return http_request_header_line_invalid(r, 400,
+diff --git a/src/request.h b/src/request.h
+index 33d93821..60757faa 100644
+--- a/src/request.h
++++ b/src/request.h
+@@ -288,6 +288,12 @@ __attribute_nonnull__()
+ __attribute_pure__
+ const char * http_request_field_check_value (const char * restrict v, uint32_t vlen, unsigned int http_header_strict);
  
--   PNG_UNUSED(transform);
-+   PNG_UNUSED(transform)
- }
++__attribute_cold__
++void http_request_trailer_set_whitelist (buffer *b);
++
++__attribute_pure__
++int http_request_trailer_check_whitelist (const char *k, uint32_t klen);
++
+ int http_request_trailer_check (request_st * restrict r, http_trailer_parse_ctx * restrict htctx);
+ int http_request_trailers_check (request_st * restrict r, char *t, uint32_t tlen, const buffer *trailer);
  
- static void
-@@ -2748,7 +2748,7 @@ png_do_invert_channel(png_transformp *transform, png_transform_controlp tc)
-       }
-    }
+diff --git a/tests/lighttpd.conf b/tests/lighttpd.conf
+index a639036e..0e381c65 100644
+--- a/tests/lighttpd.conf
++++ b/tests/lighttpd.conf
+@@ -17,6 +17,7 @@ server.name                = "www.example.org"
+ server.tag                 = "lighttpd-1.4.x"
  
--   PNG_UNUSED(transform);
-+   PNG_UNUSED(transform)
- }
+ server.feature-flags += ( "auth.delay-invalid-creds" => "disable" )
++server.feature-flags += ( "request.trailer-whitelist" => "test-trailer" )
  
- static void
-diff --git a/pngwutil.c b/pngwutil.c
-index 4c312263d..b21a16ba3 100644
---- a/pngwutil.c
-+++ b/pngwutil.c
-@@ -4894,7 +4894,7 @@ png_write_png_data(png_structrp png_ptr, png_bytep prev_pixels,
-    write_unfiltered_rowbits(png_ptr, unfiltered_row, row_bits,
-          x == 0 ? PNG_FILTER_VALUE_NONE : PNG_FILTER_VALUE_LAST, flush);
+ server.dir-listing          = "enable"
  
--   PNG_UNUSED(prev_pixels);
-+   PNG_UNUSED(prev_pixels)
- 
-    /* Handle end of row: */
-    if ((row_info_flags & png_row_end) != 0)
-diff --git a/projects/vstudio/README.txt b/projects/vstudio/README.txt
-index b3367d166..dc5390704 100644
---- a/projects/vstudio/README.txt
-+++ b/projects/vstudio/README.txt
-@@ -1,7 +1,7 @@
- 
- VisualStudio instructions
- 
--libpng version 1.7.0beta88 - August 6, 2017
-+libpng version 1.7.0beta89 - August 19, 2017
- 
- Copyright (c) 2010,2013,2015 Glenn Randers-Pehrson
- 
-diff --git a/projects/vstudio/zlib.props b/projects/vstudio/zlib.props
-index 78a035c54..2791a5084 100644
---- a/projects/vstudio/zlib.props
-+++ b/projects/vstudio/zlib.props
-@@ -2,7 +2,7 @@
- <!--
-  * zlib.props - location of zlib source
-  *
-- * libpng version 1.7.0beta88 - August 6, 2017
-+ * libpng version 1.7.0beta89 - August 19, 2017
-  *
-  * Copyright (c) 2011,2013,2014 Glenn Randers-Pehrson
-  *
-diff --git a/scripts/README.txt b/scripts/README.txt
-index 0350fd9a3..c415fce46 100644
---- a/scripts/README.txt
-+++ b/scripts/README.txt
-@@ -1,9 +1,9 @@
- 
--Makefiles for  libpng version 1.7.0beta88 - August 6, 2017
-+Makefiles for  libpng version 1.7.0beta89 - August 19, 2017
- 
- pnglibconf.h.prebuilt       =>  Stores configuration settings
-  makefile.linux    =>  Linux/ELF makefile
--                       (gcc, creates libpng17.so.17.1.7.0beta88)
-+                       (gcc, creates libpng17.so.17.1.7.0beta89)
-  makefile.gcc      =>  Generic makefile (gcc, creates static libpng.a)
-  makefile.knr      =>  Archaic UNIX Makefile that converts files with
-                        ansi2knr (Requires ansi2knr.c from
-@@ -33,12 +33,12 @@ pnglibconf.h.prebuilt       =>  Stores configuration settings
-  makefile.os2      =>  OS/2 Makefile (gcc and emx, requires libpng.def)
-  makefile.sco      =>  For SCO OSr5  ELF and Unixware 7 with Native cc
-  makefile.sggcc    =>  Silicon Graphics (gcc,
--                       creates libpng17.so.17.1.7.0beta88)
-+                       creates libpng17.so.17.1.7.0beta89)
-  makefile.sgi      =>  Silicon Graphics IRIX makefile (cc, creates static lib)
-  makefile.solaris  =>  Solaris 2.X makefile (gcc,
--                       creates libpng17.so.17.1.7.0beta88)
-+                       creates libpng17.so.17.1.7.0beta89)
-  makefile.so9      =>  Solaris 9 makefile (gcc,
--                       creates libpng17.so.17.1.7.0beta88)
-+                       creates libpng17.so.17.1.7.0beta89)
-  makefile.std      =>  Generic UNIX makefile (cc, creates static libpng.a)
-  makefile.sunos    =>  Sun makefile
-  makefile.32sunu   =>  Sun Ultra 32-bit makefile
-diff --git a/scripts/def.c b/scripts/def.c
-index 02248fb7c..8aa3bd9fd 100644
---- a/scripts/def.c
-+++ b/scripts/def.c
-@@ -21,7 +21,7 @@ PNG_DFN "OS2 DESCRIPTION "PNG image compression library""
- PNG_DFN "OS2 CODE PRELOAD MOVEABLE DISCARDABLE"
- PNG_DFN ""
- PNG_DFN "EXPORTS"
--PNG_DFN ";Version 1.7.0beta88"
-+PNG_DFN ";Version 1.7.0beta89"
- 
- #define PNG_EXPORTA(ordinal, type, name, args, attributes)\
-         PNG_DFN "@" SYMBOL_PREFIX "@@" name "@"
-diff --git a/scripts/libpng-config-head.in b/scripts/libpng-config-head.in
-index 889deba61..40ab3e1f9 100755
---- a/scripts/libpng-config-head.in
-+++ b/scripts/libpng-config-head.in
-@@ -11,7 +11,7 @@
- 
- # Modeled after libxml-config.
- 
--version=1.7.0beta88
-+version=1.7.0beta89
- prefix=""
- libdir=""
- libs=""
-diff --git a/scripts/libpng.pc.in b/scripts/libpng.pc.in
-index 778dda542..d389ef4c1 100644
---- a/scripts/libpng.pc.in
-+++ b/scripts/libpng.pc.in
-@@ -5,6 +5,6 @@ includedir=@includedir@/libpng17
- 
- Name: libpng
- Description: Loads and saves PNG files
--Version: 1.7.0beta88
-+Version: 1.7.0beta89
- Libs: -L${libdir} -lpng17
- Cflags: -I${includedir}
-diff --git a/scripts/makefile.ne12bsd b/scripts/makefile.ne12bsd
-index ab645ad0b..5aa1118ae 100644
---- a/scripts/makefile.ne12bsd
-+++ b/scripts/makefile.ne12bsd
-@@ -17,7 +17,7 @@ INCSDIR=${LOCALBASE}/include/libpng17
- 
- LIB=	png17
- SHLIB_MAJOR=	0
--SHLIB_MINOR=	1.7.0beta88
-+SHLIB_MINOR=	1.7.0beta89
- SRCS=	png.c pngset.c pngget.c pngrutil.c pngtrans.c pngwutil.c \
- 	pngread.c pngrio.c pngwio.c pngwrite.c pngrtran.c \
- 	pngwtran.c pngmem.c pngerror.c pngpread.c
-diff --git a/scripts/makefile.netbsd b/scripts/makefile.netbsd
-index dab075718..9fc1f4b27 100644
---- a/scripts/makefile.netbsd
-+++ b/scripts/makefile.netbsd
-@@ -17,7 +17,7 @@ INCSDIR=${LOCALBASE}/include
- 
- LIB=	png
- SHLIB_MAJOR=	17
--SHLIB_MINOR=	1.7.0beta88
-+SHLIB_MINOR=	1.7.0beta89
- SRCS=	png.c pngset.c pngget.c pngrutil.c pngtrans.c pngwutil.c \
- 	pngread.c pngrio.c pngwio.c pngwrite.c pngrtran.c \
- 	pngwtran.c pngmem.c pngerror.c pngpread.c
-diff --git a/scripts/makefile.openbsd b/scripts/makefile.openbsd
-index f1980aa80..b6dbb71a6 100644
---- a/scripts/makefile.openbsd
-+++ b/scripts/makefile.openbsd
-@@ -11,7 +11,7 @@ LIBDIR=	${PREFIX}/lib
- MANDIR= ${PREFIX}/man/cat
- 
- SHLIB_MAJOR=	17
--SHLIB_MINOR=	1.7.0beta88
-+SHLIB_MINOR=	1.7.0beta89
- 
- LIB=	png
- SRCS=	png.c pngerror.c pngget.c pngmem.c pngpread.c \
-diff --git a/scripts/pnglibconf.h.prebuilt b/scripts/pnglibconf.h.prebuilt
-index f948f8796..bf42a25ae 100644
---- a/scripts/pnglibconf.h.prebuilt
-+++ b/scripts/pnglibconf.h.prebuilt
-@@ -1,8 +1,8 @@
--/* libpng 1.7.0beta88 STANDARD API DEFINITION */
-+/* libpng 1.7.0beta89 STANDARD API DEFINITION */
- 
- /* pnglibconf.h - library build configuration */
- 
--/* libpng version 1.7.0beta88, August 6, 2017 */
-+/* libpng version 1.7.0beta89, August 19, 2017 */
- 
- /* Copyright (c) 1998-2016 Glenn Randers-Pehrson */
- 
-diff --git a/scripts/symbols.def b/scripts/symbols.def
-index 79f5908ae..410ca501a 100644
---- a/scripts/symbols.def
-+++ b/scripts/symbols.def
-@@ -1,4 +1,4 @@
--;Version 1.7.0beta88
-+;Version 1.7.0beta89
- ;--------------------------------------------------------------
- ; LIBPNG symbol list as a Win32 DEF file
- ; Contains all the symbols that can be exported from libpng
