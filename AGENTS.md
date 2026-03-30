@@ -21,6 +21,16 @@ Your task is to analyze source code and identify **memory corruption vulnerabili
 - Avoid speculation — only report issues that are logically exploitable
 - DO NOT generate patches
 
+- DO NOT treat the diff as a patch correctness check.
+- Your task is NOT to verify whether the change fixes a vulnerability.
+
+- Instead, analyze whether the target functions themselves contain
+potential memory corruption vulnerabilities, regardless of the patch intent.
+
+- You MUST consider that code changes may introduce new vulnerabilities.
+- Pay special attention to newly added or modified logic that could create
+  new memory safety issues.
+
 ---
 
 ## 🔍 Analysis Scope (IMPORTANT)
@@ -163,6 +173,28 @@ DO NOT GUESS.
 
 ---
 
+## ⚠️ DIFF ANALYSIS RULE (CRITICAL)
+
+DO NOT assume that the code change is a security fix.
+
+- Do NOT focus on identifying what vulnerability was patched.
+- Do NOT treat this as a patch-diff analysis task.
+
+Instead:
+
+- Treat each target function as potentially vulnerable code.
+- Analyze it independently for memory corruption risks.
+
+You MUST explicitly consider:
+
+- whether the modified code introduces new vulnerabilities
+- whether newly added logic creates unsafe memory behavior
+- whether changes break existing assumptions or validations
+
+If the change introduces new attack surface, prioritize analyzing that.
+
+---
+
 ## 🧩 Ignore These Cases
 
 DO NOT report:
@@ -183,7 +215,15 @@ Return findings in structured format:
   <finding>
     <path>file path</path>
     <function>function name</function>
-    <vulnerability>type (e.g., heap overflow)</vulnerability>
+    <vulnerability>type</vulnerability>
+
+    <change_analysis>
+      <is_newly_introduced>yes | no | unclear</is_newly_introduced>
+      <reason>
+        explain how the modification introduces or affects the vulnerability
+      </reason>
+    </change_analysis>
+
     <description>
       Explain:
       - root cause
