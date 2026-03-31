@@ -1,22 +1,44 @@
 import ujson._
 
-// ── CPG HEADER ────────────────────────────────────────────────────────────────
-if (workspace.projects.isEmpty) {
-  importCode.$JOERN_IMPORT("$TARGET_PATH", "$PROJECT_NAME")
+// ── CONFIG ───────────────────────────────────────────────────────────────
+val projectName = "$PROJECT_NAME"
+val targetPath  = "$TARGET_PATH"
+val runDataflow = "$RUN_DATAFLOW" == "true"
 
-  // importCode 실패 감지: 실행 후에도 workspace 가 비어 있으면 명시적 에러
-  if (workspace.projects.isEmpty) {
-    throw new Exception(
-      s"[NLD] importCode.$JOERN_IMPORT failed: workspace still empty. " +
-      s"Check that '$TARGET_PATH' exists inside the Joern container and contains source files."
-    )
+// ── HELPERS ──────────────────────────────────────────────────────────────
+def projectExists(name: String): Boolean =
+  workspace.projects.map(_.name).contains(name)
+
+def ensureProject(): Unit = {
+  if (!projectExists(projectName)) {
+    importCode.$JOERN_IMPORT(targetPath, projectName)
+
+    if (!projectExists(projectName)) {
+      throw new Exception(
+        s"[NLD] importCode.$JOERN_IMPORT failed for '$projectName' at '$targetPath'"
+      )
+    }
   }
-} else {
-  open(workspace.projects.head.name)
+  open(projectName)
 }
 
-// taint 분석이 필요한 경우에만 ossdataflow 실행
-if ("$RUN_DATAFLOW" == "true") {
-  run.ossdataflow
+// 간단한 헬스체크
+def isHealthy(): Boolean = {
+  try {
+    val m = cpg.method.size
+    val c = cpg.call.size
+    m > 0 && c >= 0
+  } catch {
+    case _: Throwable => false
+  }
 }
-// ── END CPG HEADER ────────────────────────────────────────────────────────────
+
+// ── MAIN ─────────────────────────────────────────────────────────────────
+ensureProject()
+
+// 상태가 이상하면 아예 cpg 재생성
+if (!isHealthy()) {
+  delete(projectName)
+  importCode.$JOERN_IMPORT(targetPath, projectName)
+  open(projectName)
+}

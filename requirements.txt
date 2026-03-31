@@ -22,3 +22,6 @@ faiss-cpu>=1.7.4         # GPU 버전: faiss-gpu
 
 # Optional: for testing
 pytest>=7.0.0
+
+# redis
+redis>=5.0.0
