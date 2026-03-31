@@ -39,6 +39,7 @@ sys.path.insert(0, str(_ROOT / "scripts" / "joern"))
 from src.utils.joern_server import JoernClient           # noqa: E402
 from src.utils.joern_executor import JoernExecutor       # noqa: E402
 from query_builders.call_context import CallContextQueryBuilder  # noqa: E402  # type: ignore[import]
+from query_builders.taint import TaintQueryBuilder       # noqa: E402  # type: ignore[import]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 경로 / 환경변수 설정
@@ -56,6 +57,7 @@ JOERN_PORT = int(os.getenv("JOERN_PORT", "9000"))
 
 # ── 타겟별 Joern 설정: JOERN_CONFIG 로 runner config 파일을 선택 ───────────────
 _CONFIGS_DIR = _ROOT / "scripts" / "joern" / "runners" / "configs"
+_RULES_DIR = _ROOT / "scripts" / "joern" / "runners" / "rules"
 
 
 def _load_runner_config() -> dict[str, Any]:
@@ -86,15 +88,53 @@ def _load_runner_config() -> dict[str, Any]:
     return json.loads(os.path.expandvars(raw))
 
 
+def _resolve_runner_path(value: Any, fallback: str) -> str:
+    """
+    runner config 경로값을 정규화한다.
+
+    환경변수 미치환 문자열("${VAR}")이 남아 있거나 비어 있으면 fallback을 사용한다.
+    """
+    if not isinstance(value, str):
+        return fallback
+
+    resolved = value.strip()
+    if not resolved or "${" in resolved:
+        return fallback
+    return resolved
+
+
 _runner_cfg = _load_runner_config()
+
+
+def _load_runner_rules() -> dict[str, Any]:
+    """현재 JOERN language에 대응하는 rules JSON을 로드한다."""
+    language = _runner_cfg.get("project", {}).get("language", "php")
+    path = _RULES_DIR / f"{language}.json"
+    if not path.exists():
+        print(f"[NLD-MCP] WARNING: rules file not found: {path}", file=sys.stderr)
+        return {}
+
+    raw = path.read_text(encoding="utf-8")
+    return json.loads(os.path.expandvars(raw))
+
+
+_runner_rules = _load_runner_rules()
 
 JOERN_PROJECT_NAME = _runner_cfg.get("joern",  {}).get("workspace_project",    "")
 JOERN_LANGUAGE     = _runner_cfg.get("project", {}).get("language",            "php")
-JOERN_TARGET_PATH  = _runner_cfg.get("paths",   {}).get("container_source_root", "/app/source")
+JOERN_TARGET_PATH  = _resolve_runner_path(
+    _runner_cfg.get("paths", {}).get("container_source_root"),
+    "/app/source",
+)
+JOERN_IMPORT       = _runner_rules.get("joern_import", JOERN_LANGUAGE)
+JOERN_SOURCES      = _runner_rules.get("sources", [])
+JOERN_SINKS        = _runner_rules.get("sinks", {})
+JOERN_SANITIZERS   = _runner_rules.get("sanitizers", [])
 
 # ── Joern executor / builder (lazy singleton) ─────────────────────────────────
 _executor: JoernExecutor | None = None
 _call_context_builder: CallContextQueryBuilder | None = None
+_taint_builder: TaintQueryBuilder | None = None
 
 # CPG 로드 / ossdataflow 실행 여부 (프로세스 수명 동안 1회만 실행)
 _cpg_ready: bool = False
@@ -121,6 +161,20 @@ def _get_call_context_builder() -> CallContextQueryBuilder:
             target_path=JOERN_TARGET_PATH,
         )
     return _call_context_builder
+
+
+def _get_taint_builder() -> TaintQueryBuilder:
+    global _taint_builder
+    project_name = _actual_project_name or JOERN_PROJECT_NAME
+    if _taint_builder is None or _taint_builder.project_name != project_name:
+        _taint_builder = TaintQueryBuilder(
+            project_name=project_name,
+            target_path=JOERN_TARGET_PATH,
+            language=JOERN_LANGUAGE,
+            joern_import=JOERN_IMPORT,
+            source_rules=JOERN_SOURCES,
+        )
+    return _taint_builder
 
 
 def _import_cpg_kwargs(run_dataflow: bool = False) -> dict[str, str]:
@@ -439,6 +493,7 @@ async def find_dataflow(
 async def find_sanitizer_or_guard(
     file_path: str,
     function_name: str,
+    sink_kind: Optional[str] = None,
 ) -> str:
     """
     대상 함수 내에 sanitizer, validation, permission check, type check 등
@@ -462,7 +517,7 @@ async def find_sanitizer_or_guard(
           - has_error_exit:  bool - 예외/에러 처리 발견 여부
           - found_calls:     발견된 관련 함수 호출 목록 (함수명 + 줄 번호)
     """
-    SANITIZER_FUNCS = [
+    SANITIZER_FUNCS = JOERN_SANITIZERS or [
         "htmlspecialchars", "htmlentities", "strip_tags", "addslashes",
         "mysql_real_escape_string", "mysqli_real_escape_string",
         "filter_var", "filter_input", "intval", "floatval", "boolval",
@@ -483,10 +538,19 @@ async def find_sanitizer_or_guard(
     ]
 
     def _build_query(funcs: list[str]) -> str:
-        pattern = "|".join(funcs)
         return (
-            f'cpg.method.filename("{file_path}").name("{function_name}")'
-            f'.call.name("({pattern})").map(c => s"${{c.name}} @ line ${{c.lineNumber}}").l'
+            'import ujson._\n'
+            'val __OUTPUT__ = {\n'
+            f'  val targetFile = "{file_path}"\n'
+            f'  val targetFunction = "{function_name}"\n'
+            '  val targetMethods = cpg.method\n'
+            '    .nameExact(targetFunction)\n'
+            '    .filter(m => !m.isExternal)\n'
+            '    .filter(m => m.filename == targetFile)\n'
+            '    .l\n'
+            '  val found = targetMethods.flatMap(_.call.map(c => ujson.Obj("name" -> c.name, "line" -> c.lineNumber.getOrElse(-1))).l)\n'
+            '  ujson.write(found)\n'
+            '}'
         )
 
     san_raw   = await _run_cpg_query(_build_query(SANITIZER_FUNCS))
@@ -494,16 +558,59 @@ async def find_sanitizer_or_guard(
     auth_raw  = await _run_cpg_query(_build_query(AUTH_FUNCS))
     err_raw   = await _run_cpg_query(_build_query(ERROR_FUNCS))
 
-    def _parse(raw: dict) -> list[str]:
-        out = _fmt_executor(raw)
-        if out.startswith("[Joern ERROR]") or out == "(no results)":
+    def _parse(raw: dict[str, Any], funcs: list[str]) -> list[str]:
+        if not raw.get("success"):
             return []
-        return [ln.strip() for ln in out.splitlines() if ln.strip()]
+        parsed = raw.get("parsed")
+        if isinstance(parsed, list):
+            matched: list[str] = []
+            target_names = set(funcs)
+            for item in parsed:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name")
+                line = item.get("line", -1)
+                if isinstance(name, str) and name in target_names:
+                    matched.append(f"{name} @ line {line}")
+            return matched
+        return []
 
-    san_calls   = _parse(san_raw)
-    guard_calls = _parse(guard_raw)
-    auth_calls  = _parse(auth_raw)
-    err_calls   = _parse(err_raw)
+    san_calls   = _parse(san_raw, SANITIZER_FUNCS)
+    guard_calls = _parse(guard_raw, GUARD_FUNCS)
+    auth_calls  = _parse(auth_raw, AUTH_FUNCS)
+    err_calls   = _parse(err_raw, ERROR_FUNCS)
+
+    protection_summary: dict[str, Any] | None = None
+    if sink_kind and sink_kind in JOERN_SINKS and JOERN_SOURCES:
+        sink_regex = JOERN_SINKS[sink_kind].get("regex", "")
+        query = _get_taint_builder().build_protection_query(
+            sink_name=sink_kind,
+            sink_regex=sink_regex,
+            sanitizers=SANITIZER_FUNCS,
+            file_path=file_path,
+            function_name=function_name,
+        )
+        prot_raw = await _run_cpg_query(query, run_dataflow=True)
+        prot_parsed = prot_raw.get("parsed", {})
+
+        if prot_raw.get("success") and isinstance(prot_parsed, dict) and "raw_stdout" not in prot_parsed:
+            matched_sanitizers = []
+            for detail in prot_parsed.get("details", []):
+                if isinstance(detail, dict):
+                    matched_sanitizers.extend(detail.get("matched_sanitizers", []))
+
+            protection_summary = {
+                "sink_kind": sink_kind,
+                "total_flows": prot_parsed.get("total_flows", 0),
+                "protected_flows": prot_parsed.get("protected_flows", 0),
+                "is_sanitized": prot_parsed.get("protected_flows", 0) > 0,
+                "matched_sanitizers": matched_sanitizers,
+            }
+        else:
+            protection_summary = {
+                "sink_kind": sink_kind,
+                "error": _fmt_executor(prot_raw),
+            }
 
     result = {
         "file_path":      file_path,
@@ -518,6 +625,7 @@ async def find_sanitizer_or_guard(
             "auth_checks":  auth_calls,
             "error_exits":  err_calls,
         },
+        "protection_analysis": protection_summary,
     }
     return json.dumps(result, ensure_ascii=False, indent=2)
 

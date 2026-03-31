@@ -47,9 +47,10 @@ class TaintRunner:
                 for name, value in all_sinks.items()
             }
 
-        source_rules = rules.get("sources", [])
+        self.source_rules = rules.get("sources", [])
+        self.sanitizers = rules.get("sanitizers", [])
 
-        if not source_rules:
+        if not self.source_rules:
             raise ValueError("No source rules found in rules JSON.")
         if not self.sink_sets:
             raise ValueError("No enabled sink categories found.")
@@ -63,7 +64,7 @@ class TaintRunner:
             target_path=self.target_path,
             language=self.language,
             joern_import=joern_import,
-            source_rules=source_rules,
+            source_rules=self.source_rules,
         )
 
     @staticmethod
@@ -86,6 +87,14 @@ class TaintRunner:
         print(f"[+] sink analysis complete: {sink_name} | flow_count={flow_count}")
         return result
 
+    async def run_protection_analysis(self, sink_name: str, sink_regex: str) -> Dict[str, Any]:
+        """보호 기법 적용 여부 분석 실행"""
+        print(f"[*] protection analysis start: {sink_name}")
+        query = self._builder.build_protection_query(sink_name, sink_regex, self.sanitizers)
+        result = await self._executor.run_query(query)
+        print(f"[+] protection analysis complete: {sink_name}")
+        return result
+
     def save_json(self, path: Path, data: Dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
@@ -94,22 +103,28 @@ class TaintRunner:
     async def analyze_all(self) -> Dict[str, Any]:
         import_result = await self.import_project()
 
-        tasks = {
-            name: asyncio.create_task(self.run_sink_analysis(name, regex))
-            for name, regex in self.sink_sets.items()
-        }
-        sink_results: Dict[str, Any] = dict(
-            zip(tasks.keys(), await asyncio.gather(*tasks.values()))
-        )
+        sink_tasks = {}
+        prot_tasks = {}
+        
+        for name, regex in self.sink_sets.items():
+            sink_tasks[name] = asyncio.create_task(self.run_sink_analysis(name, regex))
+            prot_tasks[name] = asyncio.create_task(self.run_protection_analysis(name, regex))
+
+        sink_results = {name: await task for name, task in sink_tasks.items()}
+        prot_results = {name: await task for name, task in prot_tasks.items()}
 
         final_result: Dict[str, Any] = {
             "project": import_result,
             "categories": sink_results,
+            "protections": prot_results,
         }
 
-        for sink_name, sink_result in sink_results.items():
+        for sink_name in sink_results.keys():
             sink_path = self.taint_dir / f"taint_{sink_name}.json"
-            self.save_json(sink_path, sink_result)
+            self.save_json(sink_path, sink_results[sink_name])
+            
+            prot_path = self.taint_dir / f"protection_{sink_name}.json"
+            self.save_json(prot_path, prot_results[sink_name])
 
         all_path = self.taint_dir / "taint_results_all.json"
         self.save_json(all_path, final_result)
@@ -123,17 +138,21 @@ def build_summary(all_results: Dict[str, Any]) -> Dict[str, Any]:
 
     for name, result in all_results.get("categories", {}).items():
         parsed = result.get("parsed", {})
+        prot_parsed = all_results.get("protections", {}).get(name, {}).get("parsed", {})
+        
         if isinstance(parsed, dict):
             category_summary[name] = {
                 "source_count": parsed.get("source_count"),
                 "sink_count": parsed.get("sink_count"),
                 "flow_count": parsed.get("flow_count"),
+                "protected_count": prot_parsed.get("protected_flows") if isinstance(prot_parsed, dict) else 0
             }
         else:
             category_summary[name] = {
                 "source_count": None,
                 "sink_count": None,
                 "flow_count": None,
+                "protected_count": None
             }
 
     return {

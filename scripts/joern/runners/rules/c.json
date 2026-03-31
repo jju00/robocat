@@ -35,6 +35,31 @@
       "regex": "(fopen|open|freopen)"
     }
   },
+  "sanitizers": [
+    "fgets",
+    "snprintf",
+    "strncpy",
+    "strlcpy",
+    "strlcat",
+    "memchr",
+    "memcmp",
+    "strncmp",
+    "strchr",
+    "strstr",
+    "isalpha",
+    "isdigit",
+    "isalnum",
+    "isspace",
+    "toupper",
+    "tolower",
+    "buffer_eq_icase_ss",
+    "buffer_eq_icase_ssn",
+    "http_request_field_check_value",
+    "http_header_str_contains_token",
+    "http_header_hkey_get",
+    "http_header_str_to_code",
+    "li_restricted_strtoint64"
+  ],
   "sink_priority_weight": {
     "command": 1.0,
     "memory": 0.95,
