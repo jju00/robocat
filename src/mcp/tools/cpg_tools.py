@@ -284,56 +284,54 @@ async def get_cpg_summary(
 
 
 async def find_dataflow(
-    file_path: str,
-    function_name: str,
     sink_kind: str = "eval",
 ) -> str:
     """
-    Joern taint analysis 를 사용하여 user input(source) → sink 데이터흐름 경로를 반환한다.
+    TaintQueryBuilder + taint_flow.scala 를 사용하여
+    source → sink 데이터흐름 경로를 반환한다.
+
+    source 는 rules JSON 에 정의된 JOERN_SOURCES 전체를 사용한다.
+    sink 는 JOERN_SINKS[sink_kind]["regex"] 로 매칭하며,
+    없으면 sink_kind 를 리터럴 regex 로 사용한다.
 
     Args:
-        file_path:     CPG 에 로드된 파일 경로
-        function_name: 분석할 함수 이름
-        sink_kind:     추적할 sink 함수 이름 (기본: "eval")
-                       가능한 값 예시: "eval", "exec", "include", "unserialize",
-                                       "preg_replace", "call_user_func", "system"
+        sink_kind: 추적할 sink 이름 (기본: "eval").
+                   JOERN_SINKS 에 정의된 키 또는 임의 함수명.
 
     Returns:
-        JSON 문자열 with keys:
-          - sink_kind: 추적한 sink
-          - paths_found: 발견된 경로 수
-          - raw_output: Joern 원본 출력
+        executor parsed JSON 그대로.
+        keys: project_name, language, sink_name,
+              source_count, sink_count, flow_count, flows
     """
     project = _actual_project_name or JOERN_PROJECT_NAME
     revision = await _ensure_cpg_revision()
-    cache_key = _cache.make_dataflow_key(project, revision, file_path, function_name, sink_kind)
+    cache_key = f"nld:dataflow:{project}:rev{revision}:{sink_kind}"
 
     cached = await _cache.get_json(cache_key)
     if cached is not None:
         return json.dumps(cached, ensure_ascii=False, indent=2)
 
-    q_dataflow = (
-        f'val src = cpg.method.filename("{file_path}").name("{function_name}")'
-        f'.parameter.l\n'
-        f'val sink = cpg.call.name("{sink_kind}").l\n'
-        f'sink.reachableByFlows(src).p'
-    )
+    sink_regex = JOERN_SINKS.get(sink_kind, {}).get("regex", sink_kind)
 
-    raw = await _run_cpg_query(q_dataflow, run_dataflow=True)
-    output = _fmt_executor(raw)
+    try:
+        query = _get_taint_builder().build_taint_query(sink_kind, sink_regex)
+    except ValueError as exc:
+        return json.dumps(
+            {"error": str(exc), "sink_kind": sink_kind},
+            ensure_ascii=False, indent=2,
+        )
 
-    lines = [ln for ln in output.splitlines() if ln.strip()]
-    paths_found = sum(1 for ln in lines if "→" in ln or "Flow" in ln or "Parameter" in ln)
+    raw = await _run_cpg_query(query, run_dataflow=True)
 
-    result = {
-        "file_path":   file_path,
-        "function":    function_name,
-        "sink_kind":   sink_kind,
-        "paths_found": paths_found,
-        "raw_output":  output,
-    }
-    await _cache.set_json(cache_key, result, project=project, revision=revision)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    if not raw.get("success"):
+        return json.dumps(
+            {"error": _fmt_executor(raw), "sink_kind": sink_kind},
+            ensure_ascii=False, indent=2,
+        )
+
+    parsed = raw.get("parsed", {})
+    await _cache.set_json(cache_key, parsed, project=project, revision=revision)
+    return json.dumps(parsed, ensure_ascii=False, indent=2)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Tool 4: find_sanitizer_or_guard
