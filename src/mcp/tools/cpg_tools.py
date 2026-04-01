@@ -54,9 +54,9 @@ _actual_project_name: str = ""
 
 # Redis 캐시
 _cache = RedisCache()
-_CPG_SUMMARY_CACHE_VER = "v3"
-_DATAFLOW_CACHE_VER = "v3"
-_GUARD_CACHE_VER = "v2"
+_CPG_SUMMARY_CACHE_VER = "v5"
+_DATAFLOW_CACHE_VER = "v4"
+_GUARD_CACHE_VER = "v4"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Joern 싱글턴 헬퍼
@@ -233,6 +233,9 @@ async def _ensure_cpg_revision() -> str:
 async def get_cpg_summary(
     file_path: str,
     function_name: str,
+    depth: int = 1,
+    duplicate_mode: str = "auto",
+    target_line: int = -1,
 ) -> str:
     """
     Joern CPG(Code Property Graph) 에서 대상 함수의 구조/호출 흐름 요약을 반환한다.
@@ -243,8 +246,13 @@ async def get_cpg_summary(
 
     포함 정보:
       - 함수 시그니처 (method_name, method_full_name, signature, file, line, ast_size)
-      - 직접 호출하는 함수 목록 (callees): method_name, method_full_name, signature, file, line
-      - 이 함수를 호출하는 함수 목록 (callers): method_name, method_full_name, signature, file, line
+      - 직접 호출하는 함수 목록 (callees): method_name, method_full_name, signature, file, line,
+        callsite_file, callsite_line, callsite_lines[]
+      - 이 함수를 호출하는 함수 목록 (callers): method_name, method_full_name, signature, file, line,
+        callsite_file, callsite_line, callsite_lines[]
+      - duplicate 해소 모드:
+        auto(기본) | exact_file | exact_file_line(target_line 필요)
+      - depth: call graph 확장 깊이 (기본 1)
 
     Args:
         file_path:     CPG 에 로드된 프로젝트 내 파일 경로
@@ -252,6 +260,10 @@ async def get_cpg_summary(
         function_name: 분석할 함수 이름.
                        "ClassName::method" 형식이면 메서드명만 자동 파싱.
                        (예: "Advisor::evaluateRuleExpression" 또는 "evaluateRuleExpression")
+        depth:         call graph 확장 깊이 (1 이상, 기본 1)
+        duplicate_mode: duplicate 함수 선택 모드
+                        auto | exact_file | exact_file_line
+        target_line:   exact_file_line 모드에서 강제 매칭할 함수 정의 line
 
     Returns:
         JSON 문자열 with keys:
@@ -265,38 +277,100 @@ async def get_cpg_summary(
           - results:             메서드별 상세 정보 목록
               (method_name, method_full_name, signature, file, line, ast_size,
                callee_count, caller_count, callees, callers)
+              where callees/callers entries include:
+              callsite_file, callsite_line, callsite_lines
     """
     project = _actual_project_name or JOERN_PROJECT_NAME
     revision = await _ensure_cpg_revision()
     cache_key = _cache.make_cpg_summary_key(
-        project, revision, file_path, f"{function_name}:{_CPG_SUMMARY_CACHE_VER}"
+        project,
+        revision,
+        file_path,
+        (
+            f"{function_name}:{_CPG_SUMMARY_CACHE_VER}"
+            f":d{max(1, int(depth))}"
+            f":m{(duplicate_mode or 'auto').strip().lower()}"
+            f":l{int(target_line)}"
+        ),
     )
 
     cached = await _cache.get_json(cache_key)
     if cached is not None:
         return json.dumps(cached, ensure_ascii=False, indent=2)
 
-    query = _get_call_context_builder().build_call_context_query(file_path, function_name)
-    # callgraph 오버레이가 필요해야 m.callee / m.caller 가 올바르게 동작한다.
-    result = await _run_cpg_query(query, ensure_overlays=True)
-    parsed = result.get("parsed", {})
+    mode = (duplicate_mode or "auto").strip().lower()
+    line = int(target_line)
 
-    if not result.get("success"):
-        return json.dumps(
-            {"error": _fmt_executor(result), "file_path": file_path, "function": function_name},
-            ensure_ascii=False, indent=2,
+    # exact_file_line 실패 시 line window + mode fallback:
+    # exact_file_line(start) -> ±1, ±2 -> exact_file -> auto
+    attempts: list[tuple[str, int]] = []
+    if mode == "exact_file_line":
+        attempts.append(("exact_file_line", line))
+        if line > 0:
+            for delta in (1, 2):
+                if line - delta > 0:
+                    attempts.append(("exact_file_line", line - delta))
+                attempts.append(("exact_file_line", line + delta))
+        attempts.append(("exact_file", -1))
+        attempts.append(("auto", -1))
+    elif mode == "exact_file":
+        attempts = [("exact_file", -1), ("auto", -1)]
+    else:
+        attempts = [(mode if mode in {"auto", "exact_file", "exact_file_line"} else "auto", line)]
+
+    # 중복 시도 제거(순서 유지)
+    dedup_attempts: list[tuple[str, int]] = []
+    seen_attempts: set[tuple[str, int]] = set()
+    for item in attempts:
+        if item in seen_attempts:
+            continue
+        seen_attempts.add(item)
+        dedup_attempts.append(item)
+
+    parsed: dict[str, Any] = {}
+    last_error: Optional[dict[str, Any]] = None
+
+    for attempt_mode, attempt_line in dedup_attempts:
+        query = _get_call_context_builder().build_call_context_query(
+            file_path=file_path,
+            function_name=function_name,
+            depth=depth,
+            duplicate_mode=attempt_mode,
+            target_line=attempt_line,
         )
+        # callgraph 오버레이가 필요해야 m.callee / m.caller 가 올바르게 동작한다.
+        result = await _run_cpg_query(query, ensure_overlays=True)
+        parsed = result.get("parsed", {})
 
-    if "raw_stdout" in parsed:
-        return json.dumps(
-            {
+        if not result.get("success"):
+            last_error = {
+                "error": _fmt_executor(result),
+                "file_path": file_path,
+                "function": function_name,
+            }
+            continue
+
+        if "raw_stdout" in parsed:
+            last_error = {
                 "error": "CPG 쿼리 파싱 실패",
                 "raw_stdout": parsed["raw_stdout"],
                 "file_path": file_path,
                 "function": function_name,
-            },
-            ensure_ascii=False, indent=2,
-        )
+            }
+            continue
+
+        result_count = 0
+        raw_count = parsed.get("result_count", 0)
+        try:
+            result_count = int(raw_count)
+        except Exception:
+            result_count = len(parsed.get("results", []) or [])
+
+        if result_count > 0:
+            break
+    else:
+        if last_error is not None:
+            return json.dumps(last_error, ensure_ascii=False, indent=2)
 
     await _cache.set_json(cache_key, parsed, project=project, revision=revision)
     return json.dumps(parsed, ensure_ascii=False, indent=2)
@@ -405,11 +479,16 @@ async def find_sanitizer_or_guard(
           - has_auth_check:  bool - 인증/권한 체크 발견 여부
           - has_error_exit:  bool - 예외/에러 처리 발견 여부
           - found_calls:     발견된 관련 함수 호출 목록 (함수명 + 줄 번호)
+          - protection_analysis.guard_dominance:
+              total_sinks, sinks_with_dominating_guard, sink_guard_mappings[]
+              (sink_line, sink_expression, related_guards[{name,line,expression}],
+               guard_dominates_sink)
     """
     project = _actual_project_name or JOERN_PROJECT_NAME
     revision = await _ensure_cpg_revision()
+    sink_cache_key = sink_kind or "none"
     cache_key = _cache.make_guard_key(
-        project, revision, file_path, f"{function_name}:{_GUARD_CACHE_VER}"
+        project, revision, file_path, f"{function_name}:{sink_cache_key}:{_GUARD_CACHE_VER}"
     )
 
     cached = await _cache.get_json(cache_key)
@@ -445,10 +524,10 @@ async def find_sanitizer_or_guard(
             '  val targetMethods = cpg.method\n'
             '    .nameExact(targetFunction)\n'
             '    .filter(m => !m.isExternal)\n'
-            '    .filter(m => m.filename == targetFile)\n'
+            '    .filter(m => m.filename.endsWith(targetFile))\n'
             '    .l\n'
             '  val found = targetMethods.flatMap('
-            '_.call.map(c => ujson.Obj("name" -> c.name, "line" -> c.lineNumber.getOrElse(-1))).l)\n'
+            '_.ast.isCall.map(c => ujson.Obj("name" -> c.name, "line" -> c.lineNumber.getOrElse(-1))).l)\n'
             '  ujson.write(found)\n'
             '}'
         )
@@ -487,6 +566,7 @@ async def find_sanitizer_or_guard(
             sink_name=sink_kind,
             sink_regex=sink_regex,
             sanitizers=SANITIZER_FUNCS,
+            guards=GUARD_FUNCS,
             file_path=file_path,
             function_name=function_name,
         )
@@ -503,12 +583,16 @@ async def find_sanitizer_or_guard(
                 if isinstance(detail, dict):
                     matched_sanitizers.extend(detail.get("matched_sanitizers", []))
 
+            guard_dominance = prot_parsed.get("guard_dominance", {})
+
             protection_summary = {
                 "sink_kind":        sink_kind,
                 "total_flows":      prot_parsed.get("total_flows", 0),
                 "protected_flows":  prot_parsed.get("protected_flows", 0),
                 "is_sanitized":     prot_parsed.get("protected_flows", 0) > 0,
                 "matched_sanitizers": matched_sanitizers,
+                "case_stats": prot_parsed.get("case_stats", []),
+                "guard_dominance": guard_dominance,
             }
         else:
             protection_summary = {
