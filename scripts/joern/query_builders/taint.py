@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from typing import Any, Dict, List
 
 _DEFAULT_QUERIES_DIR = Path(__file__).resolve().parents[1] / "queries"
@@ -58,10 +58,18 @@ class TaintQueryBuilder:
         source rules를 Joern DSL 표현식(StoredNode 이터레이터)으로 변환.
 
         지원 타입:
-          - identifier_regex : cpg.identifier.code(...)
-          - call_regex        : cpg.call.name(...)
+          - identifier_regex       : cpg.identifier.code("regex")
+                                     식별자 코드 문자열에 regex 매칭
+          - identifier_name_exact  : cpg.identifier.nameExact("name")
+                                     식별자 이름 정확 매칭 (argv 등)
+          - call_return            : cpg.call.name("regex")
+            (alias: call_regex)      함수 반환값이 source (getenv 등)
+          - call_arg               : cpg.call.name("regex").argument.order(N)
+                                     함수의 N번째 인자가 source (read/fgets 버퍼 등)
+                                     rule 에 "arg_index" 필드(int) 필수
 
-        복수 룰이면 ++ 연산자로 결합하여 reachableByFlows에 전달 가능한 단일 표현식을 반환.
+        복수 룰이면 ++ 연산자로 결합하고 전체를 ( ) 로 감싸
+        reachableByFlows에 전달 가능한 단일 표현식을 반환.
         """
         exprs: List[str] = []
 
@@ -76,8 +84,24 @@ class TaintQueryBuilder:
 
             if rule_type == "identifier_regex":
                 exprs.append(f'cpg.identifier.code("{esc}").cast[{_STORED_NODE}]')
-            elif rule_type == "call_regex":
+
+            elif rule_type == "identifier_name_exact":
+                exprs.append(f'cpg.identifier.nameExact("{esc}").cast[{_STORED_NODE}]')
+
+            elif rule_type in ("call_return", "call_regex"):
+                # call_regex 는 call_return 의 이전 이름 — 동일하게 처리
                 exprs.append(f'cpg.call.name("{esc}").cast[{_STORED_NODE}]')
+
+            elif rule_type == "call_arg":
+                arg_index = rule.get("arg_index")
+                if arg_index is None:
+                    raise ValueError(
+                        f"call_arg rule '{rule.get('name', value)}' requires 'arg_index' field."
+                    )
+                exprs.append(
+                    f'cpg.call.name("{esc}").argument.order({int(arg_index)}).cast[{_STORED_NODE}]'
+                )
+
             else:
                 raise ValueError(f"Unsupported source rule type: {rule_type!r}")
 
@@ -87,11 +111,12 @@ class TaintQueryBuilder:
         if len(exprs) == 1:
             return exprs[0]
 
-        return " ++ ".join(f"({e})" for e in exprs)
+        inner = " ++ ".join(f"({e})" for e in exprs)
+        return f"({inner})"
 
     # ── Full query builders ───────────────────────────────────────────────────
 
-    def build_import_query(self, run_dataflow: bool = False) -> str:
+    def build_import_query(self, ensure_overlays: bool = False) -> str:
         """import_cpg.scala 템플릿을 로드하여 프로젝트 임포트 쿼리를 생성."""
         return self._fill(
             self._load_template("import_cpg.scala"),
@@ -99,7 +124,7 @@ class TaintQueryBuilder:
             TARGET_PATH=self.escape(self.target_path),
             PROJECT_NAME=self.escape(self.project_name),
             LANGUAGE=self.escape(self.language),
-            RUN_DATAFLOW="true" if run_dataflow else "false",
+            ENSURE_OVERLAYS="true" if ensure_overlays else "false",
         )
 
     def build_taint_query(self, sink_name: str, sink_regex: str) -> str:

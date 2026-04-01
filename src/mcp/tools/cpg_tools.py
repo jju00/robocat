@@ -54,6 +54,9 @@ _actual_project_name: str = ""
 
 # Redis 캐시
 _cache = RedisCache()
+_CPG_SUMMARY_CACHE_VER = "v3"
+_DATAFLOW_CACHE_VER = "v2"
+_GUARD_CACHE_VER = "v2"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Joern 싱글턴 헬퍼
@@ -97,37 +100,43 @@ def _get_taint_builder() -> TaintQueryBuilder:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _import_cpg_kwargs(run_dataflow: bool = False) -> dict[str, str]:
+def _import_cpg_kwargs(ensure_overlays: bool = False) -> dict[str, str]:
     """import_cpg.scala 에 전달할 템플릿 변수 dict."""
     return {
-        "JOERN_IMPORT":  JOERN_LANGUAGE,
-        "TARGET_PATH":   JOERN_TARGET_PATH,
-        "PROJECT_NAME":  JOERN_PROJECT_NAME,
-        "LANGUAGE":      JOERN_LANGUAGE,
-        "RUN_DATAFLOW":  "true" if run_dataflow else "false",
+        "JOERN_IMPORT":    JOERN_LANGUAGE,
+        "TARGET_PATH":     JOERN_TARGET_PATH,
+        "PROJECT_NAME":    JOERN_PROJECT_NAME,
+        "LANGUAGE":        JOERN_LANGUAGE,
+        "ENSURE_OVERLAYS": "true" if ensure_overlays else "false",
     }
 
 
-def _build_cpg_header(run_dataflow: bool = False) -> str:
+def _build_cpg_header(ensure_overlays: bool = False) -> str:
     """
     import_cpg.scala 를 로드·치환하여 CPG setup 헤더 문자열을 반환.
 
     Joern /query-sync 는 요청 간 state를 유지하지 않으므로,
     모든 CPG 쿼리는 이 헤더를 앞에 붙여 단일 요청으로 전송한다.
+
+    ensure_overlays=True 이면 callgraph + ossdataflow 오버레이까지 적용한다.
+    m.callee / m.caller 등 callgraph 기반 쿼리나 reachableByFlows 를 사용하는
+    쿼리는 반드시 이 플래그를 True 로 설정해야 한다.
     """
     executor = _get_executor()
     template = executor.load_scala_template("import_cpg.scala")
-    return executor.fill_template(template, **_import_cpg_kwargs(run_dataflow=run_dataflow))
+    return executor.fill_template(template, **_import_cpg_kwargs(ensure_overlays=ensure_overlays))
 
 
-async def _run_cpg_query(query: str, run_dataflow: bool = False) -> dict[str, Any]:
+async def _run_cpg_query(query: str, ensure_overlays: bool = False) -> dict[str, Any]:
     """
     CPG 헤더(import + open) + 실제 쿼리를 단일 Joern 요청으로 실행.
 
     Joern REST 서버가 요청 간 REPL state를 유지하지 않는 환경에서도
     매 요청마다 CPG가 열려 있음을 보장한다.
+
+    ensure_overlays=True 이면 헤더에서 callgraph + ossdataflow 오버레이를 적용한다.
     """
-    header = _build_cpg_header(run_dataflow=run_dataflow)
+    header = _build_cpg_header(ensure_overlays=ensure_overlays)
     combined = header + "\n\n" + query
     return await _get_executor().run_query(combined)
 
@@ -229,11 +238,13 @@ async def get_cpg_summary(
     Joern CPG(Code Property Graph) 에서 대상 함수의 구조/호출 흐름 요약을 반환한다.
 
     method_call_context.scala 쿼리를 사용하여 단일 요청으로 callee/caller 전체를 조회한다.
+    파일 경로 매칭 실패 시 3단계 폴백(exact → non-external → endsWith)을 적용하고,
+    non-external + 큰 AST 순으로 정렬하여 definition 을 우선 반환한다.
 
     포함 정보:
-      - 함수 시그니처 (full name, 파일, 라인)
-      - 직접 호출하는 함수 목록 (callees): call_name, callee_full_name, call_code, line
-      - 이 함수를 호출하는 함수 목록 (callers): caller_method_name, call_code, line
+      - 함수 시그니처 (method_name, method_full_name, signature, file, line, ast_size)
+      - 직접 호출하는 함수 목록 (callees): method_name, method_full_name, signature, file, line
+      - 이 함수를 호출하는 함수 목록 (callers): method_name, method_full_name, signature, file, line
 
     Args:
         file_path:     CPG 에 로드된 프로젝트 내 파일 경로
@@ -243,19 +254,31 @@ async def get_cpg_summary(
                        (예: "Advisor::evaluateRuleExpression" 또는 "evaluateRuleExpression")
 
     Returns:
-        JSON 문자열 with keys: result_count, results (method_name, signature,
-        callee_count, caller_count, callees, callers)
+        JSON 문자열 with keys:
+          - project_name:        임포트된 프로젝트 이름
+          - query_file_path:     요청한 파일 경로
+          - query_function_name: 요청한 함수 이름
+          - matched_file:        실제 매칭된 파일 경로 (디버깅용)
+          - matched_full_name:   실제 매칭된 메서드 full name (디버깅용)
+          - candidate_count:     폴백 후 후보 메서드 수
+          - result_count:        정렬 후 반환된 결과 수
+          - results:             메서드별 상세 정보 목록
+              (method_name, method_full_name, signature, file, line, ast_size,
+               callee_count, caller_count, callees, callers)
     """
     project = _actual_project_name or JOERN_PROJECT_NAME
     revision = await _ensure_cpg_revision()
-    cache_key = _cache.make_cpg_summary_key(project, revision, file_path, function_name)
+    cache_key = _cache.make_cpg_summary_key(
+        project, revision, file_path, f"{function_name}:{_CPG_SUMMARY_CACHE_VER}"
+    )
 
     cached = await _cache.get_json(cache_key)
     if cached is not None:
         return json.dumps(cached, ensure_ascii=False, indent=2)
 
     query = _get_call_context_builder().build_call_context_query(file_path, function_name)
-    result = await _run_cpg_query(query)
+    # callgraph 오버레이가 필요해야 m.callee / m.caller 가 올바르게 동작한다.
+    result = await _run_cpg_query(query, ensure_overlays=True)
     parsed = result.get("parsed", {})
 
     if not result.get("success"):
@@ -305,7 +328,7 @@ async def find_dataflow(
     """
     project = _actual_project_name or JOERN_PROJECT_NAME
     revision = await _ensure_cpg_revision()
-    cache_key = f"nld:dataflow:{project}:rev{revision}:{sink_kind}"
+    cache_key = f"nld:dataflow:{project}:rev{revision}:{_DATAFLOW_CACHE_VER}:{sink_kind}"
 
     cached = await _cache.get_json(cache_key)
     if cached is not None:
@@ -321,7 +344,7 @@ async def find_dataflow(
             ensure_ascii=False, indent=2,
         )
 
-    raw = await _run_cpg_query(query, run_dataflow=True)
+    raw = await _run_cpg_query(query, ensure_overlays=True)
 
     if not raw.get("success"):
         return json.dumps(
@@ -367,7 +390,9 @@ async def find_sanitizer_or_guard(
     """
     project = _actual_project_name or JOERN_PROJECT_NAME
     revision = await _ensure_cpg_revision()
-    cache_key = _cache.make_guard_key(project, revision, file_path, function_name)
+    cache_key = _cache.make_guard_key(
+        project, revision, file_path, f"{function_name}:{_GUARD_CACHE_VER}"
+    )
 
     cached = await _cache.get_json(cache_key)
     if cached is not None:
@@ -447,7 +472,7 @@ async def find_sanitizer_or_guard(
             file_path=file_path,
             function_name=function_name,
         )
-        prot_raw    = await _run_cpg_query(query, run_dataflow=True)
+        prot_raw    = await _run_cpg_query(query, ensure_overlays=True)
         prot_parsed = prot_raw.get("parsed", {})
 
         if (

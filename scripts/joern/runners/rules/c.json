@@ -7,18 +7,49 @@
   "sources": [
     {
       "name": "argv",
-      "type": "identifier_regex",
-      "value": ".*\\bargv\\b.*"
+      "type": "identifier_name_exact",
+      "value": "argv",
+      "_comment": "char **argv 식별자 노드 자체를 source 로"
     },
     {
-      "name": "env_input",
-      "type": "call_regex",
-      "value": "(getenv)"
+      "name": "getenv_ret",
+      "type": "call_return",
+      "value": "(getenv)",
+      "_comment": "반환값(char*)이 오염 데이터"
     },
     {
-      "name": "stdin_input",
-      "type": "call_regex",
-      "value": "(scanf|fscanf|sscanf|fgets|gets|getchar|read|recv)"
+      "name": "getchar_ret",
+      "type": "call_return",
+      "value": "(getchar|fgetc)",
+      "_comment": "반환값(int → char)이 오염 데이터"
+    },
+    {
+      "name": "fgets_gets_buf",
+      "type": "call_arg",
+      "value": "(fgets|gets)",
+      "arg_index": 1,
+      "_comment": "fgets(buf,n,fp) / gets(buf) — 1번째 인자(버퍼)가 오염"
+    },
+    {
+      "name": "read_recv_buf",
+      "type": "call_arg",
+      "value": "(read|recv|recvfrom|recvmsg)",
+      "arg_index": 2,
+      "_comment": "read(fd,buf,n) / recv(fd,buf,n,f) — 2번째 인자(버퍼)가 오염"
+    },
+    {
+      "name": "scanf_arg",
+      "type": "call_arg",
+      "value": "(scanf|vscanf)",
+      "arg_index": 2,
+      "_comment": "scanf(fmt, &var, ...) — 2번째 인자(첫 출력 인자)가 오염"
+    },
+    {
+      "name": "fscanf_sscanf_arg",
+      "type": "call_arg",
+      "value": "(fscanf|sscanf|vfscanf|vsscanf)",
+      "arg_index": 3,
+      "_comment": "fscanf(fp,fmt,&var) / sscanf(str,fmt,&var) — 3번째 인자가 오염"
     }
   ],
   "sinks": {
