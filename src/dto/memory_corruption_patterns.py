@@ -912,3 +912,38 @@ def find_memory_corruption_pattern(name: str):
                 return item
 
     return None
+
+def enrich_memory_corruption_result(result: dict) -> dict:
+    name = str(result.get("name", "")).strip()
+    reason = str(result.get("reason", "")).strip()
+    supporting_cve_ids = result.get("supporting_cve_ids", [])
+
+    if supporting_cve_ids is None:
+        supporting_cve_ids = []
+    elif not isinstance(supporting_cve_ids, list):
+        supporting_cve_ids = [str(supporting_cve_ids)]
+
+    pattern = find_memory_corruption_pattern(name)
+
+    if pattern is None:
+        return {
+            "name": name,
+            "reason": reason,
+            "supporting_cve_ids": supporting_cve_ids[:3],
+            "representative_pattern": None,
+            "memory_corruption_category": None,
+            "cwe_ids": [],
+            "representative_code_examples": [],
+            "common_indicators": [],
+        }
+
+    return {
+        "name": name,
+        "reason": reason,
+        "supporting_cve_ids": supporting_cve_ids[:3],
+        "representative_pattern": pattern.get("representative_pattern"),
+        "memory_corruption_category": pattern.get("memory_corruption_category"),
+        "cwe_ids": pattern.get("cwe_ids", []),
+        "representative_code_examples": pattern.get("representative_code_examples", []),
+        "common_indicators": pattern.get("common_indicators", []),
+    }
