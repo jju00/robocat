@@ -156,11 +156,13 @@ class TaintQueryBuilder:
         sink_name: str,
         sink_regex: str,
         sanitizers: List[str],
+        guards: List[str] | None = None,
         file_path: str = ".*",
         function_name: str = ".*",
     ) -> str:
         """check_protection.scala 템플릿을 로드하여 보호 기법 판단 쿼리를 생성"""
         sanitizer_regex = "|".join(sanitizers) if sanitizers else "NEVER_MATCH_ANYTHING"
+        guard_regex = "|".join(guards or []) if guards else "NEVER_MATCH_ANYTHING"
         
         return self._fill(
             self._load_template("check_protection.scala"),
@@ -169,6 +171,7 @@ class TaintQueryBuilder:
             SINK_REGEX=self.escape(sink_regex),
             SINK_NAME=self.escape(sink_name),
             SANITIZER_REGEX=self.escape(sanitizer_regex),
+            GUARD_REGEX=self.escape(guard_regex),
             FILE_PATH=self.escape(file_path),
             FUNCTION_NAME=self.escape(function_name),
             LANGUAGE=self.escape(self.language),

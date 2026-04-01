@@ -22,7 +22,7 @@ val internalParamSources =
 
 val internalFieldSources =
   targetMethods.iterator
-    .flatMap(_.call.name("(<operator>\\.fieldAccess|<operator>\\.indirectFieldAccess)").l)
+    .flatMap(_.ast.isCall.name("(<operator>\\.fieldAccess|<operator>\\.indirectFieldAccess)").l)
     .toList
 
 val internalSourceList =
@@ -32,7 +32,7 @@ val internalSourceList =
 // local sinks: 타겟 함수 내부 sink
 val localSinks =
   targetMethods.iterator
-    .flatMap(_.call.name("$SINK_REGEX").l)
+    .flatMap(_.ast.isCall.name("$SINK_REGEX").l)
     .toList
 
 // global sinks: 프로젝트 전역 sink (내부 source -> 전역 sink 케이스용)
@@ -44,12 +44,12 @@ val globalSinks =
 // ── alloc / free 사이트 (UAF 메타용) ─────────────────────────────
 val allocCalls =
   targetMethods.iterator
-    .flatMap(_.call.name("(malloc|calloc|realloc|alloca|strdup|xmalloc)").l)
+    .flatMap(_.ast.isCall.name("(malloc|calloc|realloc|alloca|strdup|xmalloc)").l)
     .toList
 
 val freeCalls =
   targetMethods.iterator
-    .flatMap(_.call.name("(free|delete|kfree|xfree|g_free)").l)
+    .flatMap(_.ast.isCall.name("(free|delete|kfree|xfree|g_free)").l)
     .toList
 
 val freeLines = freeCalls.flatMap(_.lineNumber).toSet
