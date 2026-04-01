@@ -127,8 +127,18 @@ class TaintQueryBuilder:
             ENSURE_OVERLAYS="true" if ensure_overlays else "false",
         )
 
-    def build_taint_query(self, sink_name: str, sink_regex: str) -> str:
-        """taint_flow.scala 템플릿을 로드하여 소스→싱크 taint flow 쿼리를 생성."""
+    def build_taint_query(
+        self,
+        sink_name: str,
+        sink_regex: str,
+        file_path: str = "",
+        function_name: str = "",
+    ) -> str:
+        """taint_flow.scala 템플릿을 로드하여 소스→싱크 taint flow 쿼리를 생성.
+
+        file_path / function_name 을 지정하면 해당 함수 내부로 sink 범위를 제한하고
+        상대 경로(TARGET_PATH 기준)로 출력한다.
+        """
         return self._fill(
             self._load_template("taint_flow.scala"),
             PROJECT_NAME=self.escape(self.project_name),
@@ -137,6 +147,8 @@ class TaintQueryBuilder:
             SINK_NAME=self.escape(sink_name),
             LANGUAGE=self.escape(self.language),
             TARGET_PATH=self.escape(self.target_path),
+            TARGET_FILE=self.escape(file_path),
+            TARGET_FUNCTION=self.escape(function_name),
         )
 
     def build_protection_query(
@@ -144,11 +156,13 @@ class TaintQueryBuilder:
         sink_name: str,
         sink_regex: str,
         sanitizers: List[str],
+        guards: List[str] | None = None,
         file_path: str = ".*",
         function_name: str = ".*",
     ) -> str:
         """check_protection.scala 템플릿을 로드하여 보호 기법 판단 쿼리를 생성"""
         sanitizer_regex = "|".join(sanitizers) if sanitizers else "NEVER_MATCH_ANYTHING"
+        guard_regex = "|".join(guards or []) if guards else "NEVER_MATCH_ANYTHING"
         
         return self._fill(
             self._load_template("check_protection.scala"),
@@ -157,6 +171,7 @@ class TaintQueryBuilder:
             SINK_REGEX=self.escape(sink_regex),
             SINK_NAME=self.escape(sink_name),
             SANITIZER_REGEX=self.escape(sanitizer_regex),
+            GUARD_REGEX=self.escape(guard_regex),
             FILE_PATH=self.escape(file_path),
             FUNCTION_NAME=self.escape(function_name),
             LANGUAGE=self.escape(self.language),

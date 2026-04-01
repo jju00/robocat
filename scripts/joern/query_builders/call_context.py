@@ -60,20 +60,38 @@ class CallContextQueryBuilder:
 
     # ── Single query builder ──────────────────────────────────────────────────
 
-    def build_call_context_query(self, file_path: str, function_name: str) -> str:
+    def build_call_context_query(
+        self,
+        file_path: str,
+        function_name: str,
+        depth: int = 1,
+        duplicate_mode: str = "auto",
+        target_line: int = -1,
+    ) -> str:
         """
         특정 파일/함수에 대한 call context (callee + caller) 쿼리를 생성.
 
         Args:
             file_path:     CPG 내 파일 경로  (예: "libraries/classes/Advisor.php")
             function_name: 함수명. "ClassName::method" 형식이면 메서드명만 자동 파싱.
+            depth:         call graph 확장 깊이 (기본 1)
+            duplicate_mode: duplicate 함수 선택 모드.
+                            auto | exact_file | exact_file_line
+            target_line:   exact_file_line 모드에서 사용할 함수 정의 line
         """
         method_name = self.parse_method_name(function_name)
+        norm_depth = max(1, int(depth))
+        mode = (duplicate_mode or "auto").strip().lower()
+        if mode not in {"auto", "exact_file", "exact_file_line"}:
+            mode = "auto"
         return self._fill(
             self._load_template("method_call_context.scala"),
             PROJECT_NAME=self.escape(self.project_name),
             FILE_PATH=self.escape(file_path),
             FUNCTION_NAME=self.escape(method_name),
+            DEPTH=str(norm_depth),
+            DUPLICATE_MODE=self.escape(mode),
+            TARGET_LINE=str(int(target_line)),
             LANGUAGE=self.escape(self.language),
             TARGET_PATH=self.escape(self.target_path),
         )
