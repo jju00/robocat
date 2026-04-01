@@ -1,9 +1,9 @@
 import io.joern.dataflowengineoss.language.*
 import ujson._
 
-val sources =
+val sourceList =
   $SOURCE_EXPR
-    .l
+    .dedup.l
 
 val sinks =
   cpg.call
@@ -12,7 +12,7 @@ val sinks =
     .l
 
 val flows =
-  sinks.reachableByFlows(sources)
+  sinks.reachableByFlows(sourceList)
     .map { flow =>
       ujson.Arr.from(
         flow.elements.map { node =>
@@ -31,7 +31,7 @@ val outJson = ujson.Obj(
   "language"      -> "$LANGUAGE",
   "target_path"   -> "$TARGET_PATH",
   "sink_name"     -> "$SINK_NAME",
-  "source_count"  -> sources.size,
+  "source_count"  -> sourceList.size,
   "sink_count"    -> sinks.size,
   "flow_count"    -> flows.size,
   "flows"         -> ujson.Arr.from(flows)
