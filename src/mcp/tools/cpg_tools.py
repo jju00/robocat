@@ -55,7 +55,7 @@ _actual_project_name: str = ""
 # Redis 캐시
 _cache = RedisCache()
 _CPG_SUMMARY_CACHE_VER = "v3"
-_DATAFLOW_CACHE_VER = "v2"
+_DATAFLOW_CACHE_VER = "v3"
 _GUARD_CACHE_VER = "v2"
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -307,28 +307,41 @@ async def get_cpg_summary(
 
 
 async def find_dataflow(
-    sink_kind: str = "eval",
+    file_path: str,
+    function_name: str,
+    sink_kind: str = "memory",
 ) -> str:
     """
     TaintQueryBuilder + taint_flow.scala 를 사용하여
     source → sink 데이터흐름 경로를 반환한다.
 
-    source 는 rules JSON 에 정의된 JOERN_SOURCES 전체를 사용한다.
-    sink 는 JOERN_SINKS[sink_kind]["regex"] 로 매칭하며,
-    없으면 sink_kind 를 리터럴 regex 로 사용한다.
+    - 기본 케이스: 전역 source → 타겟 함수 내부 sink
+    - 추가 케이스 1: 타겟 함수 내부 source(파라미터/field access) → 타겟 함수 내부 sink
+    - 추가 케이스 2: 타겟 함수 내부 source(파라미터/field access) → 전역 sink
+    - 각 flow 노드는 role(source/sink/intermediate)로 태깅된 최소 증거 라인.
+    - 파일 경로는 TARGET_PATH 기준 상대 경로로 출력.
+    - uaf_meta(alloc_sites, free_sites, post_free_use)를 함께 반환.
 
     Args:
-        sink_kind: 추적할 sink 이름 (기본: "eval").
-                   JOERN_SINKS 에 정의된 키 또는 임의 함수명.
+        file_path:     분석 대상 파일 경로 (CPG 내 경로 suffix)
+        function_name: 분석 대상 함수 이름
+        sink_kind:     추적할 sink 카테고리 (기본: "memory").
+                       JOERN_SINKS 에 정의된 키 또는 임의 함수명 regex.
 
     Returns:
-        executor parsed JSON 그대로.
-        keys: project_name, language, sink_name,
-              source_count, sink_count, flow_count, flows
+        JSON 문자열.
+        keys: project_name, language, target_file, target_function,
+              sink_name, source_count, internal_source_count,
+              effective_source_count, sink_count, global_sink_count, flow_count,
+              flows[].{case_kind, post_free_use, nodes[].{role, line, code, type, file}},
+              uaf_meta.{alloc_sites, free_sites}
     """
     project = _actual_project_name or JOERN_PROJECT_NAME
     revision = await _ensure_cpg_revision()
-    cache_key = f"nld:dataflow:{project}:rev{revision}:{_DATAFLOW_CACHE_VER}:{sink_kind}"
+    cache_key = (
+        f"nld:dataflow:{project}:rev{revision}:{_DATAFLOW_CACHE_VER}"
+        f":{file_path}:{function_name}:{sink_kind}"
+    )
 
     cached = await _cache.get_json(cache_key)
     if cached is not None:
@@ -337,7 +350,12 @@ async def find_dataflow(
     sink_regex = JOERN_SINKS.get(sink_kind, {}).get("regex", sink_kind)
 
     try:
-        query = _get_taint_builder().build_taint_query(sink_kind, sink_regex)
+        query = _get_taint_builder().build_taint_query(
+            sink_kind,
+            sink_regex,
+            file_path=file_path,
+            function_name=function_name,
+        )
     except ValueError as exc:
         return json.dumps(
             {"error": str(exc), "sink_kind": sink_kind},

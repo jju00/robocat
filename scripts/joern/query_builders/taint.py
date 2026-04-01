@@ -127,8 +127,18 @@ class TaintQueryBuilder:
             ENSURE_OVERLAYS="true" if ensure_overlays else "false",
         )
 
-    def build_taint_query(self, sink_name: str, sink_regex: str) -> str:
-        """taint_flow.scala 템플릿을 로드하여 소스→싱크 taint flow 쿼리를 생성."""
+    def build_taint_query(
+        self,
+        sink_name: str,
+        sink_regex: str,
+        file_path: str = "",
+        function_name: str = "",
+    ) -> str:
+        """taint_flow.scala 템플릿을 로드하여 소스→싱크 taint flow 쿼리를 생성.
+
+        file_path / function_name 을 지정하면 해당 함수 내부로 sink 범위를 제한하고
+        상대 경로(TARGET_PATH 기준)로 출력한다.
+        """
         return self._fill(
             self._load_template("taint_flow.scala"),
             PROJECT_NAME=self.escape(self.project_name),
@@ -137,6 +147,8 @@ class TaintQueryBuilder:
             SINK_NAME=self.escape(sink_name),
             LANGUAGE=self.escape(self.language),
             TARGET_PATH=self.escape(self.target_path),
+            TARGET_FILE=self.escape(file_path),
+            TARGET_FUNCTION=self.escape(function_name),
         )
 
     def build_protection_query(

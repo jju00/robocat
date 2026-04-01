@@ -57,7 +57,7 @@
       "regex": "(system|execl|execlp|execle|execv|execvp|execve|popen)"
     },
     "memory": {
-      "regex": "(strcpy|strcat|sprintf|vsprintf|gets|memcpy)"
+      "regex": "(strcpy|strncpy|strcat|strncat|sprintf|snprintf|vsprintf|vsnprintf|memcpy|memmove|memset|gets|fgets|read|recv)"
     },
     "format": {
       "regex": "(printf|fprintf|sprintf|snprintf|syslog)"
