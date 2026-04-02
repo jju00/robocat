@@ -30,7 +30,7 @@ try:
     from ...utils.bm25_retriever import BM25Retriever
     from ...utils.dense_retriever import DenseRetriever
     from ...utils.embedding_cache import EmbeddingCache
-    from ...dto.output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
+    from ...dto.retriever_output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
     from ...dto.memory_corruption_patterns import enrich_memory_corruption_result
     from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
     from src.utils.bm25_retriever import BM25Retriever
     from src.utils.dense_retriever import DenseRetriever
     from src.utils.embedding_cache import EmbeddingCache
-    from src.dto.output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
+    from src.dto.retriever_output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
     from src.dto.memory_corruption_patterns import enrich_memory_corruption_result
     from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 

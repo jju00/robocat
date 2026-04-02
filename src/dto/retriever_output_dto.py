@@ -1,17 +1,33 @@
-from typing import List
-from pydantic import BaseModel, Field
+from __future__ import annotations
 
-class VulnerabilityBehaviorDTO(BaseModel):
-    vulnerability_cause_description: str
-    trigger_condition: str
-    specific_code_behavior_causing_vulnerability: str
+from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, List, Optional
 
-class RetrievedKnowledgeDTO(BaseModel):
-    cve_id: str = Field(..., description="CVE identifier, e.g. CVE-2013-7266")
-    vulnerability_behavior: VulnerabilityBehaviorDTO
-    solution_behavior: str
 
-class RetrieverResultDTO(BaseModel):
-    id: int = Field(..., description="Query/function identifier")
-    full_code: str = Field(..., description="Target function code")
-    retrieved_knowledge: List[RetrievedKnowledgeDTO]
+@dataclass
+class TopVulnerabilityDTO:
+    name: str
+    reason: str
+    supporting_cve_ids: List[str] = field(default_factory=list)
+    representative_pattern: Optional[str] = None
+    memory_corruption_category: Optional[str] = None
+    cwe_ids: List[str] = field(default_factory=list)
+    representative_code_examples: List[str] = field(default_factory=list)
+    common_indicators: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class RetrievalOutputDTO:
+    id: int
+    full_code: str
+    top_vulnerabilities: List[TopVulnerabilityDTO] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "full_code": self.full_code,
+            "top_vulnerabilities": [item.to_dict() for item in self.top_vulnerabilities],
+        }
