@@ -8,11 +8,12 @@ Codex CLI 가 취약점 판단 시 호출하는 MCP tool server.
     python3 src/mcp/server.py          # 직접 실행 (동일)
 
 Tools:
-  0. check_cpg_status      - Joern workspace 상태 진단
+  0. check_cpg_status        - Joern workspace 상태 진단
   1. get_retrieved_knowledge - 사전 계산된 retriever 결과 조회
   2. get_cpg_summary         - Joern CPG 전체 요약 (call chain, params, reachable sinks)
   3. find_dataflow           - source → sink 데이터흐름 경로 추적
   4. find_sanitizer_or_guard - sanitizer / guard / validation 코드 존재 여부 확인
+  5. read_source_context     - 특정 함수/라인 주변 source snippet 조회
 
 환경변수:
     RETRIEVER_OUTPUT_PATH   retriever 결과 JSON 경로
@@ -29,7 +30,7 @@ import src.mcp.config  # noqa: F401
 
 from mcp.server.fastmcp import FastMCP
 
-from src.mcp.tools import config_tools, cpg_tools, retriever_tools
+from src.mcp.tools import config_tools, cpg_tools, retriever_tools, source_tools
 from src.mcp.tools.retriever_tools import load_retriever_cache
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -45,7 +46,8 @@ mcp = FastMCP(
         "  1. get_retrieved_knowledge   - 사전 계산된 CVE 지식 조회\n"
         "  2. get_cpg_summary           - Joern CPG 요약 (call chain, params, sinks)\n"
         "  3. find_dataflow             - source → sink 데이터흐름 경로\n"
-        "  4. find_sanitizer_or_guard   - sanitizer / validation / guard 존재 여부\n\n"
+        "  4. find_sanitizer_or_guard   - sanitizer / validation / guard 존재 여부\n"
+        "  5. read_source_context       - 특정 함수/라인 주변 source snippet 조회\n\n"
         "취약점 판단 순서 권장:\n"
         "  1. get_retrieved_knowledge 로 관련 CVE 지식 확인\n"
         "  2. get_cpg_summary 로 함수 구조/호출 흐름 파악\n"
@@ -62,6 +64,7 @@ mcp = FastMCP(
 config_tools.register(mcp)
 retriever_tools.register(mcp)
 cpg_tools.register(mcp)
+source_tools.register(mcp)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 엔트리포인트
