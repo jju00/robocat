@@ -19,11 +19,16 @@ from src.mcp.config import DIFF_RETRIEVER_PATH, RETRIEVER_OUTPUT_PATH
 
 _retriever_by_id:       dict[int, dict] = {}   # id → RetrieverResultDTO
 _retriever_by_function: dict[str, dict] = {}   # function_name → RetrieverResultDTO
+_cache_loaded: bool = False
 
 
 def load_retriever_cache() -> None:
     """retriever_output.json을 메모리에 로드하고 id / function 기준 인덱스 생성."""
-    global _retriever_by_id, _retriever_by_function
+    global _retriever_by_id, _retriever_by_function, _cache_loaded
+
+    _retriever_by_id = {}
+    _retriever_by_function = {}
+    _cache_loaded = False
 
     if not RETRIEVER_OUTPUT_PATH.exists():
         print(
@@ -58,6 +63,7 @@ def load_retriever_cache() -> None:
                 _retriever_by_id[idx]             = entry
                 _retriever_by_function[func_name] = entry
 
+    _cache_loaded = True
     print(f"[NLD-MCP] Loaded {len(_retriever_by_id)} retriever entries.", file=sys.stderr)
 
 
@@ -71,19 +77,40 @@ def get_retrieved_knowledge(
     top_k: int = 3,
 ) -> str:
     """
-    사전 계산된 retriever 결과(CVE 취약점 지식)를 반환한다.
+    diff_functions.json의 함수 각각마다 코드적으로 유사한 함수를 매핑, 그 함수들에서 나왔던 기존 cve지식 중 가장 유사한 결과를 top_k개 반환한다.
+    
+    representative_pattern 중심으로 취약점 유형을 추론하되, 맹신하지 말고 단순히 참고자료로만 사용한다.
 
     sample_id 또는 function_name 중 하나를 반드시 지정해야 한다.
 
     Args:
-        sample_id:     retriever_output.json 의 id 필드 (예: 1, 2, 3 ...)
-        function_name: 분석 대상 함수의 fully qualified name
-                       (예: "Advisor::evaluateRuleExpression")
-        top_k:         반환할 최대 CVE 지식 항목 수 (기본: 3)
+        sample_id:     retriever_output_top1.json 의 id 필드 (예: 1, 2, 3 ...).
+                       diff_functions.json > files[].functions[].id 와 동일한 값이며,
+                       분석 대상 함수를 식별하는 1-based 순번이다.
+        function_name: 분석 대상 함수 이름 (정확 일치 우선, 없으면 부분 일치).
+                       diff_retriever.json 의 function 필드 기준으로 조회한다.
+        top_k:         반환할 최대 취약점 항목 수 (기본: 3)
 
     Returns:
-        JSON 문자열. 각 항목에 cve_id, vulnerability_behavior, solution_behavior 포함.
+        JSON 문자열. 주요 필드:
+          id                   : 샘플 식별자
+          function             : 함수 이름
+          file_path            : 파일 경로
+          top_vulnerabilities  : 취약점 항목 리스트 (top_k 개)
+            name                          : 취약점 유형 (예: "Buffer Overflow")
+            reason                        : 해당 취약점으로 판단한 근거
+            supporting_cve_ids            : 근거 CVE ID 목록
+            representative_pattern        : 취약 패턴 요약 설명
+            memory_corruption_category    : 메모리 손상 세부 분류 (없으면 null)
+            cwe_ids                       : 관련 CWE ID 목록
+            representative_code_examples  : 취약 코드 예시 목록
+            common_indicators             : 취약 패턴 식별 지표 목록
     """
+    # 서버가 import 방식으로 올라와 __main__ 블록이 실행되지 않아도 동작하도록
+    # 첫 호출 시 캐시를 지연 로드한다.
+    if not _cache_loaded:
+        load_retriever_cache()
+
     entry: Optional[dict] = None
     if sample_id is not None:
         entry = _retriever_by_id.get(int(sample_id))
@@ -108,20 +135,22 @@ def get_retrieved_knowledge(
             indent=2,
         )
 
-    knowledge_list = entry.get("retrieved_knowledge", [])[:top_k]
+    top_vulns = entry.get("top_vulnerabilities", [])[:top_k]
 
     result = {
-        "sample_id":           entry.get("id"),
-        "function":            entry.get("function", ""),
-        "file_path":           entry.get("file_path", ""),
-        "project":             entry.get("project", ""),
-        "purpose":             entry.get("purpose", ""),
-        "function_summary":    entry.get("function_summary", ""),
-        "retrieved_knowledge": knowledge_list,
+        "sample_id":          entry.get("id"),
+        "function":           entry.get("function", ""),
+        "file_path":          entry.get("file_path", ""),
+        "project":            entry.get("project", ""),
+        "purpose":            entry.get("purpose", ""),
+        "function_summary":   entry.get("function_summary", ""),
+        "top_vulnerabilities": top_vulns,
     }
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 def register(mcp: FastMCP) -> None:
     """tool 등록 — server.py 에서 mcp 인스턴스를 받아 호출."""
+    if not _cache_loaded:
+        load_retriever_cache()
     mcp.tool()(get_retrieved_knowledge)

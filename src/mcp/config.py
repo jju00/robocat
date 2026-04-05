@@ -29,21 +29,39 @@ CONFIGS_DIR = ROOT / "scripts" / "joern" / "runners" / "configs"
 RULES_DIR   = ROOT / "scripts" / "joern" / "runners" / "rules"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Retriever 경로
+# Retriever 경로  (모듈 로드 후 _resolve_data_paths() 에서 최종 결정)
 # ──────────────────────────────────────────────────────────────────────────────
 
-RETRIEVER_OUTPUT_PATH = Path(
-    os.getenv(
-        "RETRIEVER_OUTPUT_PATH",
-        str(ROOT / "data" / "retriever" / "retriever_output.json"),
-    )
-)
-DIFF_RETRIEVER_PATH = Path(
-    os.getenv(
-        "DIFF_RETRIEVER_PATH",
-        str(ROOT / "data" / "diff" / "diff_retriever.json"),
-    )
-)
+def _resolve_data_paths(runner_cfg: dict[str, Any]) -> tuple[Path, Path]:
+    """data/{LANGUAGE}/{TARGET}/... 경로를 결정한다.
+
+    우선순위:
+      1. 환경변수 RETRIEVER_OUTPUT_PATH / DIFF_RETRIEVER_PATH 명시
+      2. runner config의 language + JOERN_CONFIG(target)으로 자동 조합
+         data/{language.upper()}/{target}/retriever/retriever_output_top1.json
+         data/{language.upper()}/{target}/diff/diff_retriever.json
+      3. 레거시 fallback
+         data/retriever/retriever_output.json
+         data/diff/diff_retriever.json
+    """
+    language = runner_cfg.get("project", {}).get("language", "")
+    target   = os.getenv("JOERN_CONFIG", "").split(".")[0]   # 확장자 제거
+
+    if env := os.getenv("RETRIEVER_OUTPUT_PATH"):
+        retriever_path = Path(env)
+    elif language and target:
+        retriever_path = ROOT / "data" / language.upper() / target / "retriever" / "retriever_output_top1.json"
+    else:
+        retriever_path = ROOT / "data" / "retriever" / "retriever_output.json"
+
+    if env := os.getenv("DIFF_RETRIEVER_PATH"):
+        diff_path = Path(env)
+    elif language and target:
+        diff_path = ROOT / "data" / language.upper() / target / "diff" / "diff_retriever.json"
+    else:
+        diff_path = ROOT / "data" / "diff" / "diff_retriever.json"
+
+    return retriever_path, diff_path
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Joern 연결
@@ -117,6 +135,8 @@ def _load_runner_rules(runner_cfg: dict[str, Any]) -> dict[str, Any]:
 
 _runner_cfg   = _load_runner_config()
 _runner_rules = _load_runner_rules(_runner_cfg)
+
+RETRIEVER_OUTPUT_PATH, DIFF_RETRIEVER_PATH = _resolve_data_paths(_runner_cfg)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Joern 프로젝트 상수 (runner config + rules 에서 추출)
