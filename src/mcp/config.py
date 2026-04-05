@@ -119,10 +119,25 @@ def _resolve_runner_path(value: Any, fallback: str) -> str:
 
 def _load_runner_rules(runner_cfg: dict[str, Any]) -> dict[str, Any]:
     """현재 JOERN language에 대응하는 rules JSON을 로드한다."""
-    language = runner_cfg.get("project", {}).get("language", "php")
-    path = RULES_DIR / f"{language}.json"
-    if not path.exists():
-        print(f"[NLD-MCP] WARNING: rules file not found: {path}", file=sys.stderr)
+    language = str(runner_cfg.get("project", {}).get("language", "php")).strip()
+    candidates = []
+    if language:
+        candidates.extend([language, language.lower(), language.upper()])
+    else:
+        candidates.append("php")
+
+    path = None
+    for cand in candidates:
+        p = RULES_DIR / f"{cand}.json"
+        if p.exists():
+            path = p
+            break
+
+    if path is None:
+        print(
+            f"[NLD-MCP] WARNING: rules file not found for language='{language}' under {RULES_DIR}",
+            file=sys.stderr,
+        )
         return {}
 
     raw = path.read_text(encoding="utf-8")
@@ -148,7 +163,7 @@ JOERN_TARGET_PATH  = _resolve_runner_path(
     _runner_cfg.get("paths", {}).get("container_source_root"),
     "/app/source",
 )
-JOERN_IMPORT     = _runner_rules.get("joern_import", JOERN_LANGUAGE)
+JOERN_IMPORT     = _runner_rules.get("joern_import", JOERN_LANGUAGE.lower())
 JOERN_SOURCES    = _runner_rules.get("sources",    [])
 JOERN_SINKS      = _runner_rules.get("sinks",      {})
 JOERN_SANITIZERS = _runner_rules.get("sanitizers", [])

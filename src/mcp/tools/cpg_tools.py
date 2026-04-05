@@ -103,7 +103,7 @@ def _get_taint_builder() -> TaintQueryBuilder:
 def _import_cpg_kwargs(ensure_overlays: bool = False) -> dict[str, str]:
     """import_cpg.scala 에 전달할 템플릿 변수 dict."""
     return {
-        "JOERN_IMPORT":    JOERN_LANGUAGE,
+        "JOERN_IMPORT":    JOERN_IMPORT,
         "TARGET_PATH":     JOERN_TARGET_PATH,
         "PROJECT_NAME":    JOERN_PROJECT_NAME,
         "LANGUAGE":        JOERN_LANGUAGE,

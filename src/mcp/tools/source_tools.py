@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
+from src.mcp.config import JOERN_SINKS, JOERN_SOURCES
 
 
 # ─────────────────────────────────────────────────────────────
@@ -512,7 +513,7 @@ def mcp__nld__read_definition(
 # Tool 4: map_vuln_context
 # ─────────────────────────────────────────────────────────────
 
-_SINK_REGEXES: dict[str, str] = {
+_HEURISTIC_SINK_REGEXES: dict[str, str] = {
     "copy": r"\b(memcpy|memmove|strcpy|strncpy|strcat|strncat|snprintf|vsnprintf)\s*\(",
     "alloc": r"\b(malloc|calloc|realloc|strdup|strndup)\s*\(",
     "free": r"\bfree\s*\(",
@@ -520,13 +521,67 @@ _SINK_REGEXES: dict[str, str] = {
     "deref": r"(\-\>|(?<!\.)\.[A-Za-z_]\w*)",
 }
 
-_SOURCE_CALLS = r"\b(read|recv|fread|getenv|strtol|strtoul|atoi|atol|parse|decode)\s*\("
+_HEURISTIC_SOURCE_CALLS = r"\b(read|recv|fread|getenv|strtol|strtoul|atoi|atol|parse|decode)\s*\("
 _GUARD_HINT = r"\b(if|while)\b.*(len|size|count|idx|index|offset|NULL|!=\s*0|>\s*0|<\s*)"
 _ERROR_HINT = r"\b(return|goto)\b.*(ERR|FAIL|FATAL|WARN|error|cleanup)|\b(abort|exit|die)\s*\("
 _SIZE_HINT = re.compile(r"\b(len|size|count|idx|index|offset|cap|num)\w*\b", re.IGNORECASE)
 _KEYWORDS = {
     "if", "for", "while", "switch", "return", "sizeof",
 }
+
+
+def _strip_outer_parens(s: str) -> str:
+    t = s.strip()
+    if len(t) >= 2 and t[0] == "(" and t[-1] == ")":
+        return t[1:-1]
+    return t
+
+
+def _build_rule_sink_regexes() -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not isinstance(JOERN_SINKS, dict):
+        return out
+
+    for sink_name, sink_cfg in JOERN_SINKS.items():
+        if not isinstance(sink_cfg, dict):
+            continue
+        raw = sink_cfg.get("regex")
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        # CPG operator sinks are useful in taint query but not in plain source regex scan.
+        if "<operator>" in raw:
+            continue
+        out[f"rule_sink:{sink_name}"] = rf"\b(?:{_strip_outer_parens(raw)})\s*\("
+    return out
+
+
+def _build_rule_source_call_regex() -> re.Pattern[str] | None:
+    if not isinstance(JOERN_SOURCES, list):
+        return None
+
+    call_patterns: list[str] = []
+    for src in JOERN_SOURCES:
+        if not isinstance(src, dict):
+            continue
+        src_type = src.get("type")
+        raw = src.get("value")
+        if src_type not in {"call_return", "call_arg"}:
+            continue
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        if "<operator>" in raw:
+            continue
+        call_patterns.append(_strip_outer_parens(raw))
+
+    if not call_patterns:
+        return None
+    merged = "|".join(call_patterns)
+    return re.compile(rf"\b(?:{merged})\s*\(")
+
+
+_RULE_SINK_REGEXES = _build_rule_sink_regexes()
+_RULE_SOURCE_CALLS_RE = _build_rule_source_call_regex()
+_HEURISTIC_SOURCE_CALLS_RE = re.compile(_HEURISTIC_SOURCE_CALLS)
 
 
 def _extract_param_names(fn_code: str) -> list[str]:
@@ -598,7 +653,11 @@ def mcp__nld__map_vuln_context(
 
     # 1) sink lines
     sinks: list[dict[str, Any]] = []
-    for kind, pat in _SINK_REGEXES.items():
+    sink_patterns: dict[str, str] = {}
+    sink_patterns.update(_RULE_SINK_REGEXES)
+    sink_patterns.update(_HEURISTIC_SINK_REGEXES)
+
+    for kind, pat in sink_patterns.items():
         for m in re.finditer(pat, fn_code):
             local_line = _line_no_from_offset(fn_code, m.start())
             abs_line = fn_start + local_line - 1
@@ -636,9 +695,9 @@ def mcp__nld__map_vuln_context(
     post_free_use: list[dict[str, Any]] = []
     for idx, line in enumerate(fn_lines, start=1):
         abs_line = fn_start + idx - 1
-        if re.search(_SINK_REGEXES["alloc"], line):
+        if re.search(_HEURISTIC_SINK_REGEXES["alloc"], line):
             alloc_sites.append({"line": abs_line, "snippet": line.strip()})
-        if re.search(_SINK_REGEXES["free"], line):
+        if re.search(_HEURISTIC_SINK_REGEXES["free"], line):
             free_sites.append({"line": abs_line, "snippet": line.strip()})
 
     for free_entry in free_sites:
@@ -661,8 +720,9 @@ def mcp__nld__map_vuln_context(
     # 4) sources (params + common input calls)
     param_names = _extract_param_names(fn_code)
     source_calls: list[dict[str, Any]] = []
+    source_call_pattern = _RULE_SOURCE_CALLS_RE or _HEURISTIC_SOURCE_CALLS_RE
     for idx, line in enumerate(fn_lines, start=1):
-        if re.search(_SOURCE_CALLS, line):
+        if re.search(source_call_pattern, line):
             source_calls.append({
                 "line": fn_start + idx - 1,
                 "snippet": line.strip(),
