@@ -9,7 +9,7 @@ class DenseRetriever:
         self.corpus_embeddings = None
         self.corpus = None
 
-    def set_corpus(self, corpus_embeddings: List[List[float]], corpus: Optional[List[str]] = None):
+    def set_corpus(self, corpus_embeddings, corpus: Optional[List[str]] = None):
         """
         Set the corpus embeddings for search.
         corpus_embeddings: List of embedding vectors (floats)

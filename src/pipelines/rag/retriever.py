@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Optional, List, Dict, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import numpy as np
+
 try:
     from ...utils.bm25_retriever import BM25Retriever
     from ...utils.dense_retriever import DenseRetriever
@@ -154,43 +156,53 @@ def parse_args():
 # ─────────────────────────────────────────────────────────────
 # Embedding cache helpers
 # ─────────────────────────────────────────────────────────────
+_EMB_DIM = 1536  # OpenAI text-embedding-ada-002 / text-embedding-3-small
+
+
 def _get_embeddings_with_cache(
     texts: List[str],
     cache: EmbeddingCache,
-    embeddings_model: OpenAIEmbeddings
-) -> List[List[float]]:
-    results: List[Optional[List[float]]] = [None] * len(texts)
+    embeddings_model: OpenAIEmbeddings,
+) -> np.ndarray:
+    """캐시 히트/미스를 처리하고 (N, DIM) float32 numpy 배열을 반환한다.
+
+    Python List[List[float]] 누적을 피해 메모리를 절약한다.
+    캐시 미스분은 100개 단위 청크로 API 요청 후 캐시에 저장한다.
+    """
+    n = len(texts)
+    results = np.zeros((n, _EMB_DIM), dtype=np.float32)
     to_fetch_indices: List[int] = []
     to_fetch_texts: List[str] = []
-    
 
-    for i, text in enumerate(texts):
-        cached = cache.get(text)
-        if cached:
+    # 배치 캐시 조회 (SQLite IN 쿼리 1회)
+    cached_list = cache.get_many(texts)
+    for i, cached in enumerate(cached_list):
+        if cached is not None:
             results[i] = cached
         else:
             to_fetch_indices.append(i)
-            to_fetch_texts.append(text)
+            to_fetch_texts.append(texts[i])
 
     if to_fetch_texts:
-        log(f"[EMB] fetching {len(to_fetch_texts)} new embeddings")
+        log(f"[EMB] cache miss {len(to_fetch_texts)}/{n} — fetching from API")
         chunk_size = 100
         total_chunks = (len(to_fetch_texts) - 1) // chunk_size + 1
 
         for start in range(0, len(to_fetch_texts), chunk_size):
-            chunk = to_fetch_texts[start:start + chunk_size]
+            chunk_texts = to_fetch_texts[start:start + chunk_size]
             chunk_indices = to_fetch_indices[start:start + chunk_size]
             log(f"[EMB]   chunk {start // chunk_size + 1}/{total_chunks}")
 
-            embeddings = embeddings_model.embed_documents(chunk)
-            for idx, emb in zip(chunk_indices, embeddings):
-                results[idx] = emb
-                cache.set(texts[idx], emb)
+            new_embs: List[List[float]] = embeddings_model.embed_documents(chunk_texts)
+            for arr_idx, (text_idx, emb) in enumerate(zip(chunk_indices, new_embs)):
+                results[text_idx] = emb
+            cache.set_many(chunk_texts, new_embs)
 
-        log("[EMB] saving cache")
-        cache.save_cache()
+        log("[EMB] cache updated")
+    else:
+        log(f"[EMB] all {n} embeddings served from cache")
 
-    return results  # type: ignore
+    return results
 
 
 # ─────────────────────────────────────────────────────────────
