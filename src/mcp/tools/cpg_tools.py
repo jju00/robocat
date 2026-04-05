@@ -55,7 +55,7 @@ _actual_project_name: str = ""
 # Redis 캐시
 _cache = RedisCache()
 _CPG_SUMMARY_CACHE_VER = "v5"
-_DATAFLOW_CACHE_VER = "v4"
+_DATAFLOW_CACHE_VER = "v5"
 _GUARD_CACHE_VER = "v4"
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -400,7 +400,7 @@ async def find_dataflow(
         file_path:     분석 대상 파일 경로 (CPG 내 경로 suffix)
         function_name: 분석 대상 함수 이름
         sink_kind:     추적할 sink 카테고리 (기본: "memory").
-                       JOERN_SINKS 에 정의된 키 또는 임의 함수명 regex.
+                       JOERN_SINKS 에 정의된 키(예: "memory_expr") 또는 임의 함수명 regex.
 
     Returns:
         JSON 문자열.
@@ -445,6 +445,108 @@ async def find_dataflow(
         )
 
     parsed = raw.get("parsed", {})
+
+    # 기본 memory 분석 결과가 약한 경우, memory_expr를 조건부로 추가 실행해
+    # 연산자 기반 위험(인덱싱/산술) 후보를 보강한다.
+    if sink_kind == "memory" and "memory_expr" in JOERN_SINKS:
+        def _to_int(v: Any, default: int = 0) -> int:
+            try:
+                return int(v)
+            except Exception:
+                return default
+
+        flow_count = _to_int(parsed.get("flow_count"))
+        sink_count = _to_int(parsed.get("sink_count"))
+        uaf_meta = parsed.get("uaf_meta") if isinstance(parsed.get("uaf_meta"), dict) else {}
+        has_alloc_free = bool(uaf_meta.get("alloc_sites")) or bool(uaf_meta.get("free_sites"))
+
+        # 위험 신호 추출: 큰 callee 수 + 연산자 사용 빈도
+        callee_count = 0
+        risky_expr_op_count = 0
+        try:
+            summary_raw = await get_cpg_summary(
+                file_path=file_path,
+                function_name=function_name,
+                depth=1,
+            )
+            summary = json.loads(summary_raw)
+            if isinstance(summary, dict):
+                results = summary.get("results") or []
+                if isinstance(results, list) and results:
+                    first = results[0] if isinstance(results[0], dict) else {}
+                    callee_count = _to_int(first.get("callee_count"))
+        except Exception:
+            callee_count = 0
+
+        try:
+            expr_probe = (
+                'import ujson._\n'
+                f'val target = cpg.method.nameExact("{TaintQueryBuilder.escape(function_name)}")'
+                f'.filter(m => !m.isExternal && m.filename.endsWith("{TaintQueryBuilder.escape(file_path)}")).l\n'
+                'val c = target.iterator.flatMap(_.ast.isCall.name("(<operator>\\\\.indirectIndexAccess|<operator>\\\\.addition|<operator>\\\\.subtraction|<operator>\\\\.multiplication)").l).size\n'
+                'val __OUTPUT__ = ujson.write(ujson.Obj("count" -> c))\n'
+            )
+            expr_probe_raw = await _run_cpg_query(expr_probe, ensure_overlays=True)
+            expr_probe_parsed = expr_probe_raw.get("parsed", {}) if isinstance(expr_probe_raw, dict) else {}
+            if isinstance(expr_probe_parsed, dict):
+                risky_expr_op_count = _to_int(expr_probe_parsed.get("count"))
+        except Exception:
+            risky_expr_op_count = 0
+
+        reasons: list[str] = []
+        if sink_count <= 1:
+            reasons.append("low_sink_count")
+        if flow_count == 0 and callee_count >= 80:
+            reasons.append("high_callee_count")
+        if flow_count == 0 and risky_expr_op_count >= 12:
+            reasons.append("many_risky_expr_ops")
+        if flow_count == 0 and has_alloc_free:
+            reasons.append("alloc_or_free_present")
+
+        should_expand = len(reasons) > 0
+        if should_expand:
+            expr_regex = JOERN_SINKS["memory_expr"].get("regex", "NEVER_MATCH_ANYTHING")
+            expr_query = _get_taint_builder().build_taint_query(
+                "memory_expr",
+                expr_regex,
+                file_path=file_path,
+                function_name=function_name,
+            )
+            expr_raw = await _run_cpg_query(expr_query, ensure_overlays=True)
+            expr_parsed = expr_raw.get("parsed", {}) if expr_raw.get("success") else {
+                "error": _fmt_executor(expr_raw),
+            }
+
+            expr_sink_count = _to_int(expr_parsed.get("sink_count")) if isinstance(expr_parsed, dict) else 0
+            expr_flow_count = _to_int(expr_parsed.get("flow_count")) if isinstance(expr_parsed, dict) else 0
+
+            parsed["extended_analysis"] = {
+                "triggered": True,
+                "reasons": reasons,
+                "signals": {
+                    "callee_count": callee_count,
+                    "risky_expr_op_count": risky_expr_op_count,
+                    "has_alloc_or_free": has_alloc_free,
+                    "memory_sink_count": sink_count,
+                    "memory_flow_count": flow_count,
+                },
+                "memory_expr": expr_parsed,
+            }
+            parsed["effective_sink_count"] = sink_count + expr_sink_count
+            parsed["effective_flow_count"] = flow_count + expr_flow_count
+        else:
+            parsed["extended_analysis"] = {
+                "triggered": False,
+                "reasons": [],
+                "signals": {
+                    "callee_count": callee_count,
+                    "risky_expr_op_count": risky_expr_op_count,
+                    "has_alloc_or_free": has_alloc_free,
+                    "memory_sink_count": sink_count,
+                    "memory_flow_count": flow_count,
+                },
+            }
+
     await _cache.set_json(cache_key, parsed, project=project, revision=revision)
     return json.dumps(parsed, ensure_ascii=False, indent=2)
 
