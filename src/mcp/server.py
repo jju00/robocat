@@ -14,6 +14,10 @@ Tools:
   3. find_dataflow           - source → sink 데이터흐름 경로 추적
   4. find_sanitizer_or_guard - sanitizer / guard / validation 코드 존재 여부 확인
   5. read_source_context     - 특정 함수/라인 주변 source snippet 조회
+  6. read_definition         - 심볼의 정의(함수/타입/필드 선언)를 ctags로 찾고, 필요 시 본문깉 추출한다.
+  7. find_references         - 심볼/패턴의 사용처(호출부, 대입부, 전파 지점)를 ripgrep으로 빠르게 찾는다.
+  8. map_vuln_context        - 함수 내부 취약 슬라이스(heuristic) 수집용.
+  9. check_cpg_status        - Joern workspace 상태 진단
 
 환경변수:
     RETRIEVER_OUTPUT_PATH   retriever 결과 JSON 경로
@@ -40,20 +44,33 @@ from src.mcp.tools.retriever_tools import load_retriever_cache
 mcp = FastMCP(
     name="nld-vulnerability-analysis",
     instructions=(
-        "NLD 취약점 탐지 파이프라인의 MCP server입니다.\n"
-        "사용 가능한 tool:\n"
-        "  0. check_cpg_status          - Joern workspace 상태 진단\n"
-        "  1. get_retrieved_knowledge   - 사전 계산된 CVE 지식 조회\n"
-        "  2. get_cpg_summary           - Joern CPG 요약 (call chain, params, sinks)\n"
-        "  3. find_dataflow             - source → sink 데이터흐름 경로\n"
-        "  4. find_sanitizer_or_guard   - sanitizer / validation / guard 존재 여부\n"
-        "  5. read_source_context       - 특정 함수/라인 주변 source snippet 조회\n\n"
-        "취약점 판단 순서 권장:\n"
-        "  1. get_retrieved_knowledge 로 관련 CVE 지식 확인\n"
-        "  2. get_cpg_summary 로 함수 구조/호출 흐름 파악\n"
-        "  3. find_dataflow 로 user input → sink 경로 존재 여부 확인\n"
-        "  4. find_sanitizer_or_guard 로 방어 코드 존재 여부 확인\n"
-        "  5. 1~4 결과를 종합하여 취약(YES) / 안전(NO) / 불확실(-1) 판정"
+        "NLD memory-corruption 취약점 분석용 MCP server입니다.\n"
+        "목표: 실제 trigger 가능한 메모리 손상 취약점만 식별하고, 추측을 배제한다.\n\n"
+        "=== Tool 역할(전역 지침) ===\n"
+        "- check_cpg_status: CPG/overlay 상태 진단. 분석 시작 전에 1회 확인.\n"
+        "- get_retrieved_knowledge: 유사 CVE/패턴 힌트. 참고용이며 단독 근거로 판정 금지.\n"
+        "- get_cpg_summary: 함수 식별, caller/callee, callsite, 구조 파악.\n"
+        "- find_dataflow: source->sink 경로 증거 확보(가장 강한 CPG 근거).\n"
+        "- find_sanitizer_or_guard: validation/sanitizer/guard 존재 및 지배 여부 확인.\n"
+        "- map_vuln_context: 함수 내부 취약 슬라이스(heuristic) 수집용.\n"
+        "- read_source_context/read_definition/find_references: 최종 코드 사실 검증용.\n\n"
+        "=== 권장 판단 순서 ===\n"
+        "1) check_cpg_status로 CPG 건강 상태를 확인한다.\n"
+        "2) get_retrieved_knowledge로 잠재 유형을 좁히되, 가설로만 사용한다.\n"
+        "3) get_cpg_summary로 타겟 함수 매칭/호출 경계를 확정한다.\n"
+        "4) find_dataflow로 source->sink 경로를 확인한다.\n"
+        "5) find_sanitizer_or_guard로 guard/sanitizer가 sink를 지배하는지 확인한다.\n"
+        "6) map_vuln_context로 로컬 위험 연산(크기/인덱스/alloc-free-use)을 수집한다.\n"
+        "7) read_source_context/read_definition으로 최종 사실관계를 검증한다.\n\n"
+        "=== 증거 기준 ===\n"
+        "- High confidence: attacker-controlled source -> memory sink 경로 + guard 부재/불충분.\n"
+        "- Medium: 경로 일부만 확인되었으나 코드상 위험 연산이 명확.\n"
+        "- Low/Reject: source 불명확, 경로 불명확, 방어코드가 지배함.\n"
+        "- flow_count=0은 '안전'의 증거가 아니다. source code 직접 검증을 계속한다.\n\n"
+        "=== 불일치 처리 규칙 ===\n"
+        "- CPG 결과와 host source/diff 코드가 다르면 source code를 우선한다.\n"
+        "- function not found/candidate_count=0이면 경로/함수명/버전 불일치를 명시한다.\n"
+        "- CPG는 후보 압축 및 보강 근거, 최종 판정은 코드 사실 기반으로 수행한다."
     ),
 )
 

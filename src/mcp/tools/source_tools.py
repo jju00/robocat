@@ -80,6 +80,20 @@ TOOL_INSTRUCTIONS: dict[str, str] = {
         "- include_body=False는 선언/시그니처만 빠르게 확인할 때 사용한다.\n"
         "- include_body=True는 sink 계산식/포인터 수명 로직까지 검증해야 할 때만 사용한다."
     ),
+    "map_vuln_context": (
+        "함수 단위로 취약점 판단에 필요한 핵심 슬라이스를 빠르게 수집한다.\n"
+        "반환 슬라이스:\n"
+        "- sinks / size_or_index_defs / alloc_free_use / sources\n"
+        "- guards / error_paths / call_boundary / struct_field_usage\n\n"
+        "사용 목적:\n"
+        "- find_dataflow 전에 후보 위험 지점을 빠르게 좁힐 때\n"
+        "- flow_count=0 이어도 로컬 메모리 위험 연산(인덱스/크기계산/UAF 단서)을 확인할 때\n"
+        "- 소스코드 직접 검증(read_source_context/read_definition) 대상을 선정할 때\n\n"
+        "판단 지침:\n"
+        "- map_vuln_context 결과는 heuristic 요약이므로 단독 판정 근거로 사용하지 않는다.\n"
+        "- source→sink 경로 증거는 find_dataflow로 확인하고, 최종은 소스코드 사실검증으로 확정한다.\n"
+        "- c.json 기반 source/sink 규칙과 휴리스틱 결과를 함께 보되, 불일치 시 코드 사실을 우선한다."
+    ),
 }
 
 
