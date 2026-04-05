@@ -61,6 +61,20 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Normalize language for both Joern rules and data directory layout.
+# - rules/*.json: lowercase (c/cpp/php)
+# - data/<LANG>/...: uppercase (C/CPP/PHP)
+LANGUAGE="$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')"
+case "$LANGUAGE" in
+  c|cpp|php) ;;
+  *)
+    echo "[ERROR] Unsupported --language: $LANGUAGE (expected: c|cpp|php)"
+    exit 1
+    ;;
+esac
+LANGUAGE_LOWER="$LANGUAGE"
+LANGUAGE_UPPER="$(echo "$LANGUAGE" | tr '[:lower:]' '[:upper:]')"
+
 if [[ -z "$TARGET" || -z "$REPO" || -z "$OLD_VER" || -z "$NEW_VER" ]]; then
   echo "[ERROR] Missing required args"
   usage
@@ -79,7 +93,14 @@ export JOERN_CONFIG="$TARGET"
 export HOST_SOURCE_ROOT="$REPO"
 export HOST_WORKSPACE_ROOT="$HOST_WORKSPACE_ROOT"
 
-DIFF_DIR="$PROJECT_ROOT/data/$LANGUAGE/$TARGET/diff"
+# CONTAINER_SOURCE_ROOT: CLI로 넘기지 않으면 /app/sources/{TARGET}/source 로 자동 도출
+# (docker-compose 볼륨: HOST_TARGETS_ROOT → /app/sources)
+if [[ -z "${CONTAINER_SOURCE_ROOT:-}" ]]; then
+  CONTAINER_SOURCE_ROOT="/app/sources/$TARGET/source"
+fi
+export CONTAINER_SOURCE_ROOT
+
+DIFF_DIR="$PROJECT_ROOT/data/$LANGUAGE_UPPER/$TARGET/diff"
 CONFIG_PATH="$PROJECT_ROOT/scripts/joern/runners/configs/$TARGET.json"
 DIFF_FUNCTIONS_PATH="$DIFF_DIR/diff_functions.json"
 DIFF_RETRIEVER_PATH="$DIFF_DIR/diff_retriever.json"
@@ -106,7 +127,7 @@ cat > "$CONFIG_PATH" <<EOF
 {
   "project": {
     "name": "$TARGET",
-    "language": "$LANGUAGE"
+    "language": "$LANGUAGE_LOWER"
   },
   "paths": {
     "local_source_root": "\${HOST_SOURCE_ROOT}",
@@ -179,10 +200,10 @@ python3 scripts/generate_diff_retriever.py \
 # -----------------------------
 # 5) retriever_output_top1.json 생성
 # -----------------------------
-KNOWLEDGE_DIR="$PROJECT_ROOT/data/knowledge/$LANGUAGE"
+KNOWLEDGE_DIR="$PROJECT_ROOT/data/knowledge/$LANGUAGE_UPPER"
 if [[ ! -d "$KNOWLEDGE_DIR" ]]; then
   echo "[ERROR] knowledge dir not found: $KNOWLEDGE_DIR"
-  echo "        data/knowledge/ 아래에 '$LANGUAGE' 디렉토리가 있어야 합니다."
+  echo "        data/knowledge/ 아래에 '$LANGUAGE_UPPER' 디렉토리가 있어야 합니다."
   exit 1
 fi
 echo "[+] knowledge_dir = $KNOWLEDGE_DIR"

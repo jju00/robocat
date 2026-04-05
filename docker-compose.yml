@@ -5,7 +5,7 @@ services:
     ports:
       - "${JOERN_PORT}:9000"
     volumes:
-      - ${HOST_SOURCE_ROOT}:${CONTAINER_SOURCE_ROOT}
+      - ${HOST_TARGETS_ROOT}:/app/sources
       - ${HOST_WORKSPACE_ROOT}/joern:/app/workspace
     command: ["--server", "--server-host", "0.0.0.0", "--server-port", "9000"]
 
