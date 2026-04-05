@@ -38,9 +38,10 @@ def git_show(repo, version, path):
     return run_cmd(["git", "show", f"{version}:{path}"], cwd=repo)
 
 
-def save_diff(repo, old, new):
+def save_diff(repo, old, new, output_dir: str = "."):
     diff = run_cmd(["git", "diff", old, new], cwd=repo)
-    with open("diff.txt", "w", encoding="utf-8") as f:
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "diff.txt"), "w", encoding="utf-8") as f:
         f.write(diff)
     return diff
 
@@ -211,9 +212,9 @@ def find_function(spans: List[FunctionSpan], line: int) -> Optional[FunctionSpan
 # MAIN
 # =========================
 
-def run(repo, old, new):
+def run(repo, old, new, output_dir: str = "."):
     id_counter = 1
-    diff = save_diff(repo, old, new)
+    diff = save_diff(repo, old, new, output_dir=output_dir)
     parsed = parse_diff(diff)
 
     result = {
@@ -278,11 +279,12 @@ def run(repo, old, new):
                 "functions": funcs
             })
 
-    with open("diff_functions.json", "w", encoding="utf-8") as f:
+    out_path = os.path.join(output_dir, "diff_functions.json")
+    with open(out_path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
 
-    print("✅ diff.txt 생성")
-    print("✅ diff_functions.json 생성")
+    print(f"diff.txt → {os.path.join(output_dir, 'diff.txt')}")
+    print(f"diff_functions.json → {out_path}")
 
 
 # =========================
@@ -294,7 +296,8 @@ if __name__ == "__main__":
     parser.add_argument("--repo", required=True)
     parser.add_argument("--old", required=True)
     parser.add_argument("--new", required=True)
+    parser.add_argument("--output-dir", default=".", help="diff.txt / diff_functions.json 저장 디렉토리")
 
     args = parser.parse_args()
 
-    run(args.repo, args.old, args.new)
+    run(args.repo, args.old, args.new, output_dir=args.output_dir)

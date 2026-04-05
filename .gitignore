@@ -29,3 +29,6 @@ Thumbs.db
 
 # venv
 .venv/
+
+# embedding cache
+data/cache/
