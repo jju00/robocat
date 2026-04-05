@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
+from src.mcp.config import JOERN_SINKS, JOERN_SOURCES
 
 
 # ─────────────────────────────────────────────────────────────
@@ -78,6 +79,20 @@ TOOL_INSTRUCTIONS: dict[str, str] = {
         "- file 인자로 후보 파일을 제한해 같은 이름의 중복 정의를 줄인다.\n"
         "- include_body=False는 선언/시그니처만 빠르게 확인할 때 사용한다.\n"
         "- include_body=True는 sink 계산식/포인터 수명 로직까지 검증해야 할 때만 사용한다."
+    ),
+    "map_vuln_context": (
+        "함수 단위로 취약점 판단에 필요한 핵심 슬라이스를 빠르게 수집한다.\n"
+        "반환 슬라이스:\n"
+        "- sinks / size_or_index_defs / alloc_free_use / sources\n"
+        "- guards / error_paths / call_boundary / struct_field_usage\n\n"
+        "사용 목적:\n"
+        "- find_dataflow 전에 후보 위험 지점을 빠르게 좁힐 때\n"
+        "- flow_count=0 이어도 로컬 메모리 위험 연산(인덱스/크기계산/UAF 단서)을 확인할 때\n"
+        "- 소스코드 직접 검증(read_source_context/read_definition) 대상을 선정할 때\n\n"
+        "판단 지침:\n"
+        "- map_vuln_context 결과는 heuristic 요약이므로 단독 판정 근거로 사용하지 않는다.\n"
+        "- source→sink 경로 증거는 find_dataflow로 확인하고, 최종은 소스코드 사실검증으로 확정한다.\n"
+        "- c.json 기반 source/sink 규칙과 휴리스틱 결과를 함께 보되, 불일치 시 코드 사실을 우선한다."
     ),
 }
 
@@ -512,7 +527,7 @@ def mcp__nld__read_definition(
 # Tool 4: map_vuln_context
 # ─────────────────────────────────────────────────────────────
 
-_SINK_REGEXES: dict[str, str] = {
+_HEURISTIC_SINK_REGEXES: dict[str, str] = {
     "copy": r"\b(memcpy|memmove|strcpy|strncpy|strcat|strncat|snprintf|vsnprintf)\s*\(",
     "alloc": r"\b(malloc|calloc|realloc|strdup|strndup)\s*\(",
     "free": r"\bfree\s*\(",
@@ -520,13 +535,67 @@ _SINK_REGEXES: dict[str, str] = {
     "deref": r"(\-\>|(?<!\.)\.[A-Za-z_]\w*)",
 }
 
-_SOURCE_CALLS = r"\b(read|recv|fread|getenv|strtol|strtoul|atoi|atol|parse|decode)\s*\("
+_HEURISTIC_SOURCE_CALLS = r"\b(read|recv|fread|getenv|strtol|strtoul|atoi|atol|parse|decode)\s*\("
 _GUARD_HINT = r"\b(if|while)\b.*(len|size|count|idx|index|offset|NULL|!=\s*0|>\s*0|<\s*)"
 _ERROR_HINT = r"\b(return|goto)\b.*(ERR|FAIL|FATAL|WARN|error|cleanup)|\b(abort|exit|die)\s*\("
 _SIZE_HINT = re.compile(r"\b(len|size|count|idx|index|offset|cap|num)\w*\b", re.IGNORECASE)
 _KEYWORDS = {
     "if", "for", "while", "switch", "return", "sizeof",
 }
+
+
+def _strip_outer_parens(s: str) -> str:
+    t = s.strip()
+    if len(t) >= 2 and t[0] == "(" and t[-1] == ")":
+        return t[1:-1]
+    return t
+
+
+def _build_rule_sink_regexes() -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not isinstance(JOERN_SINKS, dict):
+        return out
+
+    for sink_name, sink_cfg in JOERN_SINKS.items():
+        if not isinstance(sink_cfg, dict):
+            continue
+        raw = sink_cfg.get("regex")
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        # CPG operator sinks are useful in taint query but not in plain source regex scan.
+        if "<operator>" in raw:
+            continue
+        out[f"rule_sink:{sink_name}"] = rf"\b(?:{_strip_outer_parens(raw)})\s*\("
+    return out
+
+
+def _build_rule_source_call_regex() -> re.Pattern[str] | None:
+    if not isinstance(JOERN_SOURCES, list):
+        return None
+
+    call_patterns: list[str] = []
+    for src in JOERN_SOURCES:
+        if not isinstance(src, dict):
+            continue
+        src_type = src.get("type")
+        raw = src.get("value")
+        if src_type not in {"call_return", "call_arg"}:
+            continue
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        if "<operator>" in raw:
+            continue
+        call_patterns.append(_strip_outer_parens(raw))
+
+    if not call_patterns:
+        return None
+    merged = "|".join(call_patterns)
+    return re.compile(rf"\b(?:{merged})\s*\(")
+
+
+_RULE_SINK_REGEXES = _build_rule_sink_regexes()
+_RULE_SOURCE_CALLS_RE = _build_rule_source_call_regex()
+_HEURISTIC_SOURCE_CALLS_RE = re.compile(_HEURISTIC_SOURCE_CALLS)
 
 
 def _extract_param_names(fn_code: str) -> list[str]:
@@ -598,7 +667,11 @@ def mcp__nld__map_vuln_context(
 
     # 1) sink lines
     sinks: list[dict[str, Any]] = []
-    for kind, pat in _SINK_REGEXES.items():
+    sink_patterns: dict[str, str] = {}
+    sink_patterns.update(_RULE_SINK_REGEXES)
+    sink_patterns.update(_HEURISTIC_SINK_REGEXES)
+
+    for kind, pat in sink_patterns.items():
         for m in re.finditer(pat, fn_code):
             local_line = _line_no_from_offset(fn_code, m.start())
             abs_line = fn_start + local_line - 1
@@ -636,9 +709,9 @@ def mcp__nld__map_vuln_context(
     post_free_use: list[dict[str, Any]] = []
     for idx, line in enumerate(fn_lines, start=1):
         abs_line = fn_start + idx - 1
-        if re.search(_SINK_REGEXES["alloc"], line):
+        if re.search(_HEURISTIC_SINK_REGEXES["alloc"], line):
             alloc_sites.append({"line": abs_line, "snippet": line.strip()})
-        if re.search(_SINK_REGEXES["free"], line):
+        if re.search(_HEURISTIC_SINK_REGEXES["free"], line):
             free_sites.append({"line": abs_line, "snippet": line.strip()})
 
     for free_entry in free_sites:
@@ -661,8 +734,9 @@ def mcp__nld__map_vuln_context(
     # 4) sources (params + common input calls)
     param_names = _extract_param_names(fn_code)
     source_calls: list[dict[str, Any]] = []
+    source_call_pattern = _RULE_SOURCE_CALLS_RE or _HEURISTIC_SOURCE_CALLS_RE
     for idx, line in enumerate(fn_lines, start=1):
-        if re.search(_SOURCE_CALLS, line):
+        if re.search(source_call_pattern, line):
             source_calls.append({
                 "line": fn_start + idx - 1,
                 "snippet": line.strip(),

@@ -1,7 +1,7 @@
 {
   "project": {
     "name": "libheif",
-    "language": "C"
+    "language": "c"
   },
   "paths": {
     "local_source_root": "${HOST_SOURCE_ROOT}",
