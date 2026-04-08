@@ -206,6 +206,17 @@ DO NOT report:
 
 ---
 
+## 🚫 Rejection Reasons (Learning Log)
+
+Use this section to continuously accumulate rejection patterns from future reports.
+
+1. **Library-only trigger path (examples/tests)**
+   - When evaluating vulnerabilities in library code, do NOT treat triggers reachable only through `examples/`, `samples/`, `benchmarks/`, or `tests/` as valid impact.
+   - You MUST prioritize and report only paths that can realistically affect downstream user applications in production usage.
+   - If no real user-application reachable path exists, do NOT report.
+
+---
+
 ## 📤 Output Format
 
 Return findings in structured format:
@@ -224,12 +235,26 @@ Return findings in structured format:
       </reason>
     </change_analysis>
 
+    <impact_analysis>
+      <impact>
+        describe practical impact in real user applications
+      </impact>
+      <follow_on_exploitability>
+        high | medium | low | unclear
+      </follow_on_exploitability>
+      <follow_on_exploitability_reason>
+        explain likelihood and conditions for post-disclosure exploitation
+      </follow_on_exploitability_reason>
+    </impact_analysis>
+
     <description>
       Explain:
       - root cause
       - data flow from attacker input
       - exact memory violation
       - why it is exploitable
+      - impact on real user applications (not examples/tests-only paths)
     </description>
   </finding>
 </vulnerabilities>
+```
