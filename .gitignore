@@ -32,3 +32,6 @@ Thumbs.db
 
 # embedding cache
 data/cache/
+
+# vuln report
+results/
