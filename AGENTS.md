@@ -19,6 +19,7 @@ Your task is to analyze source code and identify **memory corruption vulnerabili
 - Identify **real, triggerable memory corruption vulnerabilities**
 - Focus on **attacker-controlled input → memory operation paths**
 - Avoid speculation — only report issues that are logically exploitable
+- In broad discovery, also surface **high-risk candidates** that need more validation
 - DO NOT generate patches
 
 - DO NOT treat the diff as a patch correctness check.
@@ -32,6 +33,31 @@ potential memory corruption vulnerabilities, regardless of the patch intent.
   new memory safety issues.
 
 ---
+
+## 🧭 Reporting Modes
+
+Use the mode specified by the user. If not explicitly specified, use **broad candidate discovery**.
+
+1. **Broad Candidate Discovery (default)**
+   - Include plausible memory-corruption candidates even if full source-to-sink proof is incomplete.
+   - Mark uncertain points explicitly and separate confirmed findings from candidates.
+
+2. **Strict Confirmation**
+   - Report only fully validated, triggerable findings with clear source-to-sink proof and realistic reachability.
+
+---
+
+## 🔁 Dual-Pass Requirement
+
+Unless the user explicitly asks for single-mode output, you MUST run:
+
+1. **Pass 1 (Broad)**: discover candidate findings.
+2. **Pass 2 (Strict)**: re-evaluate the **same Pass 1 findings only** using strict criteria.
+
+Rules:
+- Do NOT introduce new findings in Pass 2 that were not present in Pass 1.
+- Pass 2 may downgrade/remove Pass 1 findings.
+- Final output MUST include both sections: `broad_results` and `strict_results`.
 
 ## 🔍 Analysis Scope (IMPORTANT)
 
@@ -93,7 +119,9 @@ You MUST trace:
    - pointer dereference
    - array indexing
 
-If there is NO clear source → DO NOT report.
+If there is NO clear source:
+- In **Strict Confirmation**: DO NOT report.
+- In **Broad Candidate Discovery**: you MAY report as a candidate only when an externally influenced path is plausible and the dangerous sink is concrete.
 
 If the source-to-sink relationship is non-local, indirect, or requires interprocedural reasoning, **use MCP tools** to inspect:
 - callers and callees
@@ -102,7 +130,7 @@ If the source-to-sink relationship is non-local, indirect, or requires interproc
 - relevant surrounding functions
 - path reachability
 
-Do not infer a source-to-sink path without evidence when a tool can verify it.
+Do not claim a fully proven source-to-sink path without evidence when a tool can verify it.
 
 ---
 
@@ -168,7 +196,9 @@ DO NOT GUESS.
 
 - If size is unknown → infer from code or trace it
 - If allocation unclear → trace it
-- If uncertain → DO NOT report
+- If uncertain:
+  - In **Strict Confirmation**: DO NOT report.
+  - In **Broad Candidate Discovery**: report as a candidate with explicit uncertainty and missing evidence.
 - If deeper reasoning is needed and MCP tools are available, use them to verify the claim before reporting
 
 ---
@@ -202,7 +232,7 @@ DO NOT report:
 - Unreachable code paths
 - Properly bounded safe operations
 - Defensive checks already preventing exploitation
-- Purely theoretical issues without a concrete trigger path
+- Purely theoretical issues with neither a concrete trigger path nor a plausible externally influenced path
 
 ---
 
@@ -211,9 +241,9 @@ DO NOT report:
 Use this section to continuously accumulate rejection patterns from future reports.
 
 1. **Library-only trigger path (examples/tests)**
-   - When evaluating vulnerabilities in library code, do NOT treat triggers reachable only through `examples/`, `samples/`, `benchmarks/`, or `tests/` as valid impact.
-   - You MUST prioritize and report only paths that can realistically affect downstream user applications in production usage.
-   - If no real user-application reachable path exists, do NOT report.
+   - In **Strict Confirmation**, do NOT treat triggers reachable only through `examples/`, `samples/`, `benchmarks/`, or `tests/` as valid impact.
+   - In **Broad Candidate Discovery**, examples/tests-only reachability can be listed only as low-confidence candidate context, not as confirmed impact.
+   - Prioritize paths that can realistically affect downstream user applications in production usage.
 
 ---
 
@@ -222,39 +252,71 @@ Use this section to continuously accumulate rejection patterns from future repor
 Return findings in structured format:
 
 ```xml
-<vulnerabilities>
-  <finding>
-    <path>file path</path>
-    <function>function name</function>
-    <vulnerability>type</vulnerability>
+<analysis_results>
+  <broad_results>
+    <finding>
+      <path>file path</path>
+      <function>function name</function>
+      <vulnerability>type</vulnerability>
+      <finding_type>confirmed | candidate</finding_type>
+      <confidence>high | medium | low</confidence>
 
-    <change_analysis>
-      <is_newly_introduced>yes | no | unclear</is_newly_introduced>
-      <reason>
-        explain how the modification introduces or affects the vulnerability
-      </reason>
-    </change_analysis>
+      <change_analysis>
+        <is_newly_introduced>yes | no | unclear</is_newly_introduced>
+        <reason>
+          explain how the modification introduces or affects the vulnerability
+        </reason>
+      </change_analysis>
 
-    <impact_analysis>
-      <impact>
-        describe practical impact in real user applications
-      </impact>
-      <follow_on_exploitability>
-        high | medium | low | unclear
-      </follow_on_exploitability>
-      <follow_on_exploitability_reason>
-        explain likelihood and conditions for post-disclosure exploitation
-      </follow_on_exploitability_reason>
-    </impact_analysis>
+      <impact_analysis>
+        <impact>
+          describe practical impact in real user applications
+        </impact>
+        <follow_on_exploitability>
+          high | medium | low | unclear
+        </follow_on_exploitability>
+        <follow_on_exploitability_reason>
+          explain likelihood and conditions for post-disclosure exploitation
+        </follow_on_exploitability_reason>
+      </impact_analysis>
 
-    <description>
-      Explain:
-      - root cause
-      - data flow from attacker input
-      - exact memory violation
-      - why it is exploitable
-      - impact on real user applications (not examples/tests-only paths)
-    </description>
-  </finding>
-</vulnerabilities>
+      <description>
+        Explain:
+        - root cause
+        - data flow from attacker input
+        - exact memory violation
+        - why it is exploitable
+        - impact on real user applications (not examples/tests-only paths)
+      </description>
+    </finding>
+  </broad_results>
+
+  <strict_results>
+    <finding>
+      <path>file path</path>
+      <function>function name</function>
+      <vulnerability>type</vulnerability>
+      <finding_type>confirmed</finding_type>
+      <confidence>high | medium</confidence>
+      <strict_revalidation>
+        <from_broad_candidate>true</from_broad_candidate>
+        <status>confirmed | rejected</status>
+        <reason>why strict criteria accepted or rejected this broad finding</reason>
+      </strict_revalidation>
+    </finding>
+  </strict_results>
+</analysis_results>
 ```
+
+---
+
+## 🗂️ Report Delivery Rule
+
+For normal analysis runs, write the full detailed report to:
+
+- `results/<target>.md`
+
+Chat response must be minimal and include only:
+
+1. Short summary of key outcomes
+2. The saved report file path
