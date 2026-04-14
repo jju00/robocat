@@ -1,0 +1,29 @@
+{
+  "project": {
+    "name": "libtiff",
+    "language": "c"
+  },
+  "paths": {
+    "local_source_root": "${HOST_SOURCE_ROOT}",
+    "container_source_root": "${CONTAINER_SOURCE_ROOT}",
+    "taint_dir": "${HOST_TAINT_DIR}",
+    "trace_dir": null,
+    "output_dir": "${HOST_OUTPUT_DIR}"
+  },
+  "joern": {
+    "server_url": "http://localhost:${JOERN_PORT}",
+    "workspace_project": "libtiff_root_test"
+  },
+  "trace": {
+    "webroot": null
+  },
+  "analysis": {
+    "mode": "static",
+    "enabled_sink_categories": [
+      "command",
+      "memory",
+      "format",
+      "file"
+    ]
+  }
+}
