@@ -1,0 +1,185 @@
+[
+    {
+        "CVE_id": "CVE-2019-5489",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of memory initialization and state reporting in a function that checks page presence.",
+            "trigger_condition": "A local attacker invokes a function that reveals page cache access patterns of other processes, potentially leading to information leakage.",
+            "specific_code_behavior_causing_vulnerability": "The code fails to initialize memory buffers properly and does not account for special cases like pages under construction, which can lead to residual data being exposed and incorrect reporting of page states."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to ensure that all memory buffers are properly initialized before use and to handle special cases, such as pages under construction, appropriately. This will prevent the exposure of residual data and ensure accurate reporting of page states.",
+        "purpose": "\"The function mincore_page checks whether a specific page in a given address space is present in memory and returns a status indicating its availability.\"",
+        "function": "1. To check if a page in a given address space is present in memory.  \n2. To handle the case where the address space is a temporary filesystem (tmpfs) and account for swapped-out pages.  \n3. To return a status indicating whether the page is up-to-date (present) or not.",
+        "analysis": "The modification to the `mincore_page` function in the Linux kernel is necessary to address the vulnerability identified as CVE-2019-5489, which allows local attackers to observe page cache access patterns of other processes. This vulnerability can lead to the leakage of sensitive information, as attackers can infer which pages are being accessed by other processes based on the output of the `mincore()` function.\n\n### Reasons for the Modification:\n\n1. **Memory Initialization**:\n   - The addition of `memset(vec, 0, nr);` ensures that the memory buffer `vec` is initialized to zero before it is used. This prevents any residual data from previous operations from being exposed, which could inadvertently reveal information about other processes' memory usage.\n\n2. **Tracking Page Count**:\n   - The line `walk->private += nr;` updates the private data in the `walk` structure to account for the number of pages processed. This is important for maintaining accurate state information during the memory walk, especially when dealing with large pages or multiple pages.\n\n3. **Handling Transparent Huge Pages (THP)**:\n   - The comment `/* We'll consider a THP page under construction to be there */` indicates that the code is designed to handle scenarios where a Transparent Huge Page (THP) is in the process of being constructed. By setting `memset(vec, 1, nr);`, the code indicates that these pages should be considered present, even if they are not fully constructed yet. This helps in avoiding false negatives when checking for page presence.\n\n4. **Preventing Information Leakage**:\n   - The original implementation of `mincore_page` could potentially allow an attacker to infer the state of memory pages based on the output of the function. By modifying how pages are reported (i.e., ensuring that uninitialized or unstable pages are not reported in a way that could leak information), the modified code reduces the risk of information leakage.\n\n5. **Consistency and Safety**:\n   - The changes ensure that the function behaves consistently and safely, especially in multi-threaded or multi-process environments where memory state can change rapidly. Properly initializing memory and handling special cases like THP construction helps maintain the integrity of the memory management system.\n\n### Conclusion:\nOverall, the modifications are aimed at enhancing the security of the `mincore()` implementation by preventing potential information leaks and ensuring that the function behaves correctly in various scenarios. This is crucial for maintaining the confidentiality and integrity of processes running on the system.",
+        "code_before_change": "static unsigned char mincore_page(struct address_space *mapping, pgoff_t pgoff)\n{\n\tunsigned char present = 0;\n\tstruct page *page;\n\n\t/*\n\t * When tmpfs swaps out a page from a file, any process mapping that\n\t * file will not get a swp_entry_t in its pte, but rather it is like\n\t * any other file mapping (ie. marked !present and faulted in with\n\t * tmpfs's .fault). So swapped out tmpfs mappings are tested here.\n\t */\n#ifdef CONFIG_SWAP\n\tif (shmem_mapping(mapping)) {\n\t\tpage = find_get_entry(mapping, pgoff);\n\t\t/*\n\t\t * shmem/tmpfs may return swap: account for swapcache\n\t\t * page too.\n\t\t */\n\t\tif (xa_is_value(page)) {\n\t\t\tswp_entry_t swp = radix_to_swp_entry(page);\n\t\t\tpage = find_get_page(swap_address_space(swp),\n\t\t\t\t\t     swp_offset(swp));\n\t\t}\n\t} else\n\t\tpage = find_get_page(mapping, pgoff);\n#else\n\tpage = find_get_page(mapping, pgoff);\n#endif\n\tif (page) {\n\t\tpresent = PageUptodate(page);\n\t\tput_page(page);\n\t}\n\n\treturn present;\n}",
+        "code_after_change": "\tmemset(vec, 0, nr);\n\twalk->private += nr;\n\treturn 0;\n}\n\nstatic int mincore_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,\n\t\t\tstruct mm_walk *walk)\n{\n\tspinlock_t *ptl;\n\tstruct vm_area_struct *vma = walk->vma;\n\tpte_t *ptep;\n\tunsigned char *vec = walk->private;\n\tint nr = (end - addr) >> PAGE_SHIFT;\n\n\tptl = pmd_trans_huge_lock(pmd, vma);\n\tif (ptl) {\n\t\tmemset(vec, 1, nr);\n\t\tspin_unlock(ptl);\n\t\tgoto out;\n\t}\n\n\t/* We'll consider a THP page under construction to be there */\n\tif (pmd_trans_unstable(pmd)) {\n\t\tmemset(vec, 1, nr);\n\t\tgoto out;\n\t}\n\n\tptep = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);\n\tfor (; addr != end; ptep++, addr += PAGE_SIZE) {\n\t\tpte_t pte = *ptep;\n\n\t\tif (pte_none(pte))\n\t\t\t*vec = 0;\n\t\telse if (pte_present(pte))\n\t\t\t*vec = 1;",
+        "modified_lines": {
+            "added": [
+                "\tmemset(vec, 0, nr);",
+                "\twalk->private += nr;",
+                "\t/* We'll consider a THP page under construction to be there */",
+                "\t\tmemset(vec, 1, nr);",
+                "\t\t\t*vec = 0;"
+            ],
+            "deleted": [
+                "static unsigned char mincore_page(struct address_space *mapping, pgoff_t pgoff)",
+                "{",
+                "\tunsigned char present = 0;",
+                "\tstruct page *page;",
+                "\t/*",
+                "\t * When tmpfs swaps out a page from a file, any process mapping that",
+                "\t * file will not get a swp_entry_t in its pte, but rather it is like",
+                "\t * any other file mapping (ie. marked !present and faulted in with",
+                "\t * tmpfs's .fault). So swapped out tmpfs mappings are tested here.",
+                "\t */",
+                "#ifdef CONFIG_SWAP",
+                "\tif (shmem_mapping(mapping)) {",
+                "\t\tpage = find_get_entry(mapping, pgoff);",
+                "\t\t/*",
+                "\t\t * shmem/tmpfs may return swap: account for swapcache",
+                "\t\t * page too.",
+                "\t\t */",
+                "\t\tif (xa_is_value(page)) {",
+                "\t\t\tswp_entry_t swp = radix_to_swp_entry(page);",
+                "\t\t\tpage = find_get_page(swap_address_space(swp),",
+                "\t\t\t\t\t     swp_offset(swp));",
+                "\t\t}",
+                "\t} else",
+                "\t\tpage = find_get_page(mapping, pgoff);",
+                "#else",
+                "\tpage = find_get_page(mapping, pgoff);",
+                "#endif",
+                "\tif (page) {",
+                "\t\tpresent = PageUptodate(page);",
+                "\t\tput_page(page);",
+                "\t}",
+                "\treturn present;",
+                "}"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of memory initialization and state reporting in a function that checks page presence.",
+        "trigger_condition": "A local attacker invokes a function that reveals page cache access patterns of other processes, potentially leading to information leakage.",
+        "specific_code_behavior_causing_vulnerability": "The code fails to initialize memory buffers properly and does not account for special cases like pages under construction, which can lead to residual data being exposed and incorrect reporting of page states."
+    },
+    {
+        "CVE_id": "CVE-2019-5489",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper exposure of memory access patterns through the mincore() function, allowing local attackers to infer sensitive information about other processes.",
+            "trigger_condition": "A local attacker invokes the mincore() function on a target process, leading to the potential leakage of page cache access patterns.",
+            "specific_code_behavior_causing_vulnerability": "The code directly reports the memory status of other processes, revealing whether specific pages are cached or not, which can be exploited to deduce sensitive information."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to modify the reporting mechanism of the memory status to obscure the actual memory access patterns. This can be achieved by using a function that determines the validity of memory entries without directly exposing whether pages are cached, thereby reducing the risk of information leakage.",
+        "purpose": "\"The function __mincore_unmapped_range retrieves the memory page status for a specified range of virtual memory addresses, indicating whether each page is resident in memory or not.\"",
+        "function": "1. Determine the number of pages in a specified memory range.  \n2. Check if the virtual memory area (vma) has an associated file.  \n3. Populate a vector with information about the page cache status for each page in the specified range, indicating whether each page is resident in memory or not.",
+        "analysis": "The modification to the `__mincore_unmapped_range` function is necessary to address the vulnerability described in CVE-2019-5489, which allows local attackers to observe page cache access patterns of other processes. This can lead to potential information leakage, where an attacker can infer sensitive information based on the memory access patterns of other processes.\n\n### Explanation of the Vulnerability\n\n1. **Information Leakage**: The original implementation of the `mincore()` function allowed users to query the memory status of other processes. By observing which pages are in memory (i.e., cached) and which are not, an attacker could infer details about the memory usage of other processes. This could include sensitive information such as cryptographic keys, passwords, or other confidential data.\n\n2. **Page Cache Access Patterns**: The way the original code determined whether a page was in memory (cached) or not could be exploited. If an attacker could determine which pages were accessed frequently or were resident in memory, they could potentially deduce the behavior of other processes.\n\n### Changes Made\n\n1. **Modification of the `vec` Assignment**: The change involves how the `vec` array is populated. Instead of directly assigning the result of `mincore_page`, the modified code uses the `non_swap_entry(entry)` function to determine if the entry is a valid page or not. This change helps to obscure the actual memory access patterns by not directly revealing whether a page is cached or not.\n\n2. **Handling of Special Entries**: The comment added in the modification indicates that migration or hardware poison entries are always considered \"uptodate.\" This means that the code now accounts for special cases that should not be exposed to user space, further reducing the risk of leaking information about the memory state.\n\n### Benefits of the Modification\n\n- **Enhanced Security**: By changing how memory status is reported, the modification reduces the risk of information leakage. Attackers can no longer easily determine which pages are cached based on the output of `mincore()`.\n  \n- **Obfuscation of Memory Access Patterns**: The new implementation makes it harder for an attacker to infer the behavior of other processes based on memory access patterns, thus protecting sensitive information.\n\n- **Compliance with Security Best Practices**: The modification aligns with best practices in secure coding by minimizing the amount of information exposed to user space, especially regarding the memory state of other processes.\n\nIn summary, the modification is necessary to mitigate the risk of information leakage and to enhance the overall security of the Linux kernel's memory management functions.",
+        "code_before_change": "static int __mincore_unmapped_range(unsigned long addr, unsigned long end,\n\t\t\t\tstruct vm_area_struct *vma, unsigned char *vec)\n{\n\tunsigned long nr = (end - addr) >> PAGE_SHIFT;\n\tint i;\n\n\tif (vma->vm_file) {\n\t\tpgoff_t pgoff;\n\n\t\tpgoff = linear_page_index(vma, addr);\n\t\tfor (i = 0; i < nr; i++, pgoff++)\n\t\t\tvec[i] = mincore_page(vma->vm_file->f_mapping, pgoff);\n\t} else {\n\t\tfor (i = 0; i < nr; i++)\n\t\t\tvec[i] = 0;\n\t}\n\treturn nr;\n}",
+        "code_after_change": "\t\t\tswp_entry_t entry = pte_to_swp_entry(pte);\n\n\t\t\t/*\n\t\t\t * migration or hwpoison entries are always\n\t\t\t * uptodate\n\t\t\t */\n\t\t\t*vec = !!non_swap_entry(entry);\n\t\t}\n\t\tvec++;\n\t}\n\tpte_unmap_unlock(ptep - 1, ptl);\nout:\n\twalk->private += nr;\n\tcond_resched();\n\treturn 0;\n}\n\n/*",
+        "modified_lines": {
+            "added": [
+                "\t\t\t/*",
+                "\t\t\t * migration or hwpoison entries are always",
+                "\t\t\t * uptodate",
+                "\t\t\t */",
+                "\t\t\t*vec = !!non_swap_entry(entry);"
+            ],
+            "deleted": [
+                "static int __mincore_unmapped_range(unsigned long addr, unsigned long end,",
+                "\t\t\t\tstruct vm_area_struct *vma, unsigned char *vec)",
+                "{",
+                "\tunsigned long nr = (end - addr) >> PAGE_SHIFT;",
+                "\tint i;",
+                "\tif (vma->vm_file) {",
+                "\t\tpgoff_t pgoff;",
+                "\t\tpgoff = linear_page_index(vma, addr);",
+                "\t\tfor (i = 0; i < nr; i++, pgoff++)",
+                "\t\t\tvec[i] = mincore_page(vma->vm_file->f_mapping, pgoff);",
+                "\t} else {",
+                "\t\tfor (i = 0; i < nr; i++)",
+                "\t\t\tvec[i] = 0;",
+                "\t}",
+                "\treturn nr;",
+                "}"
+            ]
+        },
+        "vulnerability_cause_description": "Improper exposure of memory access patterns through the mincore() function, allowing local attackers to infer sensitive information about other processes.",
+        "trigger_condition": "A local attacker invokes the mincore() function on a target process, leading to the potential leakage of page cache access patterns.",
+        "specific_code_behavior_causing_vulnerability": "The code directly reports the memory status of other processes, revealing whether specific pages are cached or not, which can be exploited to deduce sensitive information."
+    },
+    {
+        "CVE_id": "CVE-2019-5489",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of memory mapping information that can lead to information leakage.",
+            "trigger_condition": "A local attacker accesses the mincore() function to observe memory access patterns of other processes, potentially inferring sensitive information.",
+            "specific_code_behavior_causing_vulnerability": "The code exposes memory mapping details through a function call that returns information about mapped and unmapped pages without properly clearing or initializing the memory used for this purpose."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to clear any previously stored memory mapping information before reusing the memory area. This ensures that no residual data is exposed, preventing information leakage about memory access patterns of other processes.",
+        "purpose": "\"The function mincore_unmapped_range calculates the number of unmapped pages in a specified address range and updates the private data in the mm_walk structure.\"",
+        "function": "1. It defines a function named `mincore_unmapped_range`.  \n2. It takes three parameters: `addr`, `end`, and `walk`.  \n3. It calls another function `__mincore_unmapped_range` to determine the unmapped range of memory pages between `addr` and `end`.  \n4. It updates the `private` field of the `walk` structure with the result from `__mincore_unmapped_range`.  \n5. It returns 0, indicating successful completion of the function.",
+        "analysis": "The modification to the `mincore_unmapped_range` function is necessary to address the vulnerability CVE-2019-5489, which allows local attackers to observe page cache access patterns of other processes. This vulnerability arises from the way the `mincore()` function was implemented, specifically in how it handles the `walk->private` pointer and the information it exposes about memory mappings.\n\n### Explanation of the Vulnerability\n\n1. **Information Leakage**: The original implementation of `mincore_unmapped_range` calls `__mincore_unmapped_range`, which likely returns information about the memory mappings of the specified address range. This information could include whether pages are mapped or unmapped, which can be exploited by an attacker to infer access patterns of other processes. By observing these patterns, an attacker could potentially deduce sensitive information, such as cryptographic keys or other confidential data.\n\n2. **Memory Access Patterns**: The ability to observe how memory is accessed by other processes can lead to side-channel attacks. For example, if an attacker can determine which pages are being accessed frequently, they might infer which data is being used by other processes, leading to a breach of confidentiality.\n\n### Changes Made in the Fix\n\n1. **Initialization of `vec`**: The modification introduces a new variable `vec`, which points to `walk->private`. This is used to store the results of the memory mapping check.\n\n2. **Clearing Memory**: The line `memset(vec, 0, nr);` initializes the memory pointed to by `vec` to zero. This is crucial because it ensures that any previously stored information in that memory area is cleared before it is reused. This prevents any residual data from being exposed to the caller, which could otherwise leak information about previous memory mappings.\n\n3. **Updating `walk->private`**: The line `walk->private += nr;` updates the `walk->private` pointer to reflect the new position after writing the cleared memory. This ensures that the pointer is correctly advanced for future operations.\n\n4. **Removal of the Vulnerable Call**: The original call to `__mincore_unmapped_range` is removed. This is significant because that function was responsible for returning potentially sensitive information about the memory mappings, which could be exploited. By removing this call and replacing it with a safe initialization, the risk of information leakage is mitigated.\n\n### Conclusion\n\nIn summary, the modification is necessary to eliminate the potential for information leakage regarding memory access patterns of other processes. By clearing the memory and avoiding the exposure of sensitive information through the original function call, the fix enhances the security of the `mincore()` implementation in the Linux kernel, thereby protecting against local attacks that could exploit this vulnerability.",
+        "code_before_change": "static int mincore_unmapped_range(unsigned long addr, unsigned long end,\n\t\t\t\t   struct mm_walk *walk)\n{\n\twalk->private += __mincore_unmapped_range(addr, end,\n\t\t\t\t\t\t  walk->vma, walk->private);\n\treturn 0;\n}",
+        "code_after_change": "static int mincore_unmapped_range(unsigned long addr, unsigned long end,\n\t\t\t\t   struct mm_walk *walk)\n{\n\tunsigned char *vec = walk->private;\n\tunsigned long nr = (end - addr) >> PAGE_SHIFT;\n\n\tmemset(vec, 0, nr);\n\twalk->private += nr;\n\treturn 0;\n}",
+        "modified_lines": {
+            "added": [
+                "\tunsigned char *vec = walk->private;",
+                "\tunsigned long nr = (end - addr) >> PAGE_SHIFT;",
+                "\tmemset(vec, 0, nr);",
+                "\twalk->private += nr;"
+            ],
+            "deleted": [
+                "\twalk->private += __mincore_unmapped_range(addr, end,",
+                "\t\t\t\t\t\t  walk->vma, walk->private);"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of memory mapping information that can lead to information leakage.",
+        "trigger_condition": "A local attacker accesses the mincore() function to observe memory access patterns of other processes, potentially inferring sensitive information.",
+        "specific_code_behavior_causing_vulnerability": "The code exposes memory mapping details through a function call that returns information about mapped and unmapped pages without properly clearing or initializing the memory used for this purpose."
+    },
+    {
+        "CVE_id": "CVE-2019-5489",
+        "vulnerability_behavior": {
+            "vulnerability_cause_description": "Improper handling of memory page states can lead to information leakage about other processes' memory access patterns.",
+            "trigger_condition": "A local attacker invokes a function that checks the memory state of other processes, potentially revealing sensitive information based on the returned page cache access patterns.",
+            "specific_code_behavior_causing_vulnerability": "The code directly exposes the presence and state of memory pages without adequate checks, allowing attackers to infer access patterns and potentially sensitive information."
+        },
+        "solution": "To mitigate the vulnerability, it is necessary to ensure that the function does not reveal the state of memory pages belonging to other processes. This can be achieved by modifying the handling of memory states to prevent information leakage, such as initializing output vectors properly and controlling the output based on the actual presence of pages without exposing their detailed states.",
+        "purpose": "\"The function mincore_pte_range determines the residency status of pages in a specified memory range, indicating whether they are present in memory or swapped out, and updates a vector accordingly.\"",
+        "function": "1. Locking the page table entry for a given memory range.  \n2. Checking if the page table entry is unstable and handling unmapped ranges accordingly.  \n3. Iterating through the page table entries to determine the presence and status of pages, updating a vector to reflect their state.  \n4. Handling swap entries and updating the vector based on their status.  \n5. Unlocking the page table entry after processing and rescheduling if necessary.",
+        "analysis": "The modification to the `mincore_pte_range` function is necessary to address the vulnerability identified as CVE-2019-5489, which allows local attackers to observe page cache access patterns of other processes. This can lead to the potential leakage of sensitive information.\n\n### Key Reasons for the Modification:\n\n1. **Preventing Information Leakage**:\n   - The original code allowed the function to return information about the memory pages of other processes, which could be exploited to infer access patterns. By modifying how the `vec` array is populated, the code now ensures that it does not inadvertently reveal the state of memory pages that belong to other processes.\n\n2. **Handling Unstable Pages**:\n   - The original implementation called `__mincore_unmapped_range` when encountering unstable pages, which could lead to revealing information about the memory state. The modification replaces this with a more controlled approach that sets the vector to indicate the presence or absence of pages without leaking details about their state.\n\n3. **Consistent Behavior for THP (Transparent Huge Pages)**:\n   - The modification introduces a check for THP pages under construction, treating them as present. This is important for maintaining consistent behavior in memory management, ensuring that the system does not leak information about the construction state of these pages.\n\n4. **Correctly Handling Swap Entries**:\n   - The original code had a more complex handling of swap entries that could lead to inconsistencies in the information returned. The modified code simplifies this by using `!!non_swap_entry(entry)` to indicate whether the swap entry is valid or not, thus preventing any potential leakage of information about the swap state.\n\n5. **Setting Default Values**:\n   - The modification ensures that the vector is initialized correctly (e.g., setting `*vec = 0` for unmapped pages), which helps in avoiding any unintended information leakage through uninitialized or incorrectly initialized values.\n\n### Summary:\nThe modifications are crucial for enhancing the security of the `mincore` implementation by ensuring that it does not leak sensitive information about the memory state of other processes. By controlling the output more strictly and handling different memory states appropriately, the changes mitigate the risk of local attackers inferring access patterns or other sensitive information.",
+        "code_before_change": "static int mincore_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,\n\t\t\tstruct mm_walk *walk)\n{\n\tspinlock_t *ptl;\n\tstruct vm_area_struct *vma = walk->vma;\n\tpte_t *ptep;\n\tunsigned char *vec = walk->private;\n\tint nr = (end - addr) >> PAGE_SHIFT;\n\n\tptl = pmd_trans_huge_lock(pmd, vma);\n\tif (ptl) {\n\t\tmemset(vec, 1, nr);\n\t\tspin_unlock(ptl);\n\t\tgoto out;\n\t}\n\n\tif (pmd_trans_unstable(pmd)) {\n\t\t__mincore_unmapped_range(addr, end, vma, vec);\n\t\tgoto out;\n\t}\n\n\tptep = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);\n\tfor (; addr != end; ptep++, addr += PAGE_SIZE) {\n\t\tpte_t pte = *ptep;\n\n\t\tif (pte_none(pte))\n\t\t\t__mincore_unmapped_range(addr, addr + PAGE_SIZE,\n\t\t\t\t\t\t vma, vec);\n\t\telse if (pte_present(pte))\n\t\t\t*vec = 1;\n\t\telse { /* pte is a swap entry */\n\t\t\tswp_entry_t entry = pte_to_swp_entry(pte);\n\n\t\t\tif (non_swap_entry(entry)) {\n\t\t\t\t/*\n\t\t\t\t * migration or hwpoison entries are always\n\t\t\t\t * uptodate\n\t\t\t\t */\n\t\t\t\t*vec = 1;\n\t\t\t} else {\n#ifdef CONFIG_SWAP\n\t\t\t\t*vec = mincore_page(swap_address_space(entry),\n\t\t\t\t\t\t    swp_offset(entry));\n#else\n\t\t\t\tWARN_ON(1);\n\t\t\t\t*vec = 1;\n#endif\n\t\t\t}\n\t\t}\n\t\tvec++;\n\t}\n\tpte_unmap_unlock(ptep - 1, ptl);\nout:\n\twalk->private += nr;\n\tcond_resched();\n\treturn 0;\n}",
+        "code_after_change": "static int mincore_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,\n\t\t\tstruct mm_walk *walk)\n{\n\tspinlock_t *ptl;\n\tstruct vm_area_struct *vma = walk->vma;\n\tpte_t *ptep;\n\tunsigned char *vec = walk->private;\n\tint nr = (end - addr) >> PAGE_SHIFT;\n\n\tptl = pmd_trans_huge_lock(pmd, vma);\n\tif (ptl) {\n\t\tmemset(vec, 1, nr);\n\t\tspin_unlock(ptl);\n\t\tgoto out;\n\t}\n\n\t/* We'll consider a THP page under construction to be there */\n\tif (pmd_trans_unstable(pmd)) {\n\t\tmemset(vec, 1, nr);\n\t\tgoto out;\n\t}\n\n\tptep = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);\n\tfor (; addr != end; ptep++, addr += PAGE_SIZE) {\n\t\tpte_t pte = *ptep;\n\n\t\tif (pte_none(pte))\n\t\t\t*vec = 0;\n\t\telse if (pte_present(pte))\n\t\t\t*vec = 1;\n\t\telse { /* pte is a swap entry */\n\t\t\tswp_entry_t entry = pte_to_swp_entry(pte);\n\n\t\t\t/*\n\t\t\t * migration or hwpoison entries are always\n\t\t\t * uptodate\n\t\t\t */\n\t\t\t*vec = !!non_swap_entry(entry);\n\t\t}\n\t\tvec++;\n\t}\n\tpte_unmap_unlock(ptep - 1, ptl);\nout:\n\twalk->private += nr;\n\tcond_resched();\n\treturn 0;\n}",
+        "modified_lines": {
+            "added": [
+                "\t/* We'll consider a THP page under construction to be there */",
+                "\t\tmemset(vec, 1, nr);",
+                "\t\t\t*vec = 0;",
+                "\t\t\t/*",
+                "\t\t\t * migration or hwpoison entries are always",
+                "\t\t\t * uptodate",
+                "\t\t\t */",
+                "\t\t\t*vec = !!non_swap_entry(entry);"
+            ],
+            "deleted": [
+                "\t\t__mincore_unmapped_range(addr, end, vma, vec);",
+                "\t\t\t__mincore_unmapped_range(addr, addr + PAGE_SIZE,",
+                "\t\t\t\t\t\t vma, vec);",
+                "\t\t\tif (non_swap_entry(entry)) {",
+                "\t\t\t\t/*",
+                "\t\t\t\t * migration or hwpoison entries are always",
+                "\t\t\t\t * uptodate",
+                "\t\t\t\t */",
+                "\t\t\t\t*vec = 1;",
+                "\t\t\t} else {",
+                "#ifdef CONFIG_SWAP",
+                "\t\t\t\t*vec = mincore_page(swap_address_space(entry),",
+                "\t\t\t\t\t\t    swp_offset(entry));",
+                "#else",
+                "\t\t\t\tWARN_ON(1);",
+                "\t\t\t\t*vec = 1;",
+                "#endif",
+                "\t\t\t}"
+            ]
+        },
+        "vulnerability_cause_description": "Improper handling of memory page states can lead to information leakage about other processes' memory access patterns.",
+        "trigger_condition": "A local attacker invokes a function that checks the memory state of other processes, potentially revealing sensitive information based on the returned page cache access patterns.",
+        "specific_code_behavior_causing_vulnerability": "The code directly exposes the presence and state of memory pages without adequate checks, allowing attackers to infer access patterns and potentially sensitive information."
+    }
+]
