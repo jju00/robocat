@@ -1,0 +1,139 @@
+{
+  "language": "c",
+  "joern_import": "c",
+  "function_parser": "c",
+  "trace_support": null,
+  "dynamic_trace_type": null,
+  "sources": [
+    {
+      "name": "argv",
+      "type": "identifier_name_exact",
+      "value": "argv",
+      "_comment": "char **argv 식별자 노드 자체를 source 로"
+    },
+    {
+      "name": "getenv_ret",
+      "type": "call_return",
+      "value": "(getenv)",
+      "_comment": "반환값(char*)이 오염 데이터"
+    },
+    {
+      "name": "getchar_ret",
+      "type": "call_return",
+      "value": "(getchar|fgetc)",
+      "_comment": "반환값(int → char)이 오염 데이터"
+    },
+    {
+      "name": "fgets_gets_buf",
+      "type": "call_arg",
+      "value": "(fgets|gets|gets_s)",
+      "arg_index": 1,
+      "_comment": "fgets(buf,n,fp) / gets(buf) — 1번째 인자(버퍼)가 오염"
+    },
+    {
+      "name": "read_recv_buf",
+      "type": "call_arg",
+      "value": "(read|pread|pread64|recv|recvfrom|recvmsg)",
+      "arg_index": 2,
+      "_comment": "read(fd,buf,n) / recv(fd,buf,n,f) — 2번째 인자(버퍼)가 오염"
+    },
+    {
+      "name": "fread_buf",
+      "type": "call_arg",
+      "value": "(fread)",
+      "arg_index": 1,
+      "_comment": "fread(ptr,size,nmemb,fp) — 1번째 인자(버퍼)가 오염"
+    },
+    {
+      "name": "scanf_arg",
+      "type": "call_arg",
+      "value": "(scanf|vscanf)",
+      "arg_index": 2,
+      "_comment": "scanf(fmt, &var, ...) — 2번째 인자(첫 출력 인자)가 오염"
+    },
+    {
+      "name": "fscanf_sscanf_arg",
+      "type": "call_arg",
+      "value": "(fscanf|sscanf|vfscanf|vsscanf)",
+      "arg_index": 3,
+      "_comment": "fscanf(fp,fmt,&var) / sscanf(str,fmt,&var) — 3번째 인자가 오염"
+    },
+    {
+      "name": "line_reader_ret",
+      "type": "call_return",
+      "value": "(getline|getdelim)",
+      "_comment": "getline/getdelim 반환값(읽은 길이)을 source 로"
+    },
+    {
+      "name": "read_len_ret",
+      "type": "call_return",
+      "value": "(read|pread|pread64|recv|recvfrom|recvmsg|fread)",
+      "_comment": "입력 함수 반환값(읽은 바이트 수)을 source 로"
+    },
+    {
+      "name": "numeric_parse_ret",
+      "type": "call_return",
+      "value": "(atoi|atol|atoll|strtol|strtoul|strtoll|strtoull|strtoimax|strtoumax)",
+      "_comment": "텍스트 파싱 숫자값이 size/index 로 쓰일 수 있어 source 로"
+    },
+    {
+      "name": "archive_decoders_ret",
+      "type": "call_return",
+      "value": "(archive_le16dec|archive_le32dec|archive_le64dec|archive_be16dec|archive_be32dec|archive_be64dec)",
+      "_comment": "바이너리 파싱 길이/오프셋 값(source) 추적"
+    }
+  ],
+  "sinks": {
+    "command": {
+      "regex": "(system|execl|execlp|execle|execv|execvp|execve|popen)"
+    },
+    "memory": {
+      "regex": "(strcpy|strncpy|strcat|strncat|strlcpy|strlcat|sprintf|snprintf|vsprintf|vsnprintf|memcpy|memmove|memset|bcopy|bzero|wmemcpy|wmemmove|gets|gets_s|fgets|getline|getdelim|read|pread|pread64|recv|recvfrom|recvmsg|fread|malloc|calloc|realloc|reallocarray|alloca|strdup|strndup|free|cfree)"
+    },
+    "memory_expr": {
+      "regex": "(<operator>\\.indirectIndexAccess|<operator>\\.addition|<operator>\\.subtraction|<operator>\\.multiplication)"
+    },
+    "format": {
+      "regex": "(printf|fprintf|sprintf|snprintf|syslog)"
+    },
+    "file": {
+      "regex": "(fopen|open|freopen)"
+    }
+  },
+  "sanitizers": [
+    "fgets",
+    "getline",
+    "getdelim",
+    "snprintf",
+    "vsnprintf",
+    "strncpy",
+    "strncat",
+    "strlcpy",
+    "strlcat",
+    "memcpy_s",
+    "memmove_s",
+    "strncpy_s",
+    "strnlen_s",
+    "strlen",
+    "strnlen",
+    "memchr",
+    "memcmp",
+    "strncmp",
+    "strchr",
+    "strstr",
+    "assert",
+    "isalpha",
+    "isdigit",
+    "isalnum",
+    "isspace",
+    "toupper",
+    "tolower"
+  ],
+  "sink_priority_weight": {
+    "command": 1.0,
+    "memory": 0.95,
+    "memory_expr": 0.9,
+    "format": 0.75,
+    "file": 0.7
+  }
+}
