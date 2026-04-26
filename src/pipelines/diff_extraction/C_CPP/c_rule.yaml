@@ -1,0 +1,73 @@
+rules:
+  - id: c-interesting-ops-loose
+    languages: [c]
+    severity: INFO
+    message: Potentially interesting operation
+
+    pattern-either:
+
+      # ========================
+      # memory
+      # ========================
+      - pattern: memcpy(...)
+      - pattern: memmove(...)
+      - pattern: strcpy(...)
+      - pattern: strncpy(...)
+      - pattern: strcat(...)
+      - pattern: strncat(...)
+      - pattern: malloc(...)
+      - pattern: calloc(...)
+      - pattern: realloc(...)
+      - pattern: free(...)
+
+      # ========================
+      # string / format
+      # ========================
+      - pattern: sprintf(...)
+      - pattern: snprintf(...)
+      - pattern: printf(...)
+      - pattern: fprintf(...)
+      - pattern: sscanf(...)
+      - pattern: fscanf(...)
+
+      # ========================
+      # file I/O
+      # ========================
+      - pattern: fopen(...)
+      - pattern: open(...)
+      - pattern: read(...)
+      - pattern: write(...)
+      - pattern: fread(...)
+      - pattern: fwrite(...)
+      - pattern: close(...)
+
+      # ========================
+      # system / exec
+      # ========================
+      - pattern: system(...)
+      - pattern: exec(...)
+      - pattern: popen(...)
+
+      # ========================
+      # arithmetic (overflow 가능)
+      # ========================
+      - pattern: $X + $Y
+      - pattern: $X - $Y
+      - pattern: $X * $Y
+      - pattern: $X / $Y
+      - pattern: $X << $Y
+      - pattern: $X >> $Y
+
+      # ========================
+      # pointer / array
+      # ========================
+      - pattern: $ARR[$IDX]
+      - pattern: "*$PTR"
+      - pattern: $PTR->field
+
+      # ========================
+      # 조건 / 비교 (흐름 제어)
+      # ========================
+      - pattern: if ($COND)
+      - pattern: while ($COND)
+      - pattern: for (...)

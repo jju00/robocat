@@ -1,0 +1,651 @@
+"""
+Hybrid Retriever + GPT Top1 Selector + DTO Enrichment
+====================================
+Stage 1:
+- purpose           ↔ DenseRetriever (LangChain OpenAIEmbeddings)
+- function_summary  ↔ DenseRetriever (LangChain OpenAIEmbeddings)
+- full_code         ↔ BM25Retriever(code_before_change)
+- RRF로 세 결과를 결합하여 top 20 후보 검색
+
+Stage 2:
+- top 20 후보를 ChatOpenAI(gpt-4o-mini)에 전달
+- 가장 가능성 높은 취약점 1개 선정 후 DTO enrichment
+
+입력:
+- diff_retriever.json
+
+출력:
+- retriever_output.json (하나의 merged json 파일)
+"""
+
+import json
+import os
+import sys
+import argparse
+from pathlib import Path
+from typing import Optional, List, Dict, Tuple, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
+
+try:
+    from ...utils.bm25_retriever import BM25Retriever
+    from ...utils.dense_retriever import DenseRetriever
+    from ...utils.embedding_cache import EmbeddingCache
+    from ...dto.retriever_output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
+    from ...dto.memory_corruption_patterns import enrich_memory_corruption_result
+    from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+except ImportError:
+    _ROOT = Path(__file__).resolve().parents[3]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    from src.utils.bm25_retriever import BM25Retriever
+    from src.utils.dense_retriever import DenseRetriever
+    from src.utils.embedding_cache import EmbeddingCache
+    from src.dto.retriever_output_dto import RetrievalOutputDTO, TopVulnerabilityDTO
+    from src.dto.memory_corruption_patterns import enrich_memory_corruption_result
+    from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+
+
+# ─────────────────────────────────────────────────────────────
+# Global state
+# ─────────────────────────────────────────────────────────────
+GLOBAL_KNOWLEDGE_DATA: Optional[List[dict]] = None
+
+RETRIEVER_PURPOSE: Optional[DenseRetriever] = None
+RETRIEVER_FUNCTION: Optional[DenseRetriever] = None
+RETRIEVER_CODE_BEFORE: Optional[BM25Retriever] = None
+
+EMBEDDINGS_MODEL: Optional[OpenAIEmbeddings] = None
+CHAT_MODEL: Optional[ChatOpenAI] = None
+
+_ACTIVE_FIELDS: Dict[str, bool] = {
+    "purpose": False,
+    "function": False,
+    "code_before": False,
+}
+
+
+# ─────────────────────────────────────────────────────────────
+# Utils
+# ─────────────────────────────────────────────────────────────
+def log(msg: str):
+    print(msg, flush=True)
+
+
+def safe_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def safe_list_of_str(value: Any, limit: Optional[int] = None) -> List[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        items = [safe_text(v).strip() for v in value if safe_text(v).strip()]
+    else:
+        items = [safe_text(value).strip()] if safe_text(value).strip() else []
+
+    seen = set()
+    deduped: List[str] = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            deduped.append(item)
+
+    if limit is not None:
+        return deduped[:limit]
+    return deduped
+
+
+def build_output_dto(item_id: int, query_full_code: str, top_vulnerabilities: List[dict]) -> Dict[str, Any]:
+    dto_items: List[TopVulnerabilityDTO] = []
+
+    for vuln in top_vulnerabilities:
+        enriched = enrich_memory_corruption_result({
+            "name": safe_text(vuln.get("name")).strip(),
+            "reason": safe_text(vuln.get("reason")).strip(),
+            "supporting_cve_ids": safe_list_of_str(vuln.get("supporting_cve_ids"), limit=3),
+        })
+
+        dto_items.append(
+            TopVulnerabilityDTO(
+                name=safe_text(enriched.get("name")).strip(),
+                reason=safe_text(enriched.get("reason")).strip(),
+                supporting_cve_ids=safe_list_of_str(enriched.get("supporting_cve_ids"), limit=3),
+                representative_pattern=(safe_text(enriched.get("representative_pattern")).strip() or None),
+                memory_corruption_category=(safe_text(enriched.get("memory_corruption_category")).strip() or None),
+                cwe_ids=safe_list_of_str(enriched.get("cwe_ids")),
+                representative_code_examples=safe_list_of_str(enriched.get("representative_code_examples")),
+                common_indicators=safe_list_of_str(enriched.get("common_indicators")),
+            )
+        )
+
+    output = RetrievalOutputDTO(
+        id=int(item_id),
+        full_code=query_full_code,
+        top_vulnerabilities=dto_items,
+    )
+    return output.to_dict()
+
+
+# ─────────────────────────────────────────────────────────────
+# CLI
+# ─────────────────────────────────────────────────────────────
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--diff-path", type=str, required=True, help="Input diff JSON file")
+    p.add_argument("--knowledge-dir", type=str, required=True, help="Directory containing knowledge JSON files")
+    p.add_argument(
+        "--output-path",
+        type=str,
+        default="data/retriever_output.json",
+        help="Path to save merged results"
+    )
+    p.add_argument("--candidate-k", type=int, default=20, help="Number of retrieval candidates before GPT selection")
+    p.add_argument("--final-k", type=int, default=1, help="Number of final vulnerability types selected by GPT")
+    p.add_argument("--workers", type=int, default=8, help="Number of parallel workers")
+    p.add_argument("--limit", type=int, default=0, help="앞에서부터 N개 item만 처리 (0이면 전체)")
+    return p.parse_args()
+
+
+# ─────────────────────────────────────────────────────────────
+# Embedding cache helpers
+# ─────────────────────────────────────────────────────────────
+_EMB_DIM = 1536  # OpenAI text-embedding-ada-002 / text-embedding-3-small
+
+
+def _get_embeddings_with_cache(
+    texts: List[str],
+    cache: EmbeddingCache,
+    embeddings_model: OpenAIEmbeddings,
+) -> np.ndarray:
+    """캐시 히트/미스를 처리하고 (N, DIM) float32 numpy 배열을 반환한다.
+
+    Python List[List[float]] 누적을 피해 메모리를 절약한다.
+    캐시 미스분은 100개 단위 청크로 API 요청 후 캐시에 저장한다.
+    """
+    n = len(texts)
+    results = np.zeros((n, _EMB_DIM), dtype=np.float32)
+    to_fetch_indices: List[int] = []
+    to_fetch_texts: List[str] = []
+
+    # 배치 캐시 조회 (SQLite IN 쿼리 1회)
+    cached_list = cache.get_many(texts)
+    for i, cached in enumerate(cached_list):
+        if cached is not None:
+            results[i] = cached
+        else:
+            to_fetch_indices.append(i)
+            to_fetch_texts.append(texts[i])
+
+    if to_fetch_texts:
+        log(f"[EMB] cache miss {len(to_fetch_texts)}/{n} — fetching from API")
+        chunk_size = 100
+        total_chunks = (len(to_fetch_texts) - 1) // chunk_size + 1
+
+        for start in range(0, len(to_fetch_texts), chunk_size):
+            chunk_texts = to_fetch_texts[start:start + chunk_size]
+            chunk_indices = to_fetch_indices[start:start + chunk_size]
+            log(f"[EMB]   chunk {start // chunk_size + 1}/{total_chunks}")
+
+            new_embs: List[List[float]] = embeddings_model.embed_documents(chunk_texts)
+            for arr_idx, (text_idx, emb) in enumerate(zip(chunk_indices, new_embs)):
+                results[text_idx] = emb
+            cache.set_many(chunk_texts, new_embs)
+
+        log("[EMB] cache updated")
+    else:
+        log(f"[EMB] all {n} embeddings served from cache")
+
+    return results
+
+
+# ─────────────────────────────────────────────────────────────
+# Retriever builders
+# ─────────────────────────────────────────────────────────────
+def _build_bm25_retriever(corpus: List[str], name: str) -> Tuple[BM25Retriever, bool]:
+    log(f"[BUILD:BM25:{name}] corpus size = {len(corpus)}")
+    is_active = any(text.strip() for text in corpus)
+    log(f"[BUILD:BM25:{name}] active = {is_active}")
+
+    retriever = BM25Retriever()
+    retriever.set_corpus(corpus)
+    return retriever, is_active
+
+
+def _build_dense_retriever(
+    corpus: List[str],
+    name: str,
+    cache: EmbeddingCache,
+    embeddings_model: OpenAIEmbeddings
+) -> Tuple[DenseRetriever, bool]:
+    log(f"[BUILD:DENSE:{name}] corpus size = {len(corpus)}")
+    is_active = any(text.strip() for text in corpus)
+    log(f"[BUILD:DENSE:{name}] active = {is_active}")
+
+    if not is_active:
+        return DenseRetriever(), False
+
+    embeddings = _get_embeddings_with_cache(corpus, cache, embeddings_model)
+    retriever = DenseRetriever()
+    retriever.set_corpus(embeddings, corpus)
+    return retriever, True
+
+
+# ─────────────────────────────────────────────────────────────
+# Initialization
+# ─────────────────────────────────────────────────────────────
+def init_retriever(knowledge_dir: str):
+    global GLOBAL_KNOWLEDGE_DATA
+    global RETRIEVER_PURPOSE, RETRIEVER_FUNCTION, RETRIEVER_CODE_BEFORE
+    global EMBEDDINGS_MODEL, CHAT_MODEL, _ACTIVE_FIELDS
+
+    log("[INIT] init_retriever entered")
+
+    EMBEDDINGS_MODEL = OpenAIEmbeddings(
+        model="text-embedding-3-small"
+    )
+    CHAT_MODEL = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0
+    )
+
+    _ROOT = Path(__file__).resolve().parents[3]
+    cache_dir = _ROOT / "data" / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    embedding_cache = EmbeddingCache(str(cache_dir / "embeddings.json"))
+
+    GLOBAL_KNOWLEDGE_DATA = []
+    knowledge_dir_path = Path(knowledge_dir)
+
+    if not knowledge_dir_path.exists():
+        raise FileNotFoundError(f"knowledge_dir does not exist: {knowledge_dir_path}")
+
+    json_files = sorted(knowledge_dir_path.rglob("*.json"))
+    log(f"[INIT] knowledge files found = {len(json_files)}")
+
+    for idx, json_file in enumerate(json_files, start=1):
+        if idx % 10 == 0 or idx == len(json_files):
+            log(f"[INIT] loading ({idx}/{len(json_files)}): {json_file.name}")
+
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if isinstance(data, list):
+            GLOBAL_KNOWLEDGE_DATA.extend(data)
+        elif isinstance(data, dict):
+            GLOBAL_KNOWLEDGE_DATA.append(data)
+
+    log(f"[INIT] total knowledge items = {len(GLOBAL_KNOWLEDGE_DATA)}")
+
+    purpose_corpus = [safe_text(item.get("purpose")) for item in GLOBAL_KNOWLEDGE_DATA]
+    function_corpus = [
+        safe_text(item.get("function") or item.get("function_summary"))
+        for item in GLOBAL_KNOWLEDGE_DATA
+    ]
+    code_before_corpus = [
+        safe_text(item.get("code_before_change") or item.get("code"))
+        for item in GLOBAL_KNOWLEDGE_DATA
+    ]
+
+    log("[INIT] building PURPOSE dense retriever")
+    RETRIEVER_PURPOSE, _ACTIVE_FIELDS["purpose"] = _build_dense_retriever(
+        purpose_corpus, "purpose", embedding_cache, EMBEDDINGS_MODEL
+    )
+
+    log("[INIT] building FUNCTION dense retriever")
+    RETRIEVER_FUNCTION, _ACTIVE_FIELDS["function"] = _build_dense_retriever(
+        function_corpus, "function", embedding_cache, EMBEDDINGS_MODEL
+    )
+
+    log("[INIT] building CODE_BEFORE bm25 retriever")
+    RETRIEVER_CODE_BEFORE, _ACTIVE_FIELDS["code_before"] = _build_bm25_retriever(
+        code_before_corpus, "code_before"
+    )
+
+    log("[INIT] init_retriever done")
+
+
+# ─────────────────────────────────────────────────────────────
+# Stage 1: RRF
+# ─────────────────────────────────────────────────────────────
+def _compute_rrf_scores(
+    query_purpose: Optional[str],
+    query_function_summary: Optional[str],
+    query_full_code: Optional[str],
+    k: int = 60,
+) -> List[float]:
+    if GLOBAL_KNOWLEDGE_DATA is None:
+        raise ValueError("GLOBAL_KNOWLEDGE_DATA is not initialized.")
+
+    n = len(GLOBAL_KNOWLEDGE_DATA)
+    rrf_scores = [0.0] * n
+
+    field_configs = [
+        ("purpose", query_purpose, RETRIEVER_PURPOSE, "dense"),
+        ("function", query_function_summary, RETRIEVER_FUNCTION, "dense"),
+        ("code_before", query_full_code, RETRIEVER_CODE_BEFORE, "bm25"),
+    ]
+
+    for field_name, query_text, retriever, r_type in field_configs:
+        if not _ACTIVE_FIELDS[field_name]:
+            continue
+        if not query_text or not query_text.strip():
+            continue
+
+        log(f"[RANK] searching field={field_name} (type={r_type})")
+
+        if r_type == "dense":
+            if EMBEDDINGS_MODEL is None:
+                raise ValueError("EMBEDDINGS_MODEL is not initialized.")
+            query_emb = EMBEDDINGS_MODEL.embed_query(query_text)
+            sorted_idxs = retriever.search(query_emb, top_n=-1)  # type: ignore
+        else:
+            sorted_idxs = retriever.search(query_text, top_n=-1)  # type: ignore
+
+        log(f"[RANK] search done field={field_name}, returned={len(sorted_idxs)}")
+
+        for rank, idx in enumerate(sorted_idxs, start=1):
+            rrf_scores[idx] += 1.0 / (k + rank)
+
+    return rrf_scores
+
+
+def retrieve_top_k_candidates(
+    query_purpose: Optional[str],
+    query_function_summary: Optional[str],
+    query_full_code: Optional[str],
+    top_k: int,
+) -> List[dict]:
+    """
+    Stage 1:
+    - 전체 knowledge item에 대해 RRF 점수 계산
+    - CVE_id별 최고 점수 item 1개만 유지
+    - 상위 top_k개 후보 반환
+    """
+    if GLOBAL_KNOWLEDGE_DATA is None:
+        raise ValueError("GLOBAL_KNOWLEDGE_DATA is not initialized.")
+
+    rrf_scores = _compute_rrf_scores(
+        query_purpose=query_purpose,
+        query_function_summary=query_function_summary,
+        query_full_code=query_full_code,
+    )
+
+    sorted_indices = sorted(
+        range(len(GLOBAL_KNOWLEDGE_DATA)),
+        key=lambda i: rrf_scores[i],
+        reverse=True
+    )
+
+    seen_cves: Dict[str, Tuple[int, float]] = {}
+    for idx in sorted_indices:
+        item = GLOBAL_KNOWLEDGE_DATA[idx]
+        cve_id = safe_text(item.get("CVE_id") or item.get("cve_id") or f"NO_CVE_{idx}")
+        if cve_id not in seen_cves:
+            seen_cves[cve_id] = (idx, rrf_scores[idx])
+
+    top_cves = sorted(seen_cves.values(), key=lambda x: x[1], reverse=True)[:top_k]
+
+    results: List[dict] = []
+    for item_idx, score in top_cves:
+        item = GLOBAL_KNOWLEDGE_DATA[item_idx]
+        vb = item.get("vulnerability_behavior", {}) or {}
+
+        results.append({
+            "cve_id": safe_text(item.get("CVE_id") or item.get("cve_id")),
+            "rrf_score": score,
+            "purpose": safe_text(item.get("purpose")),
+            "function": safe_text(item.get("function") or item.get("function_summary")),
+            "vulnerability_cause_description": safe_text(
+                vb.get("vulnerability_cause_description")
+                or item.get("vulnerability_cause_description")
+            ),
+            "trigger_condition": safe_text(
+                vb.get("trigger_condition")
+                or item.get("trigger_condition")
+            ),
+            "specific_code_behavior_causing_vulnerability": safe_text(
+                vb.get("specific_code_behavior_causing_vulnerability")
+                or item.get("specific_code_behavior_causing_vulnerability")
+            ),
+            "solution_behavior": safe_text(
+                item.get("solution_behavior") or item.get("solution")
+            ),
+        })
+
+    return results
+
+
+# ─────────────────────────────────────────────────────────────
+# Stage 2: GPT selects top 1 + enriches with DTO/pattern dictionary
+# ─────────────────────────────────────────────────────────────
+def _build_candidate_summary(candidates: List[dict]) -> str:
+    lines: List[str] = []
+    for i, item in enumerate(candidates, start=1):
+        lines.append(
+            f"""[{i}]
+CVE_ID: {item.get("cve_id", "")}
+RRF_SCORE: {item.get("rrf_score", 0.0):.6f}
+PURPOSE: {item.get("purpose", "")}
+FUNCTION: {item.get("function", "")}
+CAUSE: {item.get("vulnerability_cause_description", "")}
+TRIGGER: {item.get("trigger_condition", "")}
+CODE_BEHAVIOR: {item.get("specific_code_behavior_causing_vulnerability", "")}
+SOLUTION: {item.get("solution_behavior", "")}
+""".strip()
+        )
+    return "\n\n".join(lines)
+
+
+def select_top_vulnerabilities_with_gpt(
+    query_purpose: str,
+    query_function_summary: str,
+    query_full_code: str,
+    candidates: List[dict],
+    final_k: int = 1,
+) -> List[dict]:
+    if CHAT_MODEL is None:
+        raise ValueError("CHAT_MODEL is not initialized.")
+
+    candidate_text = _build_candidate_summary(candidates)
+
+    system_prompt = (
+        "You are a security analysis assistant.\n"
+        "Your job is to read retrieved vulnerability candidates and identify the single most likely vulnerability TYPE.\n"
+        "Return ONLY valid JSON.\n"
+        "Do not include markdown fences.\n"
+    )
+
+    user_prompt = f"""
+Given the query information and the retrieved candidates, choose the single most likely vulnerability type.
+
+[Query]
+PURPOSE: {query_purpose}
+FUNCTION_SUMMARY: {query_function_summary}
+FULL_CODE:
+{query_full_code}
+
+[Retrieved Candidates]
+{candidate_text}
+
+Return JSON in this exact schema:
+{{
+  "top_vulnerabilities": [
+    {{
+      "name": "vulnerability type name",
+      "reason": "why this type is likely based on repeated evidence from the candidates",
+      "supporting_cve_ids": ["CVE-...","CVE-..."]
+    }}
+  ]
+}}
+
+Rules:
+- Return exactly {final_k} items.
+- Focus on vulnerability TYPES, not specific CVEs.
+- Return exactly 1 item even if evidence is weak.
+- Focus on the single best vulnerability TYPE, not specific CVEs.
+- Use concise canonical names like "Buffer Overflow", "Use-After-Free", "Null Pointer Dereference", "Integer Overflow", "Format String Bug".
+- supporting_cve_ids must contain at most 3 of the most relevant candidate CVE IDs.
+- Return JSON only.
+""".strip()
+
+    response = CHAT_MODEL.invoke([
+        ("system", system_prompt),
+        ("human", user_prompt),
+    ])
+
+    content = response.content if hasattr(response, "content") else str(response)
+    content = content.strip()
+
+    try:
+        parsed = json.loads(content)
+        top_vulns = parsed.get("top_vulnerabilities", [])
+        if not isinstance(top_vulns, list):
+            raise ValueError("top_vulnerabilities is not a list")
+        cleaned = []
+        for item in top_vulns[:1]:
+            cleaned.append({
+                "name": safe_text(item.get("name")).strip(),
+                "reason": safe_text(item.get("reason")).strip(),
+                "supporting_cve_ids": safe_list_of_str(item.get("supporting_cve_ids"), limit=3),
+            })
+
+        if not cleaned:
+            cleaned.append({
+                "name": "",
+                "reason": "GPT output parsing fallback",
+                "supporting_cve_ids": [],
+            })
+
+        return cleaned
+
+    except Exception as e:
+        log(f"[GPT] parse failed: {e}")
+        fallback = []
+        for item in candidates[:1]:
+            fallback.append({
+                "name": safe_text(item.get("vulnerability_cause_description", "")[:80]).strip(),
+                "reason": "Fallback due to GPT JSON parse failure",
+                "supporting_cve_ids": safe_list_of_str(item.get("cve_id"), limit=3),
+            })
+        if not fallback:
+            fallback.append({
+                "name": "",
+                "reason": "Fallback due to empty candidates",
+                "supporting_cve_ids": [],
+            })
+        return fallback
+
+
+# ─────────────────────────────────────────────────────────────
+# Per-item processing
+# ─────────────────────────────────────────────────────────────
+def process_function(item: dict, args) -> Optional[dict]:
+    item_id = item.get("id")
+    if item_id is None:
+        log("[ITEM] skipped item without id")
+        return None
+
+    log(f"[ITEM {item_id:04d}] start")
+
+    query_purpose = safe_text(item.get("purpose"))
+    query_function_summary = safe_text(item.get("function_summary") or item.get("function"))
+    query_full_code = safe_text(item.get("full_code") or item.get("code"))
+
+    candidates = retrieve_top_k_candidates(
+        query_purpose=query_purpose,
+        query_function_summary=query_function_summary,
+        query_full_code=query_full_code,
+        top_k=args.candidate_k,
+    )
+    log(f"[ITEM {item_id:04d}] candidate count = {len(candidates)}")
+
+    top_vulnerabilities = select_top_vulnerabilities_with_gpt(
+        query_purpose=query_purpose,
+        query_function_summary=query_function_summary,
+        query_full_code=query_full_code,
+        candidates=candidates,
+        final_k=args.final_k,
+    )
+    log(f"[ITEM {item_id:04d}] final top vulnerabilities = {len(top_vulnerabilities)}")
+
+    return build_output_dto(
+        item_id=item_id,
+        query_full_code=query_full_code,
+        top_vulnerabilities=top_vulnerabilities,
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────
+def main():
+    args = parse_args()
+    log("[MAIN] script start")
+
+    _ROOT = Path(__file__).resolve().parents[3]
+    log(f"[MAIN] root = {_ROOT}")
+
+    knowledge_dir = str(_ROOT / args.knowledge_dir) if not Path(args.knowledge_dir).is_absolute() else args.knowledge_dir
+    input_path = str(_ROOT / args.diff_path) if not Path(args.diff_path).is_absolute() else args.diff_path
+    output_path = str(_ROOT / args.output_path) if not Path(args.output_path).is_absolute() else args.output_path
+
+    log(f"[MAIN] input_path = {input_path}")
+    log(f"[MAIN] knowledge_dir = {knowledge_dir}")
+    log(f"[MAIN] output_path = {output_path}")
+    log(f"[MAIN] candidate_k = {args.candidate_k}, final_k = {args.final_k}, workers = {args.workers}, limit = {args.limit}")
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    log("[MAIN] init_retriever start")
+    init_retriever(knowledge_dir)
+    log("[MAIN] init_retriever finished")
+
+    log("[MAIN] loading diff input")
+    with open(input_path, "r", encoding="utf-8") as f:
+        test_data = json.load(f)
+
+    log(f"[MAIN] diff items loaded = {len(test_data)}")
+
+    if args.limit and args.limit > 0:
+        test_data = test_data[:args.limit]
+        log(f"[MAIN] limited diff items = {len(test_data)}")
+
+    out = []
+
+    log("[MAIN] ThreadPoolExecutor start")
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = {
+            executor.submit(process_function, item, args): item
+            for item in test_data
+        }
+        log(f"[MAIN] futures submitted = {len(futures)}")
+
+        for future in as_completed(futures):
+            try:
+                res = future.result()
+                if res is not None:
+                    out.append(res)
+                    log(f"[MAIN] collected result count = {len(out)}")
+            except Exception as e:
+                item = futures[future]
+                item_id = item.get("id", "UNKNOWN")
+                log(f"[ERROR] item_id={item_id} failed: {e}")
+
+    out.sort(key=lambda x: x["id"])
+
+    log(f"[MAIN] writing merged output count = {len(out)}")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=4, ensure_ascii=False)
+
+    log("[MAIN] done")
+
+
+if __name__ == "__main__":
+    main()
