@@ -1,0 +1,1351 @@
+[
+    {
+        "id": 1,
+        "full_code": "ExternalEntityRefHandler(XML_Parser parser, const XML_Char *context,\n                         const XML_Char *base, const XML_Char *systemId,\n                         const XML_Char *publicId) {\n  int rc = XML_STATUS_ERROR;\n  TouchString(context);\n  TouchString(base);\n  TouchString(systemId);\n  TouchString(publicId);\n\n  if (g_external_entity) {\n    XML_Parser ext_parser\n        = XML_ExternalEntityParserCreate(parser, context, g_encoding);\n    if (ext_parser != NULL) {\n      rc = Parse(ext_parser, g_external_entity, g_external_entity_size, 1);\n      XML_ParserFree(ext_parser);\n    }\n  }\n\n  return rc;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "XML External Entity (XXE)",
+                "reason": "The candidates frequently involve improper handling of external entities in XML parsing, leading to potential unauthorized access or resource exposure.",
+                "supporting_cve_ids": [
+                    "CVE-2020-26247",
+                    "CVE-2023-52426",
+                    "CVE-2023-2837"
+                ],
+                "representative_pattern": null,
+                "memory_corruption_category": null,
+                "cwe_ids": [],
+                "representative_code_examples": [],
+                "common_indicators": []
+            }
+        ]
+    },
+    {
+        "id": 2,
+        "full_code": "LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\n  XML_Parser parentParser = XML_ParserCreate(xstr(ENCODING_FOR_FUZZING));\n  assert(parentParser);\n  ParseOneInput(parentParser, data, size);\n  // not freed yet, but used later and freed then\n\n  XML_Parser namespaceParser = XML_ParserCreateNS(NULL, '!');\n  assert(namespaceParser);\n  ParseOneInput(namespaceParser, data, size);\n  XML_ParserFree(namespaceParser);\n\n  XML_Parser externalEntityParser\n      = XML_ExternalEntityParserCreate(parentParser, \"e1\", NULL);\n  if (externalEntityParser != NULL) {\n    ParseOneInput(externalEntityParser, data, size);\n    XML_ParserFree(externalEntityParser);\n  }\n\n  XML_Parser externalDtdParser\n      = XML_ExternalEntityParserCreate(parentParser, NULL, NULL);\n  if (externalDtdParser != NULL) {\n    ParseOneInput(externalDtdParser, data, size);\n    XML_ParserFree(externalDtdParser);\n  }\n\n  // finally frees this parser which served as parent\n  XML_ParserFree(parentParser);\n  return 0;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "XML External Entity (XXE)",
+                "reason": "The candidates frequently highlight issues related to improper handling of external entities in XML parsing, leading to potential security risks such as unauthorized access to internal resources.",
+                "supporting_cve_ids": [
+                    "CVE-2020-26247",
+                    "CVE-2023-2837",
+                    "CVE-2022-29181"
+                ],
+                "representative_pattern": null,
+                "memory_corruption_category": null,
+                "cwe_ids": [],
+                "representative_code_examples": [],
+                "common_indicators": []
+            }
+        ]
+    },
+    {
+        "id": 3,
+        "full_code": "ParseOneInput(XML_Parser p, const uint8_t *data, size_t size) {\n  // Set the hash salt using siphash to generate a deterministic hash.\n  struct sipkey *key = sip_keyof(hash_key);\n  XML_SetHashSalt(p, (unsigned long)siphash24(data, size, key));\n  (void)sip24_valid;\n\n  XML_SetUserData(p, p);\n  XML_SetElementHandler(p, start, end);\n  XML_SetCharacterDataHandler(p, may_stop_character_handler);\n  assert(size <= INT_MAX);\n  XML_Parse(p, (const XML_Char *)data, (int)size, 0);\n  if (XML_Parse(p, (const XML_Char *)data, (int)size, 1) == XML_STATUS_ERROR) {\n    XML_ErrorString(XML_GetErrorCode(p));\n  }\n  XML_GetCurrentLineNumber(p);\n  if (size % 2) {\n    XML_ParserReset(p, NULL);\n  }\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "XML External Entity (XXE)",
+                "reason": "Multiple candidates indicate vulnerabilities related to improper handling of XML input, allowing for external entity references that can lead to unauthorized access or resource consumption.",
+                "supporting_cve_ids": [
+                    "CVE-2022-29181",
+                    "CVE-2015-10082",
+                    "CVE-2020-26247"
+                ],
+                "representative_pattern": null,
+                "memory_corruption_category": null,
+                "cwe_ids": [],
+                "representative_code_examples": [],
+                "common_indicators": []
+            }
+        ]
+    },
+    {
+        "id": 4,
+        "full_code": "LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\n  if (size == 0)\n    return 0;\n\n  XML_Parser parentParser = XML_ParserCreate(xstr(ENCODING_FOR_FUZZING));\n  assert(parentParser);\n  ParseOneInput(parentParser, data, size);\n  // not freed yet, but used later and freed then\n\n  XML_Parser namespaceParser = XML_ParserCreateNS(NULL, '!');\n  assert(namespaceParser);\n  ParseOneInput(namespaceParser, data, size);\n  XML_ParserFree(namespaceParser);\n\n  XML_Parser externalEntityParser\n      = XML_ExternalEntityParserCreate(parentParser, \"e1\", NULL);\n  if (externalEntityParser != NULL) {\n    ParseOneInput(externalEntityParser, data, size);\n    XML_ParserFree(externalEntityParser);\n  }\n\n  XML_Parser externalDtdParser\n      = XML_ExternalEntityParserCreate(parentParser, NULL, NULL);\n  if (externalDtdParser != NULL) {\n    ParseOneInput(externalDtdParser, data, size);\n    XML_ParserFree(externalDtdParser);\n  }\n\n  // finally frees this parser which served as parent\n  XML_ParserFree(parentParser);\n  return 0;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "XML External Entity Injection (XXE)",
+                "reason": "The function processes XML data and involves multiple parsers, which can lead to vulnerabilities related to external entity processing, as evidenced by multiple candidates that highlight issues with handling external entities.",
+                "supporting_cve_ids": [
+                    "CVE-2020-26247",
+                    "CVE-2019-15903",
+                    "CVE-2012-0037"
+                ],
+                "representative_pattern": "신뢰할 수 없는 입력이 해석기나 명령 실행 맥락에 직접 삽입되어 구조를 바꾸는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-74"
+                ],
+                "representative_code_examples": [
+                    "interpreter.run(user_input)",
+                    "command = prefix + user_input"
+                ],
+                "common_indicators": [
+                    "해석기 입력 직접 결합",
+                    "명령 구성 문자열 조합",
+                    "입력 검증과 인코딩 부족"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 5,
+        "full_code": "ParseOneInput(XML_Parser p, const uint8_t *data, size_t size) {\n  // Set the hash salt using siphash to generate a deterministic hash.\n  struct sipkey *key = sip_keyof(hash_key);\n  XML_SetHashSalt(p, (unsigned long)siphash24(data, size, key));\n  (void)sip24_valid;\n\n  XML_SetUserData(p, p);\n  XML_SetElementHandler(p, start, end);\n  XML_SetCharacterDataHandler(p, may_stop_character_handler);\n  assert(size <= INT_MAX);\n  void *buf = XML_GetBuffer(p, (int)size);\n  assert(buf);\n  memcpy(buf, data, size);\n  XML_ParseBuffer(p, (int)size, 0);\n  buf = XML_GetBuffer(p, (int)size);\n  if (buf == NULL) {\n    return;\n  }\n  memcpy(buf, data, size);\n  if (XML_ParseBuffer(p, (int)size, 1) == XML_STATUS_ERROR) {\n    XML_ErrorString(XML_GetErrorCode(p));\n  }\n  XML_GetCurrentLineNumber(p);\n  if (size % 2) {\n    XML_ParserReset(p, NULL);\n  }\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate issues with memory allocation and copying data without proper bounds checking, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2023-52426",
+                    "CVE-2022-29181",
+                    "CVE-2021-43114"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 6,
+        "full_code": "   memory area which stores the name.  During the XML_Parse()/\n   XML_ParseBuffer() when the element is open, the memory for the 'raw'\n   version of the name (in the document encoding) is shared with the\n   document buffer.  If the element is open across calls to\n   XML_Parse()/XML_ParseBuffer(), the buffer is re-allocated to\n   contain the 'raw' name as well.\n\n   A parser reuses these structures, maintaining a list of allocated\n   TAG objects in a free list.\n*/\ntypedef struct tag {\n  struct tag *parent;  /* parent of this element */\n  const char *rawName; /* tagName in the original encoding */\n  int rawNameLength;\n  TAG_NAME name; /* tagName in the API encoding */\n  union {\n    char *raw;     /* for byte-level access (rawName storage) */\n    XML_Char *str; /* for character-level access (converted name) */\n  } buf;           /* buffer for name components */\n  char *bufEnd;    /* end of the buffer */\n  BINDING *bindings;\n} TAG;\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input lengths and memory allocation, leading to potential buffer overflows when copying data into fixed-size buffers.",
+                "supporting_cve_ids": [
+                    "CVE-2019-15903",
+                    "CVE-2020-26247",
+                    "CVE-2015-6031"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 7,
+        "full_code": "XML_ParserCreate(const XML_Char *encodingName) {\n  return XML_ParserCreate_MM(encodingName, NULL, NULL);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "XML External Entity (XXE)",
+                "reason": "Multiple candidates indicate vulnerabilities related to improper handling of external entities in XML parsing, leading to unauthorized access or resource exposure.",
+                "supporting_cve_ids": [
+                    "CVE-2020-26247",
+                    "CVE-2022-29181",
+                    "CVE-2015-10082"
+                ],
+                "representative_pattern": null,
+                "memory_corruption_category": null,
+                "cwe_ids": [],
+                "representative_code_examples": [],
+                "common_indicators": []
+            }
+        ]
+    },
+    {
+        "id": 8,
+        "full_code": "XML_ParserCreate_MM(const XML_Char *encodingName,\n                    const XML_Memory_Handling_Suite *memsuite,\n                    const XML_Char *nameSep) {\n  return parserCreate(encodingName, memsuite, nameSep, NULL, NULL);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "XML External Entity (XXE)",
+                "reason": "Multiple candidates indicate vulnerabilities related to improper handling of external entities in XML parsing, leading to potential unauthorized access to sensitive data.",
+                "supporting_cve_ids": [
+                    "CVE-2020-21572",
+                    "CVE-2018-1000085",
+                    "CVE-2023-52426"
+                ],
+                "representative_pattern": null,
+                "memory_corruption_category": null,
+                "cwe_ids": [],
+                "representative_code_examples": [],
+                "common_indicators": []
+            }
+        ]
+    },
+    {
+        "id": 9,
+        "full_code": "#  if defined(XML_TESTING)\nvoid\n#  else\nstatic void\n#  endif\nexpat_free(XML_Parser parser, void *ptr, int sourceLine) {\n  assert(parser != NULL);\n\n  if (ptr == NULL) {\n    return;\n  }\n\n  const XML_Parser rootParser = getRootParserOf(parser, NULL);\n  assert(rootParser->m_parentParser == NULL);\n\n  // Extract size (to the eyes of malloc_fcn/realloc_fcn) and\n  // the original pointer returned by malloc/realloc\n  void *const mallocedPtr = (char *)ptr - EXPAT_MALLOC_PADDING - sizeof(size_t);\n  const size_t bytesAllocated\n      = sizeof(size_t) + EXPAT_MALLOC_PADDING + *(size_t *)mallocedPtr;\n\n  // Update accounting\n  assert(rootParser->m_alloc_tracker.bytesAllocated >= bytesAllocated);\n  rootParser->m_alloc_tracker.bytesAllocated -= bytesAllocated;\n\n  // Report as needed\n  if (rootParser->m_alloc_tracker.debugLevel >= 2) {\n    expat_heap_stat(rootParser, '-', bytesAllocated,\n                    rootParser->m_alloc_tracker.bytesAllocated,\n                    rootParser->m_alloc_tracker.peakBytesAllocated, sourceLine);\n  }\n\n  // NOTE: This may be freeing rootParser, so freeing has to come last\n  parser->m_mem.free_fcn(mallocedPtr);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Use-After-Free",
+                "reason": "Multiple candidates indicate improper management of memory leading to use-after-free vulnerabilities, where memory is accessed after it has been freed.",
+                "supporting_cve_ids": [
+                    "CVE-2022-0156",
+                    "CVE-2022-2889",
+                    "CVE-2018-20786"
+                ],
+                "representative_pattern": "해제된 메모리를 가리키는 포인터를 이후에 다시 읽거나 쓰거나 호출에 사용하는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-416"
+                ],
+                "representative_code_examples": [
+                    "free(ptr); printf(\"%s\", ptr);",
+                    "free(obj); obj->field = 1;",
+                    "delete p; p->run();"
+                ],
+                "common_indicators": [
+                    "free/delete 이후 동일 포인터 사용",
+                    "해제 후 NULL 처리 없음",
+                    "소유권 관리 불명확"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 10,
+        "full_code": "expat_heap_increase_tolerable(XML_Parser rootParser, XmlBigCount increase,\n                              int sourceLine) {\n  assert(rootParser != NULL);\n  assert(increase > 0);\n\n  XmlBigCount newTotal = 0;\n  bool tolerable = true;\n\n  // Detect integer overflow\n  if ((XmlBigCount)-1 - rootParser->m_alloc_tracker.bytesAllocated < increase) {\n    tolerable = false;\n  } else {\n    newTotal = rootParser->m_alloc_tracker.bytesAllocated + increase;\n\n    if (newTotal >= rootParser->m_alloc_tracker.activationThresholdBytes) {\n      assert(newTotal > 0);\n      // NOTE: This can be +infinity when dividing by zero but not -nan\n      const float amplification\n          = (float)newTotal / (float)rootParser->m_accounting.countBytesDirect;\n      if (amplification\n          > rootParser->m_alloc_tracker.maximumAmplificationFactor) {\n        tolerable = false;\n      }\n    }\n  }\n\n  if (! tolerable && (rootParser->m_alloc_tracker.debugLevel >= 1)) {\n    expat_heap_stat(rootParser, '+', increase, newTotal, newTotal, sourceLine);\n  }\n\n  return tolerable;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Integer Overflow",
+                "reason": "The function's purpose includes detecting potential integer overflow, and multiple candidates highlight improper handling of integer overflow during memory allocation calculations, leading to vulnerabilities.",
+                "supporting_cve_ids": [
+                    "CVE-2012-2673",
+                    "CVE-2015-8865",
+                    "CVE-2017-6308"
+                ],
+                "representative_pattern": "정수 계산 결과가 표현 범위를 넘어 크기 계산, 인덱스 계산, 할당 크기 산정이 잘못되는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-190"
+                ],
+                "representative_code_examples": [
+                    "size_t total = count * elem_size; char *p = malloc(total);",
+                    "int len = a + b; char *buf = malloc(len);"
+                ],
+                "common_indicators": [
+                    "할당 크기 계산식",
+                    "곱셈/덧셈 후 범위 검사 없음",
+                    "signed/unsigned 혼용"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 11,
+        "full_code": "#  define REALLOC(parser, p, s) (expat_realloc((parser), (p), (s), __LINE__))\n#  define FREE(parser, p) (expat_free((parser), (p), __LINE__))\n#else\n#  define MALLOC(parser, s) (parser->m_mem.malloc_fcn((s)))\n#  define REALLOC(parser, p, s) (parser->m_mem.realloc_fcn((p), (s)))\n#  define FREE(parser, p) (parser->m_mem.free_fcn((p)))\n#endif\n\n#if XML_GE == 1\nstatic void\nexpat_heap_stat(XML_Parser rootParser, char operator, XmlBigCount absDiff,\n                XmlBigCount newTotal, XmlBigCount peakTotal, int sourceLine) {\n  // NOTE: This can be +infinity or -nan\n  const float amplification\n      = (float)newTotal / (float)rootParser->m_accounting.countBytesDirect;\n  fprintf(\n      stderr,\n      \"expat: Allocations(%p): Direct \" EXPAT_FMT_ULL(\"10\") \", allocated %c\" EXPAT_FMT_ULL(\n          \"10\") \" to \" EXPAT_FMT_ULL(\"10\") \" (\" EXPAT_FMT_ULL(\"10\") \" peak), amplification %8.2f (xmlparse.c:%d)\\n\",\n      (void *)rootParser, rootParser->m_accounting.countBytesDirect, operator,\n      absDiff, newTotal, peakTotal, (double)amplification, sourceLine);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Integer Overflow",
+                "reason": "Multiple candidates indicate improper handling of integer calculations leading to potential overflows during memory allocation, which can result in insufficient memory being allocated.",
+                "supporting_cve_ids": [
+                    "CVE-2012-2674",
+                    "CVE-2012-2673",
+                    "CVE-2016-9262"
+                ],
+                "representative_pattern": "정수 계산 결과가 표현 범위를 넘어 크기 계산, 인덱스 계산, 할당 크기 산정이 잘못되는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-190"
+                ],
+                "representative_code_examples": [
+                    "size_t total = count * elem_size; char *p = malloc(total);",
+                    "int len = a + b; char *buf = malloc(len);"
+                ],
+                "common_indicators": [
+                    "할당 크기 계산식",
+                    "곱셈/덧셈 후 범위 검사 없음",
+                    "signed/unsigned 혼용"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 12,
+        "full_code": "#  if defined(XML_TESTING)\nvoid *\n#  else\nstatic void *\n#  endif\nexpat_malloc(XML_Parser parser, size_t size, int sourceLine) {\n  // Detect integer overflow\n  if (SIZE_MAX - size < sizeof(size_t) + EXPAT_MALLOC_PADDING) {\n    return NULL;\n  }\n\n  const XML_Parser rootParser = getRootParserOf(parser, NULL);\n  assert(rootParser->m_parentParser == NULL);\n\n  const size_t bytesToAllocate = sizeof(size_t) + EXPAT_MALLOC_PADDING + size;\n\n  if ((XmlBigCount)-1 - rootParser->m_alloc_tracker.bytesAllocated\n      < bytesToAllocate) {\n    return NULL; // i.e. signal integer overflow as out-of-memory\n  }\n\n  if (! expat_heap_increase_tolerable(rootParser, bytesToAllocate,\n                                      sourceLine)) {\n    return NULL; // i.e. signal violation as out-of-memory\n  }\n\n  // Actually allocate\n  void *const mallocedPtr = parser->m_mem.malloc_fcn(bytesToAllocate);\n\n  if (mallocedPtr == NULL) {\n    return NULL;\n  }\n\n  // Update in-block recorded size\n  *(size_t *)mallocedPtr = size;\n\n  // Update accounting\n  rootParser->m_alloc_tracker.bytesAllocated += bytesToAllocate;\n\n  // Report as needed\n  if (rootParser->m_alloc_tracker.debugLevel >= 2) {\n    if (rootParser->m_alloc_tracker.bytesAllocated\n        > rootParser->m_alloc_tracker.peakBytesAllocated) {\n      rootParser->m_alloc_tracker.peakBytesAllocated\n          = rootParser->m_alloc_tracker.bytesAllocated;\n    }\n    expat_heap_stat(rootParser, '+', bytesToAllocate,\n                    rootParser->m_alloc_tracker.bytesAllocated,\n                    rootParser->m_alloc_tracker.peakBytesAllocated, sourceLine);\n  }\n\n  return (char *)mallocedPtr + sizeof(size_t) + EXPAT_MALLOC_PADDING;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Integer Overflow",
+                "reason": "The candidates repeatedly highlight issues related to improper handling of integer overflow during memory allocation calculations, leading to potential vulnerabilities.",
+                "supporting_cve_ids": [
+                    "CVE-2012-2673",
+                    "CVE-2012-2674",
+                    "CVE-2012-2675"
+                ],
+                "representative_pattern": "정수 계산 결과가 표현 범위를 넘어 크기 계산, 인덱스 계산, 할당 크기 산정이 잘못되는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-190"
+                ],
+                "representative_code_examples": [
+                    "size_t total = count * elem_size; char *p = malloc(total);",
+                    "int len = a + b; char *buf = malloc(len);"
+                ],
+                "common_indicators": [
+                    "할당 크기 계산식",
+                    "곱셈/덧셈 후 범위 검사 없음",
+                    "signed/unsigned 혼용"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 13,
+        "full_code": "#  if defined(XML_TESTING)\nvoid *\n#  else\nstatic void *\n#  endif\nexpat_realloc(XML_Parser parser, void *ptr, size_t size, int sourceLine) {\n  assert(parser != NULL);\n\n  if (ptr == NULL) {\n    return expat_malloc(parser, size, sourceLine);\n  }\n\n  if (size == 0) {\n    expat_free(parser, ptr, sourceLine);\n    return NULL;\n  }\n\n  const XML_Parser rootParser = getRootParserOf(parser, NULL);\n  assert(rootParser->m_parentParser == NULL);\n\n  // Extract original size (to the eyes of the caller) and the original\n  // pointer returned by malloc/realloc\n  void *mallocedPtr = (char *)ptr - EXPAT_MALLOC_PADDING - sizeof(size_t);\n  const size_t prevSize = *(size_t *)mallocedPtr;\n\n  // Classify upcoming change\n  const bool isIncrease = (size > prevSize);\n  const size_t absDiff\n      = (size > prevSize) ? (size - prevSize) : (prevSize - size);\n\n  // Ask for permission from accounting\n  if (isIncrease) {\n    if (! expat_heap_increase_tolerable(rootParser, absDiff, sourceLine)) {\n      return NULL; // i.e. signal violation as out-of-memory\n    }\n  }\n\n  // NOTE: Integer overflow detection has already been done for us\n  //       by expat_heap_increase_tolerable(..) above\n  assert(SIZE_MAX - sizeof(size_t) - EXPAT_MALLOC_PADDING >= size);\n\n  // Actually allocate\n  mallocedPtr = parser->m_mem.realloc_fcn(\n      mallocedPtr, sizeof(size_t) + EXPAT_MALLOC_PADDING + size);\n\n  if (mallocedPtr == NULL) {\n    return NULL;\n  }\n\n  // Update accounting\n  if (isIncrease) {\n    assert((XmlBigCount)-1 - rootParser->m_alloc_tracker.bytesAllocated\n           >= absDiff);\n    rootParser->m_alloc_tracker.bytesAllocated += absDiff;\n  } else { // i.e. decrease\n    assert(rootParser->m_alloc_tracker.bytesAllocated >= absDiff);\n    rootParser->m_alloc_tracker.bytesAllocated -= absDiff;\n  }\n\n  // Report as needed\n  if (rootParser->m_alloc_tracker.debugLevel >= 2) {\n    if (rootParser->m_alloc_tracker.bytesAllocated\n        > rootParser->m_alloc_tracker.peakBytesAllocated) {\n      rootParser->m_alloc_tracker.peakBytesAllocated\n          = rootParser->m_alloc_tracker.bytesAllocated;\n    }\n    expat_heap_stat(rootParser, isIncrease ? '+' : '-', absDiff,\n                    rootParser->m_alloc_tracker.bytesAllocated,\n                    rootParser->m_alloc_tracker.peakBytesAllocated, sourceLine);\n  }\n\n  // Update in-block recorded size\n  *(size_t *)mallocedPtr = size;\n\n  return (char *)mallocedPtr + sizeof(size_t) + EXPAT_MALLOC_PADDING;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Integer Overflow",
+                "reason": "Multiple candidates indicate improper handling of integer overflow during memory allocation calculations, leading to potential vulnerabilities.",
+                "supporting_cve_ids": [
+                    "CVE-2012-2673",
+                    "CVE-2017-6308",
+                    "CVE-2022-3299"
+                ],
+                "representative_pattern": "정수 계산 결과가 표현 범위를 넘어 크기 계산, 인덱스 계산, 할당 크기 산정이 잘못되는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-190"
+                ],
+                "representative_code_examples": [
+                    "size_t total = count * elem_size; char *p = malloc(total);",
+                    "int len = a + b; char *buf = malloc(len);"
+                ],
+                "common_indicators": [
+                    "할당 크기 계산식",
+                    "곱셈/덧셈 후 범위 검사 없음",
+                    "signed/unsigned 혼용"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 14,
+        "full_code": "generate_hash_secret_salt(XML_Parser parser) {\n  unsigned long entropy;\n  (void)parser;\n\n  /* \"Failproof\" high quality providers: */\n#if defined(HAVE_ARC4RANDOM_BUF)\n  arc4random_buf(&entropy, sizeof(entropy));\n  return ENTROPY_DEBUG(\"arc4random_buf\", entropy);\n#elif defined(HAVE_ARC4RANDOM)\n  writeRandomBytes_arc4random((void *)&entropy, sizeof(entropy));\n  return ENTROPY_DEBUG(\"arc4random\", entropy);\n#else\n  /* Try high quality providers first .. */\n#  ifdef _WIN32\n  if (writeRandomBytes_rand_s((void *)&entropy, sizeof(entropy))) {\n    return ENTROPY_DEBUG(\"rand_s\", entropy);\n  }\n#  elif defined(HAVE_GETRANDOM) || defined(HAVE_SYSCALL_GETRANDOM)\n  if (writeRandomBytes_getrandom_nonblock((void *)&entropy, sizeof(entropy))) {\n    return ENTROPY_DEBUG(\"getrandom\", entropy);\n  }\n#  endif\n#  if ! defined(_WIN32) && defined(XML_DEV_URANDOM)\n  if (writeRandomBytes_dev_urandom((void *)&entropy, sizeof(entropy))) {\n    return ENTROPY_DEBUG(\"/dev/urandom\", entropy);\n  }\n#  endif /* ! defined(_WIN32) && defined(XML_DEV_URANDOM) */\n  /* .. and self-made low quality for backup: */\n\n  entropy = gather_time_entropy();\n#  if ! defined(__wasi__)\n  /* Process ID is 0 bits entropy if attacker has local access */\n  entropy ^= getpid();\n#  endif\n\n  /* Factors are 2^31-1 and 2^61-1 (Mersenne primes M31 and M61) */\n  if (sizeof(unsigned long) == 4) {\n    return ENTROPY_DEBUG(\"fallback(4)\", entropy * 2147483647);\n  } else {\n    return ENTROPY_DEBUG(\"fallback(8)\",\n                         entropy * (unsigned long)2305843009213693951ULL);\n  }\n#endif\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input lengths and buffer sizes, leading to potential out-of-bounds writes.",
+                "supporting_cve_ids": [
+                    "CVE-2020-1921",
+                    "CVE-2020-1918",
+                    "CVE-2020-1916"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 15,
+        "full_code": "get_hash_secret_salt(XML_Parser parser) {\n  const XML_Parser rootParser = getRootParserOf(parser, NULL);\n  assert(! rootParser->m_parentParser);\n\n  return rootParser->m_hash_secret_salt;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input lengths and buffer sizes, leading to potential out-of-bounds writes and memory corruption.",
+                "supporting_cve_ids": [
+                    "CVE-2020-1918",
+                    "CVE-2020-1919",
+                    "CVE-2021-43114"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 16,
+        "full_code": "#if ! defined(HAVE_ARC4RANDOM_BUF) && ! defined(HAVE_ARC4RANDOM)\n\n#  if defined(HAVE_GETRANDOM) || defined(HAVE_SYSCALL_GETRANDOM)\n\n/* Obtain entropy on Linux 3.17+ */\nstatic int\nwriteRandomBytes_getrandom_nonblock(void *target, size_t count) {\n  int success = 0; /* full count bytes written? */\n  size_t bytesWrittenTotal = 0;\n  const unsigned int getrandomFlags = GRND_NONBLOCK;\n\n  do {\n    void *const currentTarget = (void *)((char *)target + bytesWrittenTotal);\n    const size_t bytesToWrite = count - bytesWrittenTotal;\n\n    assert(bytesToWrite <= INT_MAX);\n\n    const int bytesWrittenMore =\n#    if defined(HAVE_GETRANDOM)\n        (int)getrandom(currentTarget, bytesToWrite, getrandomFlags);\n#    else\n        (int)syscall(SYS_getrandom, currentTarget, bytesToWrite,\n                     getrandomFlags);\n#    endif\n\n    if (bytesWrittenMore > 0) {\n      bytesWrittenTotal += bytesWrittenMore;\n      if (bytesWrittenTotal >= count)\n        success = 1;\n    }\n  } while (! success && (errno == EINTR));\n\n  return success;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Integer Overflow",
+                "reason": "Multiple candidates indicate vulnerabilities arising from improper handling of integer types, leading to potential overflows during memory allocation and size calculations.",
+                "supporting_cve_ids": [
+                    "CVE-2023-36326",
+                    "CVE-2017-1000380",
+                    "CVE-2012-2673"
+                ],
+                "representative_pattern": "정수 계산 결과가 표현 범위를 넘어 크기 계산, 인덱스 계산, 할당 크기 산정이 잘못되는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-190"
+                ],
+                "representative_code_examples": [
+                    "size_t total = count * elem_size; char *p = malloc(total);",
+                    "int len = a + b; char *buf = malloc(len);"
+                ],
+                "common_indicators": [
+                    "할당 크기 계산식",
+                    "곱셈/덧셈 후 범위 검사 없음",
+                    "signed/unsigned 혼용"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 17,
+        "full_code": "XmlInitUnknownEncoding(void *mem, const int *table, CONVERTER convert,\n                       void *userData) {\n  int i;\n  struct unknown_encoding *e = (struct unknown_encoding *)mem;\n  memcpy(mem, &latin1_encoding, sizeof(struct normal_encoding));\n  for (i = 0; i < 128; i++)\n    if (latin1_encoding.type[i] != BT_OTHER\n        && latin1_encoding.type[i] != BT_NONXML && table[i] != i)\n      return 0;\n  for (i = 0; i < 256; i++) {\n    int c = table[i];\n    if (c == -1) {\n      e->normal.type[i] = BT_MALFORM;\n      /* This shouldn't really get used. */\n      e->utf16[i] = 0xFFFF;\n      e->utf8[i][0] = 1;\n      e->utf8[i][1] = 0;\n    } else if (c < 0) {\n      if (c < -4)\n        return 0;\n      /* Multi-byte sequences need a converter function */\n      if (! convert)\n        return 0;\n      e->normal.type[i] = (unsigned char)(BT_LEAD2 - (c + 2));\n      e->utf8[i][0] = 0;\n      e->utf16[i] = 0;\n    } else if (c < 0x80) {\n      if (latin1_encoding.type[c] != BT_OTHER\n          && latin1_encoding.type[c] != BT_NONXML && c != i)\n        return 0;\n      e->normal.type[i] = latin1_encoding.type[c];\n      e->utf8[i][0] = 1;\n      e->utf8[i][1] = (char)c;\n      e->utf16[i] = (unsigned short)(c == 0 ? 0xFFFF : c);\n    } else if (checkCharRefNumber(c) < 0) {\n      e->normal.type[i] = BT_NONXML;\n      /* This shouldn't really get used. */\n      e->utf16[i] = 0xFFFF;\n      e->utf8[i][0] = 1;\n      e->utf8[i][1] = 0;\n    } else {\n      if (c > 0xFFFF)\n        return 0;\n      if (UCS2_GET_NAMING(nmstrtPages, c >> 8, c & 0xff))\n        e->normal.type[i] = BT_NMSTRT;\n      else if (UCS2_GET_NAMING(namePages, c >> 8, c & 0xff))\n        e->normal.type[i] = BT_NAME;\n      else\n        e->normal.type[i] = BT_OTHER;\n      e->utf8[i][0] = (char)XmlUtf8Encode(c, e->utf8[i] + 1);\n      e->utf16[i] = (unsigned short)c;\n    }\n  }\n  e->userData = userData;\n  e->convert = convert;\n  if (convert) {\n    e->normal.isName2 = unknown_isName;\n    e->normal.isName3 = unknown_isName;\n    e->normal.isName4 = unknown_isName;\n    e->normal.isNmstrt2 = unknown_isNmstrt;\n    e->normal.isNmstrt3 = unknown_isNmstrt;\n    e->normal.isNmstrt4 = unknown_isNmstrt;\n    e->normal.isInvalid2 = unknown_isInvalid;\n    e->normal.isInvalid3 = unknown_isInvalid;\n    e->normal.isInvalid4 = unknown_isInvalid;\n  }\n  e->normal.enc.utf8Convert = unknown_toUtf8;\n  e->normal.enc.utf16Convert = unknown_toUtf16;\n  return &(e->normal.enc);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper memory allocation and lack of validation for input sizes, leading to potential out-of-bounds writes.",
+                "supporting_cve_ids": [
+                    "CVE-2016-6870",
+                    "CVE-2016-5094",
+                    "CVE-2020-12141"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 18,
+        "full_code": "#  define ns(x) x##_ns\n\n#  define XML_TOK_NS_C\n#  include \"xmltok_ns.c\"\n#  undef XML_TOK_NS_C\n\n#  undef NS\n#  undef ns\n\nENCODING *\nXmlInitUnknownEncodingNS(void *mem, const int *table, CONVERTER convert,\n                         void *userData) {\n  ENCODING *enc = XmlInitUnknownEncoding(mem, table, convert, userData);\n  if (enc)\n    ((struct normal_encoding *)enc)->type[ASCII_COLON] = BT_COLON;\n  return enc;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of buffer sizes and memory allocation, leading to potential overflows when processing input data.",
+                "supporting_cve_ids": [
+                    "CVE-2018-14359",
+                    "CVE-2022-47517",
+                    "CVE-2019-14934"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 19,
+        "full_code": "make_alloc_test_case(Suite *s) {\n  TCase *tc_alloc = tcase_create(\"allocation tests\");\n\n  suite_add_tcase(s, tc_alloc);\n  tcase_add_checked_fixture(tc_alloc, alloc_setup, alloc_teardown);\n\n  tcase_add_test(tc_alloc, test_alloc_parse_xdecl);\n  tcase_add_test(tc_alloc, test_alloc_parse_xdecl_2);\n  tcase_add_test(tc_alloc, test_alloc_parse_pi);\n  tcase_add_test(tc_alloc, test_alloc_parse_pi_2);\n  tcase_add_test(tc_alloc, test_alloc_parse_pi_3);\n  tcase_add_test(tc_alloc, test_alloc_parse_comment);\n  tcase_add_test(tc_alloc, test_alloc_parse_comment_2);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_create_external_parser);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_run_external_parser);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_dtd_copy_default_atts);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_external_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_ext_entity_set_encoding);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_internal_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_parameter_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_dtd_default_handling);\n  tcase_add_test(tc_alloc, test_alloc_explicit_encoding);\n  tcase_add_test(tc_alloc, test_alloc_set_base);\n  tcase_add_test(tc_alloc, test_alloc_realloc_buffer);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_ext_entity_realloc_buffer);\n  tcase_add_test(tc_alloc, test_alloc_realloc_many_attributes);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_public_entity_value);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc,\n                                test_alloc_realloc_subst_public_entity_value);\n  tcase_add_test(tc_alloc, test_alloc_parse_public_doctype);\n  tcase_add_test(tc_alloc, test_alloc_parse_public_doctype_long_name);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_set_foreign_dtd);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_attribute_enum_value);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc,\n                                test_alloc_realloc_attribute_enum_value);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_realloc_implied_attribute);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_realloc_default_attribute);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_notation);\n  tcase_add_test(tc_alloc, test_alloc_public_notation);\n  tcase_add_test(tc_alloc, test_alloc_system_notation);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_nested_groups);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_realloc_nested_groups);\n  tcase_add_test(tc_alloc, test_alloc_large_group);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_realloc_group_choice);\n  tcase_add_test(tc_alloc, test_alloc_pi_in_epilog);\n  tcase_add_test(tc_alloc, test_alloc_comment_in_epilog);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc,\n                                test_alloc_realloc_long_attribute_value);\n  tcase_add_test(tc_alloc, test_alloc_attribute_whitespace);\n  tcase_add_test(tc_alloc, test_alloc_attribute_predefined_entity);\n  tcase_add_test(tc_alloc, test_alloc_long_attr_default_with_char_ref);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_long_attr_value);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_nested_entities);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc,\n                                test_alloc_realloc_param_entity_newline);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_realloc_ce_extends_pe);\n  tcase_add_test__ifdef_xml_dtd(tc_alloc, test_alloc_realloc_attributes);\n  tcase_add_test(tc_alloc, test_alloc_long_doc_name);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_long_base);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_long_public_id);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_long_entity_value);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_long_notation);\n\n  tcase_add_test__ifdef_xml_dtd(\n      tc_alloc, test_alloc_reset_after_external_entity_parser_create_fail);\n\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_tracker_size_recorded);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_tracker_pointer_alignment);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_tracker_maximum_amplification);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_tracker_threshold);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_tracker_getbuffer_unlimited);\n  tcase_add_test__if_xml_ge(tc_alloc, test_alloc_tracker_api);\n\n  tcase_add_test(tc_alloc, test_mem_api_cycle);\n  tcase_add_test__if_xml_ge(tc_alloc, test_mem_api_unlimited);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Memory Management Error",
+                "reason": "The candidates frequently highlight issues related to improper handling of memory allocation, leading to various vulnerabilities such as buffer overflows, use-after-free, and integer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2013-6401",
+                    "CVE-2014-9765",
+                    "CVE-2018-17942"
+                ],
+                "representative_pattern": null,
+                "memory_corruption_category": null,
+                "cwe_ids": [],
+                "representative_code_examples": [],
+                "common_indicators": []
+            }
+        ]
+    },
+    {
+        "id": 20,
+        "full_code": "sizeRecordedFor(void *ptr) {\n  return *(size_t *)((char *)ptr - EXPAT_MALLOC_PADDING - sizeof(size_t));\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Integer Overflow",
+                "reason": "Multiple candidates indicate improper handling of integer overflow during memory allocation calculations, leading to potential vulnerabilities.",
+                "supporting_cve_ids": [
+                    "CVE-2012-2674",
+                    "CVE-2012-2675",
+                    "CVE-2017-6308"
+                ],
+                "representative_pattern": "정수 계산 결과가 표현 범위를 넘어 크기 계산, 인덱스 계산, 할당 크기 산정이 잘못되는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-190"
+                ],
+                "representative_code_examples": [
+                    "size_t total = count * elem_size; char *p = malloc(total);",
+                    "int len = a + b; char *buf = malloc(len);"
+                ],
+                "common_indicators": [
+                    "할당 크기 계산식",
+                    "곱셈/덧셈 후 범위 검사 없음",
+                    "signed/unsigned 혼용"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 21,
+        "full_code": "make_basic_test_case(Suite *s) {\n  TCase *tc_basic = tcase_create(\"basic tests\");\n\n  suite_add_tcase(s, tc_basic);\n  tcase_add_checked_fixture(tc_basic, basic_setup, basic_teardown);\n\n  tcase_add_test(tc_basic, test_nul_byte);\n  tcase_add_test(tc_basic, test_u0000_char);\n  tcase_add_test(tc_basic, test_siphash_self);\n  tcase_add_test(tc_basic, test_siphash_spec);\n  tcase_add_test(tc_basic, test_bom_utf8);\n  tcase_add_test(tc_basic, test_bom_utf16_be);\n  tcase_add_test(tc_basic, test_bom_utf16_le);\n  tcase_add_test(tc_basic, test_nobom_utf16_le);\n  tcase_add_test(tc_basic, test_hash_collision);\n  tcase_add_test(tc_basic, test_illegal_utf8);\n  tcase_add_test(tc_basic, test_utf8_auto_align);\n  tcase_add_test(tc_basic, test_utf16);\n  tcase_add_test(tc_basic, test_utf16_le_epilog_newline);\n  tcase_add_test(tc_basic, test_not_utf16);\n  tcase_add_test(tc_basic, test_bad_encoding);\n  tcase_add_test(tc_basic, test_latin1_umlauts);\n  tcase_add_test(tc_basic, test_long_utf8_character);\n  tcase_add_test(tc_basic, test_long_latin1_attribute);\n  tcase_add_test(tc_basic, test_long_ascii_attribute);\n  /* Regression test for SF bug #491986. */\n  tcase_add_test(tc_basic, test_danish_latin1);\n  /* Regression test for SF bug #514281. */\n  tcase_add_test(tc_basic, test_french_charref_hexidecimal);\n  tcase_add_test(tc_basic, test_french_charref_decimal);\n  tcase_add_test(tc_basic, test_french_latin1);\n  tcase_add_test(tc_basic, test_french_utf8);\n  tcase_add_test(tc_basic, test_utf8_false_rejection);\n  tcase_add_test(tc_basic, test_line_number_after_parse);\n  tcase_add_test(tc_basic, test_column_number_after_parse);\n  tcase_add_test(tc_basic, test_line_and_column_numbers_inside_handlers);\n  tcase_add_test(tc_basic, test_line_number_after_error);\n  tcase_add_test(tc_basic, test_column_number_after_error);\n  tcase_add_test(tc_basic, test_really_long_lines);\n  tcase_add_test(tc_basic, test_really_long_encoded_lines);\n  tcase_add_test(tc_basic, test_end_element_events);\n  tcase_add_test(tc_basic, test_helper_is_whitespace_normalized);\n  tcase_add_test(tc_basic, test_attr_whitespace_normalization);\n  tcase_add_test(tc_basic, test_xmldecl_misplaced);\n  tcase_add_test(tc_basic, test_xmldecl_invalid);\n  tcase_add_test(tc_basic, test_xmldecl_missing_attr);\n  tcase_add_test(tc_basic, test_xmldecl_missing_value);\n  tcase_add_test__if_xml_ge(tc_basic, test_unknown_encoding_internal_entity);\n  tcase_add_test(tc_basic, test_unrecognised_encoding_internal_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_set_encoding);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_no_handler);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_set_bom);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_bad_encoding);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_bad_encoding_2);\n  tcase_add_test(tc_basic, test_wfc_undeclared_entity_unread_external_subset);\n  tcase_add_test(tc_basic, test_wfc_undeclared_entity_no_external_subset);\n  tcase_add_test(tc_basic, test_wfc_undeclared_entity_standalone);\n  tcase_add_test(tc_basic,\n                 test_wfc_undeclared_entity_with_external_subset_standalone);\n  tcase_add_test(tc_basic, test_entity_with_external_subset_unless_standalone);\n  tcase_add_test(tc_basic, test_wfc_undeclared_entity_with_external_subset);\n  tcase_add_test(tc_basic, test_not_standalone_handler_reject);\n  tcase_add_test(tc_basic, test_not_standalone_handler_accept);\n  tcase_add_test(tc_basic, test_entity_start_tag_level_greater_than_one);\n  tcase_add_test__if_xml_ge(tc_basic, test_wfc_no_recursive_entity_refs);\n  tcase_add_test(tc_basic, test_no_indirectly_recursive_entity_refs);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_invalid_parse);\n  tcase_add_test__if_xml_ge(tc_basic, test_dtd_default_handling);\n  tcase_add_test(tc_basic, test_dtd_attr_handling);\n  tcase_add_test(tc_basic, test_empty_ns_without_namespaces);\n  tcase_add_test(tc_basic, test_ns_in_attribute_default_without_namespaces);\n  tcase_add_test(tc_basic, test_stop_parser_between_char_data_calls);\n  tcase_add_test(tc_basic, test_suspend_parser_between_char_data_calls);\n  tcase_add_test(tc_basic, test_repeated_stop_parser_between_char_data_calls);\n  tcase_add_test(tc_basic, test_good_cdata_ascii);\n  tcase_add_test(tc_basic, test_good_cdata_utf16);\n  tcase_add_test(tc_basic, test_good_cdata_utf16_le);\n  tcase_add_test(tc_basic, test_long_cdata_utf16);\n  tcase_add_test(tc_basic, test_multichar_cdata_utf16);\n  tcase_add_test(tc_basic, test_utf16_bad_surrogate_pair);\n  tcase_add_test(tc_basic, test_bad_cdata);\n  tcase_add_test(tc_basic, test_bad_cdata_utf16);\n  tcase_add_test(tc_basic, test_stop_parser_between_cdata_calls);\n  tcase_add_test(tc_basic, test_suspend_parser_between_cdata_calls);\n  tcase_add_test(tc_basic, test_memory_allocation);\n  tcase_add_test__if_xml_ge(tc_basic, test_default_current);\n  tcase_add_test(tc_basic, test_dtd_elements);\n  tcase_add_test(tc_basic, test_dtd_elements_nesting);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_set_foreign_dtd);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_foreign_dtd_not_standalone);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_invalid_foreign_dtd);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_foreign_dtd_with_doctype);\n  tcase_add_test__ifdef_xml_dtd(tc_basic,\n                                test_foreign_dtd_without_external_subset);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_empty_foreign_dtd);\n  tcase_add_test(tc_basic, test_set_base);\n  tcase_add_test(tc_basic, test_attributes);\n  tcase_add_test__if_xml_ge(tc_basic, test_reset_in_entity);\n  tcase_add_test(tc_basic, test_resume_invalid_parse);\n  tcase_add_test(tc_basic, test_resume_resuspended);\n  tcase_add_test(tc_basic, test_cdata_default);\n  tcase_add_test(tc_basic, test_subordinate_reset);\n  tcase_add_test(tc_basic, test_subordinate_suspend);\n  tcase_add_test__if_xml_ge(tc_basic, test_subordinate_xdecl_suspend);\n  tcase_add_test__if_xml_ge(tc_basic, test_subordinate_xdecl_abort);\n  tcase_add_test__ifdef_xml_dtd(tc_basic,\n                                test_ext_entity_invalid_suspended_parse);\n  tcase_add_test(tc_basic, test_explicit_encoding);\n  tcase_add_test(tc_basic, test_trailing_cr);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_trailing_cr);\n  tcase_add_test(tc_basic, test_trailing_rsqb);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_trailing_rsqb);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_good_cdata);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_user_parameters);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_ref_parameter);\n  tcase_add_test(tc_basic, test_empty_parse);\n  tcase_add_test(tc_basic, test_negative_len_parse);\n  tcase_add_test(tc_basic, test_negative_len_parse_buffer);\n  tcase_add_test(tc_basic, test_get_buffer_1);\n  tcase_add_test(tc_basic, test_get_buffer_2);\n#if XML_CONTEXT_BYTES > 0\n  tcase_add_test(tc_basic, test_get_buffer_3_overflow);\n#endif\n  tcase_add_test(tc_basic, test_buffer_can_grow_to_max);\n  tcase_add_test(tc_basic, test_getbuffer_allocates_on_zero_len);\n  tcase_add_test(tc_basic, test_byte_info_at_end);\n  tcase_add_test(tc_basic, test_byte_info_at_error);\n  tcase_add_test(tc_basic, test_byte_info_at_cdata);\n  tcase_add_test(tc_basic, test_predefined_entities);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_invalid_tag_in_dtd);\n  tcase_add_test(tc_basic, test_not_predefined_entities);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ignore_section);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ignore_section_utf16);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ignore_section_utf16_be);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_bad_ignore_section);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_external_bom_consumed);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_external_entity_values);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_not_standalone);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_ext_entity_value_abort);\n  tcase_add_test(tc_basic, test_bad_public_doctype);\n  tcase_add_test(tc_basic, test_attribute_enum_value);\n  tcase_add_test(tc_basic, test_predefined_entity_redefinition);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_dtd_stop_processing);\n  tcase_add_test(tc_basic, test_public_notation_no_sysid);\n  tcase_add_test(tc_basic, test_nested_groups);\n  tcase_add_test(tc_basic, test_group_choice);\n  tcase_add_test(tc_basic, test_standalone_parameter_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_skipped_parameter_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_basic,\n                                test_recursive_external_parameter_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_basic,\n                                test_recursive_external_parameter_entity_2);\n  tcase_add_test(tc_basic, test_undefined_ext_entity_in_external_dtd);\n  tcase_add_test(tc_basic, test_suspend_xdecl);\n  tcase_add_test(tc_basic, test_abort_epilog);\n  tcase_add_test(tc_basic, test_abort_epilog_2);\n  tcase_add_test(tc_basic, test_suspend_epilog);\n  tcase_add_test(tc_basic, test_suspend_in_sole_empty_tag);\n  tcase_add_test(tc_basic, test_unfinished_epilog);\n  tcase_add_test(tc_basic, test_partial_char_in_epilog);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_suspend_resume_internal_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_basic,\n                                test_suspend_resume_internal_entity_issue_629);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_resume_entity_with_syntax_error);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_suspend_resume_parameter_entity);\n  tcase_add_test(tc_basic, test_restart_on_error);\n  tcase_add_test(tc_basic, test_reject_lt_in_attribute_value);\n  tcase_add_test(tc_basic, test_reject_unfinished_param_in_att_value);\n  tcase_add_test(tc_basic, test_trailing_cr_in_att_value);\n  tcase_add_test(tc_basic, test_standalone_internal_entity);\n  tcase_add_test(tc_basic, test_skipped_external_entity);\n  tcase_add_test(tc_basic, test_skipped_null_loaded_ext_entity);\n  tcase_add_test(tc_basic, test_skipped_unloaded_ext_entity);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_param_entity_with_trailing_cr);\n  tcase_add_test__if_xml_ge(tc_basic, test_invalid_character_entity);\n  tcase_add_test__if_xml_ge(tc_basic, test_invalid_character_entity_2);\n  tcase_add_test__if_xml_ge(tc_basic, test_invalid_character_entity_3);\n  tcase_add_test__if_xml_ge(tc_basic, test_invalid_character_entity_4);\n  tcase_add_test(tc_basic, test_pi_handled_in_default);\n  tcase_add_test(tc_basic, test_comment_handled_in_default);\n  tcase_add_test(tc_basic, test_pi_yml);\n  tcase_add_test(tc_basic, test_pi_xnl);\n  tcase_add_test(tc_basic, test_pi_xmm);\n  tcase_add_test(tc_basic, test_utf16_pi);\n  tcase_add_test(tc_basic, test_utf16_be_pi);\n  tcase_add_test(tc_basic, test_utf16_be_comment);\n  tcase_add_test(tc_basic, test_utf16_le_comment);\n  tcase_add_test(tc_basic, test_missing_encoding_conversion_fn);\n  tcase_add_test(tc_basic, test_failing_encoding_conversion_fn);\n  tcase_add_test(tc_basic, test_unknown_encoding_success);\n  tcase_add_test(tc_basic, test_unknown_encoding_bad_name);\n  tcase_add_test(tc_basic, test_unknown_encoding_bad_name_2);\n  tcase_add_test(tc_basic, test_unknown_encoding_long_name_1);\n  tcase_add_test(tc_basic, test_unknown_encoding_long_name_2);\n  tcase_add_test(tc_basic, test_invalid_unknown_encoding);\n  tcase_add_test(tc_basic, test_unknown_ascii_encoding_ok);\n  tcase_add_test(tc_basic, test_unknown_ascii_encoding_fail);\n  tcase_add_test(tc_basic, test_unknown_encoding_invalid_length);\n  tcase_add_test(tc_basic, test_unknown_encoding_invalid_topbit);\n  tcase_add_test(tc_basic, test_unknown_encoding_invalid_surrogate);\n  tcase_add_test(tc_basic, test_unknown_encoding_invalid_high);\n  tcase_add_test(tc_basic, test_unknown_encoding_invalid_attr_value);\n  tcase_add_test(tc_basic, test_unknown_encoding_user_data_primary);\n  tcase_add_test(tc_basic, test_unknown_encoding_user_data_secondary);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_latin1_utf16le_bom);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_latin1_utf16be_bom);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_latin1_utf16le_bom2);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_latin1_utf16be_bom2);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_utf16_be);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_utf16_le);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_utf16_unknown);\n  tcase_add_test__if_xml_ge(tc_basic, test_ext_entity_utf8_non_bom);\n  tcase_add_test(tc_basic, test_utf8_in_cdata_section);\n  tcase_add_test(tc_basic, test_utf8_in_cdata_section_2);\n  tcase_add_test(tc_basic, test_utf8_in_start_tags);\n  tcase_add_test(tc_basic, test_trailing_spaces_in_elements);\n  tcase_add_test(tc_basic, test_utf16_attribute);\n  tcase_add_test(tc_basic, test_utf16_second_attr);\n  tcase_add_test(tc_basic, test_attr_after_solidus);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_utf16_pe);\n  tcase_add_test(tc_basic, test_bad_attr_desc_keyword);\n  tcase_add_test(tc_basic, test_bad_attr_desc_keyword_utf16);\n  tcase_add_test(tc_basic, test_bad_doctype);\n  tcase_add_test(tc_basic, test_bad_doctype_utf8);\n  tcase_add_test(tc_basic, test_bad_doctype_utf16);\n  tcase_add_test(tc_basic, test_bad_doctype_plus);\n  tcase_add_test(tc_basic, test_bad_doctype_star);\n  tcase_add_test(tc_basic, test_bad_doctype_query);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_unknown_encoding_bad_ignore);\n  tcase_add_test(tc_basic, test_entity_in_utf16_be_attr);\n  tcase_add_test(tc_basic, test_entity_in_utf16_le_attr);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_entity_public_utf16_be);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_entity_public_utf16_le);\n  tcase_add_test(tc_basic, test_short_doctype);\n  tcase_add_test(tc_basic, test_short_doctype_2);\n  tcase_add_test(tc_basic, test_short_doctype_3);\n  tcase_add_test(tc_basic, test_long_doctype);\n  tcase_add_test(tc_basic, test_bad_entity);\n  tcase_add_test(tc_basic, test_bad_entity_2);\n  tcase_add_test(tc_basic, test_bad_entity_3);\n  tcase_add_test(tc_basic, test_bad_entity_4);\n  tcase_add_test(tc_basic, test_bad_notation);\n  tcase_add_test(tc_basic, test_default_doctype_handler);\n  tcase_add_test(tc_basic, test_empty_element_abort);\n  tcase_add_test__ifdef_xml_dtd(tc_basic,\n                                test_pool_integrity_with_unfinished_attr);\n  tcase_add_test__ifdef_xml_dtd(tc_basic, test_empty_ext_param_entity_in_value);\n  tcase_add_test__if_xml_ge(tc_basic, test_entity_ref_no_elements);\n  tcase_add_test__if_xml_ge(tc_basic, test_deep_nested_entity);\n  tcase_add_test__if_xml_ge(tc_basic, test_deep_nested_attribute_entity);\n  tcase_add_test__if_xml_ge(tc_basic,\n                            test_deep_nested_entity_delayed_interpretation);\n  tcase_add_test__if_xml_ge(tc_basic, test_nested_entity_suspend);\n  tcase_add_test__if_xml_ge(tc_basic, test_nested_entity_suspend_2);\n  tcase_add_test(tc_basic, test_big_tokens_scale_linearly);\n  tcase_add_test(tc_basic, test_set_reparse_deferral);\n  tcase_add_test(tc_basic, test_reparse_deferral_is_inherited);\n  tcase_add_test(tc_basic, test_set_reparse_deferral_on_null_parser);\n  tcase_add_test(tc_basic, test_set_reparse_deferral_on_the_fly);\n  tcase_add_test(tc_basic, test_set_bad_reparse_option);\n  tcase_add_test(tc_basic, test_bypass_heuristic_when_close_to_bufsize);\n  tcase_add_test(tc_basic, test_varying_buffer_fills);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate vulnerabilities related to improper handling of memory allocation and insufficient buffer sizes, leading to potential overflows when processing input data.",
+                "supporting_cve_ids": [
+                    "CVE-2018-25103",
+                    "CVE-2020-13649",
+                    "CVE-2024-40130"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 22,
+        "full_code": "    if (_XML_Parse_SINGLE_BYTES(g_parser, text, (int)strlen(text), XML_TRUE)\n        == XML_STATUS_OK) {\n      snprintf(text, sizeof(text),\n               \"expected token error for '%c' (ordinal %d) in UTF-8 text\", i,\n               i);\n      fail(text);\n    } else if (XML_GetErrorCode(g_parser) != XML_ERROR_INVALID_TOKEN)\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input sizes and memory boundaries, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2019-19275",
+                    "CVE-2019-19274",
+                    "CVE-2015-8863"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 23,
+        "full_code": "main(int argc, char *argv[]) {\n  XML_Parser parser;\n  char *XMLBuf, *XMLBufEnd, *XMLBufPtr;\n  int fd;\n  FILE *file;\n  struct stat fileAttr;\n  int nrOfLoops, bufferSize, i, isFinal;\n  size_t fileSize;\n  int j = 0, ns = 0;\n  clock_t tstart, tend;\n  double cpuTime = 0.0;\n\n  if (argc > 1) {\n    if (argv[1][0] == '-') {\n      if (argv[1][1] == 'n' && argv[1][2] == '\\0') {\n        ns = 1;\n        j = 1;\n      } else\n        return usage(argv[0], 1);\n    }\n  }\n\n  if (argc != j + 4)\n    return usage(argv[0], 1);\n\n  fd = open(argv[j + 1], O_RDONLY);\n  if (fd == -1) {\n    fprintf(stderr, \"could not open file '%s'\\n\", argv[j + 1]);\n    return 2;\n  }\n\n  if (fstat(fd, &fileAttr) != 0) {\n    close(fd);\n    fprintf(stderr, \"could not fstat file '%s'\\n\", argv[j + 1]);\n    return 2;\n  }\n\n  file = fdopen(fd, \"r\");\n  if (! file) {\n    close(fd);\n    fprintf(stderr, \"could not fdopen file '%s'\\n\", argv[j + 1]);\n    return 2;\n  }\n\n  bufferSize = atoi(argv[j + 2]);\n  nrOfLoops = atoi(argv[j + 3]);\n  if (bufferSize <= 0 || nrOfLoops <= 0) {\n    fclose(file); // NOTE: this closes fd as well\n    fprintf(stderr, \"buffer size and nr of loops must be greater than zero.\\n\");\n    return 3;\n  }\n\n  XMLBuf = malloc(fileAttr.st_size);\n  if (XMLBuf == NULL) {\n    fclose(file); // NOTE: this closes fd as well\n    fprintf(stderr, \"ouf of memory.\\n\");\n    return 5;\n  }\n  fileSize = fread(XMLBuf, sizeof(char), fileAttr.st_size, file);\n  fclose(file); // NOTE: this closes fd as well\n\n  if (ns)\n    parser = XML_ParserCreateNS(NULL, '!');\n  else\n    parser = XML_ParserCreate(NULL);\n\n  i = 0;\n  XMLBufEnd = XMLBuf + fileSize;\n  while (i < nrOfLoops) {\n    XMLBufPtr = XMLBuf;\n    isFinal = 0;\n    tstart = clock();\n    do {\n      ptrdiff_t parseBufferSize = XMLBufEnd - XMLBufPtr;\n      if (parseBufferSize <= (ptrdiff_t)bufferSize)\n        isFinal = 1;\n      else\n        parseBufferSize = bufferSize;\n      assert(parseBufferSize <= (ptrdiff_t)bufferSize);\n      if (! XML_Parse(parser, XMLBufPtr, (int)parseBufferSize, isFinal)) {\n        fprintf(stderr,\n                \"error '%\" XML_FMT_STR \"' at line %\" XML_FMT_INT_MOD\n                \"u character %\" XML_FMT_INT_MOD \"u\\n\",\n                XML_ErrorString(XML_GetErrorCode(parser)),\n                XML_GetCurrentLineNumber(parser),\n                XML_GetCurrentColumnNumber(parser));\n        free(XMLBuf);\n        XML_ParserFree(parser);\n        return 4;\n      }\n      XMLBufPtr += bufferSize;\n    } while (! isFinal);\n    tend = clock();\n    cpuTime += ((double)(tend - tstart)) / CLOCKS_PER_SEC;\n    XML_ParserReset(parser, NULL);\n    i++;\n  }\n\n  XML_ParserFree(parser);\n  free(XMLBuf);\n\n  printf(\"%d loops, with buffer size %d. Average time per loop: %f\\n\",\n         nrOfLoops, bufferSize, cpuTime / (double)nrOfLoops);\n  return 0;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate issues with insufficient buffer size and improper handling of input lengths, leading to potential overwrites of adjacent memory.",
+                "supporting_cve_ids": [
+                    "CVE-2016-5157",
+                    "CVE-2022-34295",
+                    "CVE-2019-1010305"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 24,
+        "full_code": "// Portable remake of strndup(3) for C99\nchar *\nportable_strndup(const char *s, size_t n) {\n  if ((s == NULL) || (n == SIZE_MAX)) {\n    errno = EINVAL;\n    return NULL;\n  }\n\n  n = portable_strnlen(s, n);\n\n  char *const buffer = (char *)malloc(n + 1);\n  if (buffer == NULL) {\n    errno = ENOMEM;\n    return NULL;\n  }\n\n  errno = 0;\n\n  memcpy(buffer, s, n);\n\n  buffer[n] = '\\0';\n\n  return buffer;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate issues with memory allocation and copying data without proper boundary checks, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2016-2315",
+                    "CVE-2020-21674",
+                    "CVE-2019-17178"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 25,
+        "full_code": "// Portable remake of strnlen(3) for C99\nstatic size_t\nportable_strnlen(const char *s, size_t maxlen) {\n  const char *const end = (const char *)memchr(s, '\\0', maxlen);\n  return (end == NULL) ? maxlen : (size_t)(end - s);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of buffer sizes and lengths, leading to potential overflows when writing data beyond allocated memory.",
+                "supporting_cve_ids": [
+                    "CVE-2020-4030",
+                    "CVE-2017-7586",
+                    "CVE-2020-21674"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 26,
+        "full_code": "counting_start_element_handler(void *userData, const XML_Char *name,\n                               const XML_Char **atts) {\n  ParserAndElementInfo *const parserAndElementInfos\n      = (ParserAndElementInfo *)userData;\n  ElementInfo *info = parserAndElementInfos->info;\n  AttrInfo *attr;\n  int count, id, i;\n\n  while (info->name != NULL) {\n    if (! xcstrcmp(name, info->name))\n      break;\n    info++;\n  }\n  if (info->name == NULL)\n    fail(\"Element not recognised\");\n  /* The attribute count is twice what you might expect.  It is a\n   * count of items in atts, an array which contains alternating\n   * attribute names and attribute values.  For the naive user this\n   * is possibly a little unexpected, but it is what the\n   * documentation in expat.h tells us to expect.\n   */\n  count = XML_GetSpecifiedAttributeCount(parserAndElementInfos->parser);\n  if (info->attr_count * 2 != count) {\n    fail(\"Not got expected attribute count\");\n    return;\n  }\n  id = XML_GetIdAttributeIndex(parserAndElementInfos->parser);\n  if (id == -1 && info->id_name != NULL) {\n    fail(\"ID not present\");\n    return;\n  }\n  if (id != -1 && xcstrcmp(atts[id], info->id_name) != 0) {\n    fail(\"ID does not have the correct name\");\n    return;\n  }\n  for (i = 0; i < info->attr_count; i++) {\n    attr = info->attributes;\n    while (attr->name != NULL) {\n      if (! xcstrcmp(atts[0], attr->name))\n        break;\n      attr++;\n    }\n    if (attr->name == NULL) {\n      fail(\"Attribute not recognised\");\n      return;\n    }\n    if (xcstrcmp(atts[1], attr->value) != 0) {\n      fail(\"Attribute has wrong value\");\n      return;\n    }\n    /* Remember, two entries in atts per attribute (see above) */\n    atts += 2;\n  }\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of memory operations, leading to potential buffer overflows when accessing or writing beyond allocated memory.",
+                "supporting_cve_ids": [
+                    "CVE-2016-0546",
+                    "CVE-2020-26247",
+                    "CVE-2022-1908"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 27,
+        "full_code": "end_element_event_handler2(void *userData, const XML_Char *name) {\n  StructData *storage = (StructData *)userData;\n  StructData_AddItem(storage, name, (int)XML_GetCurrentColumnNumber(g_parser),\n                     (int)XML_GetCurrentLineNumber(g_parser), STRUCT_END_TAG);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Null Pointer Dereference",
+                "reason": "Multiple candidates indicate issues with dereferencing pointers that may be NULL, leading to crashes or undefined behavior.",
+                "supporting_cve_ids": [
+                    "CVE-2023-52426",
+                    "CVE-2021-43114",
+                    "CVE-2023-46001"
+                ],
+                "representative_pattern": "NULL 이 될 수 있는 포인터에 대해 유효성 검사 없이 역참조하는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-476"
+                ],
+                "representative_code_examples": [
+                    "node = find(id); return node->value;",
+                    "char *p = getenv(\"X\"); printf(\"%c\", p[0]);"
+                ],
+                "common_indicators": [
+                    "함수 반환 포인터 NULL 체크 없음",
+                    "에러 경로 누락",
+                    "조건 분기 후 널 가능성 남아 있음"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 28,
+        "full_code": "external_entity_devaluer(XML_Parser parser, const XML_Char *context,\n                         const XML_Char *base, const XML_Char *systemId,\n                         const XML_Char *publicId) {\n  const char *text = \"<!ELEMENT doc EMPTY>\\n\"\n                     \"<!ENTITY % e1 SYSTEM 'bar'>\\n\"\n                     \"%e1;\\n\";\n  XML_Parser ext_parser;\n  int clear_handler_flag = (XML_GetUserData(parser) != NULL);\n\n  UNUSED_P(base);\n  UNUSED_P(publicId);\n  if (systemId == NULL || ! xcstrcmp(systemId, XCS(\"bar\")))\n    return XML_STATUS_OK;\n  if (xcstrcmp(systemId, XCS(\"foo\")) != 0)\n    fail(\"Unexpected system ID\");\n  ext_parser = XML_ExternalEntityParserCreate(parser, context, NULL);\n  if (ext_parser == NULL)\n    fail(\"Could note create external entity parser\");\n  if (clear_handler_flag)\n    XML_SetExternalEntityRefHandler(ext_parser, NULL);\n  if (_XML_Parse_SINGLE_BYTES(ext_parser, text, (int)strlen(text), XML_TRUE)\n      == XML_STATUS_ERROR)\n    xml_failure(ext_parser);\n\n  XML_ParserFree(ext_parser);\n  return XML_STATUS_OK;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "XML External Entity Injection (XXE)",
+                "reason": "The function processes external XML entities, which can lead to vulnerabilities if not properly handled, as evidenced by multiple candidates that discuss improper handling of external entities and their potential exploitation.",
+                "supporting_cve_ids": [
+                    "CVE-2020-26247",
+                    "CVE-2016-7418",
+                    "CVE-2017-16932"
+                ],
+                "representative_pattern": "신뢰할 수 없는 입력이 해석기나 명령 실행 맥락에 직접 삽입되어 구조를 바꾸는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-74"
+                ],
+                "representative_code_examples": [
+                    "interpreter.run(user_input)",
+                    "command = prefix + user_input"
+                ],
+                "common_indicators": [
+                    "해석기 입력 직접 결합",
+                    "명령 구성 문자열 조합",
+                    "입력 검증과 인코딩 부족"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 29,
+        "full_code": "external_entity_duff_loader(XML_Parser parser, const XML_Char *context,\n                            const XML_Char *base, const XML_Char *systemId,\n                            const XML_Char *publicId) {\n  XML_Parser new_parser;\n  unsigned int i;\n  const unsigned int max_alloc_count = 10;\n\n  UNUSED_P(base);\n  UNUSED_P(systemId);\n  UNUSED_P(publicId);\n  /* Try a few different allocation levels */\n  for (i = 0; i < max_alloc_count; i++) {\n    g_allocation_count = (int)i;\n    new_parser = XML_ExternalEntityParserCreate(parser, context, NULL);\n    if (new_parser != NULL) {\n      XML_ParserFree(new_parser);\n      break;\n    }\n  }\n  if (i == 0)\n    fail(\"External parser creation ignored failing allocator\");\n  else if (i == max_alloc_count)\n    fail(\"Extern parser not created with max allocation count\");\n\n  /* Make sure other random allocation doesn't now fail */\n  g_allocation_count = ALLOC_ALWAYS_SUCCEED;\n\n  /* Make sure the failure code path is executed too */\n  return XML_STATUS_ERROR;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Memory Allocation Error",
+                "reason": "The function's purpose involves creating an XML parser with varying allocation counts and handling allocation failures, which aligns with multiple candidates that highlight issues related to improper memory allocation and management.",
+                "supporting_cve_ids": [
+                    "CVE-2023-52426",
+                    "CVE-2021-43114",
+                    "CVE-2022-29181"
+                ],
+                "representative_pattern": null,
+                "memory_corruption_category": null,
+                "cwe_ids": [],
+                "representative_code_examples": [],
+                "common_indicators": []
+            }
+        ]
+    },
+    {
+        "id": 30,
+        "full_code": "param_entity_match_handler(void *userData, const XML_Char *entityName,\n                           int is_parameter_entity, const XML_Char *value,\n                           int value_length, const XML_Char *base,\n                           const XML_Char *systemId, const XML_Char *publicId,\n                           const XML_Char *notationName) {\n  UNUSED_P(userData);\n  UNUSED_P(base);\n  UNUSED_P(systemId);\n  UNUSED_P(publicId);\n  UNUSED_P(notationName);\n  if (! is_parameter_entity || entity_name_to_match == NULL\n      || entity_value_to_match == NULL) {\n    return;\n  }\n  if (! xcstrcmp(entityName, entity_name_to_match)) {\n    /* The cast here is safe because we control the horizontal and\n     * the vertical, and we therefore know our strings are never\n     * going to overflow an int.\n     */\n    if (value_length != (int)xcstrlen(entity_value_to_match)\n        || xcstrncmp(value, entity_value_to_match, value_length) != 0) {\n      entity_match_flag = ENTITY_MATCH_FAIL;\n    } else {\n      entity_match_flag = ENTITY_MATCH_SUCCESS;\n    }\n  }\n  /* Else leave the match flag alone */\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input sizes and lack of checks on buffer limits, leading to potential overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2016-0546",
+                    "CVE-2014-9765",
+                    "CVE-2012-0037"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 31,
+        "full_code": "start_element_event_handler2(void *userData, const XML_Char *name,\n                             const XML_Char **attr) {\n  StructData *storage = (StructData *)userData;\n  UNUSED_P(attr);\n  StructData_AddItem(storage, name, (int)XML_GetCurrentColumnNumber(g_parser),\n                     (int)XML_GetCurrentLineNumber(g_parser), STRUCT_START_TAG);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input lengths and memory copying, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2015-6031",
+                    "CVE-2011-7131",
+                    "CVE-2016-9934"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 32,
+        "full_code": "user_data_checking_unknown_encoding_handler(void *userData,\n                                            const XML_Char *encoding,\n                                            XML_Encoding *info) {\n  const intptr_t number = (intptr_t)userData;\n  assert_true(number == 0xC0FFEE);\n  return long_encoding_handler(userData, encoding, info);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of buffer sizes and lack of validation for input lengths, leading to potential overflows when writing data.",
+                "supporting_cve_ids": [
+                    "CVE-2020-12141",
+                    "CVE-2019-14934",
+                    "CVE-2022-35928"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 33,
+        "full_code": "verify_attlist_decl_handler(void *userData, const XML_Char *element_name,\n                            const XML_Char *attr_name,\n                            const XML_Char *attr_type,\n                            const XML_Char *default_value, int is_required) {\n  AttTest *at = (AttTest *)userData;\n\n  if (xcstrcmp(element_name, at->element_name) != 0)\n    fail(\"Unexpected element name in attribute declaration\");\n  if (xcstrcmp(attr_name, at->attr_name) != 0)\n    fail(\"Unexpected attribute name in attribute declaration\");\n  if (xcstrcmp(attr_type, at->attr_type) != 0)\n    fail(\"Unexpected attribute type in attribute declaration\");\n  if ((default_value == NULL && at->default_value != NULL)\n      || (default_value != NULL && at->default_value == NULL)\n      || (default_value != NULL\n          && xcstrcmp(default_value, at->default_value) != 0))\n    fail(\"Unexpected default value in attribute declaration\");\n  if (is_required != at->is_required)\n    fail(\"Requirement mismatch in attribute declaration\");\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate issues with insufficient bounds checking and improper handling of input sizes, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2022-31031",
+                    "CVE-2021-40818",
+                    "CVE-2022-23537"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 34,
+        "full_code": "dup_original_string(XML_Parser parser) {\n  const int byte_count = XML_GetCurrentByteCount(parser);\n\n  assert_true(byte_count >= 0);\n\n  int offset = -1;\n  int size = -1;\n\n  const char *const context = XML_GetInputContext(parser, &offset, &size);\n\n#if XML_CONTEXT_BYTES > 0\n  assert_true(context != NULL);\n  assert_true(offset >= 0);\n  assert_true(size >= 0);\n  return portable_strndup(context + offset, byte_count);\n#else\n  assert_true(context == NULL);\n  return NULL;\n#endif\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate vulnerabilities related to improper handling of input lengths and memory copying, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2022-41409",
+                    "CVE-2018-14362",
+                    "CVE-2023-2837"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 35,
+        "full_code": "      // Opened by tag, closed by entity (non-root case)\n      {\"<!DOCTYPE t0 [\\n\"\n       \"  <!ENTITY g0 ''>\\n\"\n       \"  <!ENTITY g1 '&g0;</t1>'>\\n\"\n       \"]>\\n\"\n       \"<t0><t1>&g1;</t0>\\n\",\n       XML_STATUS_ERROR, XML_ERROR_TAG_MISMATCH, 5, 8},\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input lengths and memory copying, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2011-6031",
+                    "CVE-2016-4478",
+                    "CVE-2021-34121"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 36,
+        "full_code": "make_miscellaneous_test_case(Suite *s) {\n  TCase *tc_misc = tcase_create(\"miscellaneous tests\");\n\n  suite_add_tcase(s, tc_misc);\n  tcase_add_checked_fixture(tc_misc, NULL, basic_teardown);\n\n  tcase_add_test(tc_misc, test_misc_alloc_create_parser);\n  tcase_add_test(tc_misc, test_misc_alloc_create_parser_with_encoding);\n  tcase_add_test(tc_misc, test_misc_null_parser);\n  tcase_add_test(tc_misc, test_misc_error_string);\n  tcase_add_test(tc_misc, test_misc_version);\n  tcase_add_test(tc_misc, test_misc_features);\n  tcase_add_test(tc_misc, test_misc_attribute_leak);\n  tcase_add_test(tc_misc, test_misc_utf16le);\n  tcase_add_test(tc_misc, test_misc_stop_during_end_handler_issue_240_1);\n  tcase_add_test(tc_misc, test_misc_stop_during_end_handler_issue_240_2);\n  tcase_add_test__ifdef_xml_dtd(\n      tc_misc, test_misc_deny_internal_entity_closing_doctype_issue_317);\n  tcase_add_test(tc_misc, test_misc_tag_mismatch_reset_leak);\n  tcase_add_test(tc_misc,\n                 test_misc_create_external_entity_parser_with_null_context);\n  tcase_add_test(tc_misc, test_misc_general_entities_support);\n  tcase_add_test(tc_misc, test_misc_char_handler_stop_without_leak);\n  tcase_add_test(tc_misc, test_misc_resumeparser_not_crashing);\n  tcase_add_test(tc_misc, test_misc_stopparser_rejects_unstarted_parser);\n  tcase_add_test__if_xml_ge(tc_misc, test_renter_loop_finite_content);\n  tcase_add_test(tc_misc, test_misc_expected_event_ptr_issue_980);\n  tcase_add_test(tc_misc, test_misc_sync_entity_tolerated);\n  tcase_add_test(tc_misc, test_misc_async_entity_rejected);\n  tcase_add_test(tc_misc, test_misc_no_infinite_loop_issue_1161);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Use-After-Free",
+                "reason": "Multiple candidates indicate improper management of dynamically allocated memory, leading to potential access of freed memory.",
+                "supporting_cve_ids": [
+                    "CVE-2021-4173",
+                    "CVE-2022-2817",
+                    "CVE-2014-9765"
+                ],
+                "representative_pattern": "해제된 메모리를 가리키는 포인터를 이후에 다시 읽거나 쓰거나 호출에 사용하는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-416"
+                ],
+                "representative_code_examples": [
+                    "free(ptr); printf(\"%s\", ptr);",
+                    "free(obj); obj->field = 1;",
+                    "delete p; p->run();"
+                ],
+                "common_indicators": [
+                    "free/delete 이후 동일 포인터 사용",
+                    "해제 후 NULL 처리 없음",
+                    "소유권 관리 불명확"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 37,
+        "full_code": "on_characters_issue_980(void *userData, const XML_Char *s, int len) {\n  (void)s;\n  (void)len;\n  XML_Parser parser = (XML_Parser)userData;\n\n  char *const original_string = dup_original_string(parser);\n\n#if XML_CONTEXT_BYTES > 0\n  assert_true(original_string != NULL);\n  assert_true(strcmp(original_string, \"&draft.day;\") == 0);\n  free(original_string);\n#else\n  assert_true(original_string == NULL);\n#endif\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input lengths and memory allocations, leading to potential buffer overflows when data exceeds allocated sizes.",
+                "supporting_cve_ids": [
+                    "CVE-2011-6031",
+                    "CVE-2022-1586",
+                    "CVE-2022-29181"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 38,
+        "full_code": "make_nsalloc_test_case(Suite *s) {\n  TCase *tc_nsalloc = tcase_create(\"namespace allocation tests\");\n\n  suite_add_tcase(s, tc_nsalloc);\n  tcase_add_checked_fixture(tc_nsalloc, nsalloc_setup, nsalloc_teardown);\n\n  tcase_add_test(tc_nsalloc, test_nsalloc_xmlns);\n  tcase_add_test(tc_nsalloc, test_nsalloc_parse_buffer);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_prefix);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_uri);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_attr);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_attr_prefix);\n  tcase_add_test(tc_nsalloc, test_nsalloc_realloc_attributes);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_element);\n  tcase_add_test(tc_nsalloc, test_nsalloc_realloc_binding_uri);\n  tcase_add_test(tc_nsalloc, test_nsalloc_realloc_long_prefix);\n  tcase_add_test(tc_nsalloc, test_nsalloc_realloc_longer_prefix);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_namespace);\n  tcase_add_test(tc_nsalloc, test_nsalloc_less_long_namespace);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_context);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_realloc_long_context);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_realloc_long_context_2);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_realloc_long_context_3);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_realloc_long_context_4);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_realloc_long_context_5);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_realloc_long_context_6);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_realloc_long_context_7);\n  tcase_add_test(tc_nsalloc, test_nsalloc_realloc_long_ge_name);\n  tcase_add_test__if_xml_ge(tc_nsalloc,\n                            test_nsalloc_realloc_long_context_in_dtd);\n  tcase_add_test__if_xml_ge(tc_nsalloc, test_nsalloc_long_default_in_ext);\n  tcase_add_test(tc_nsalloc, test_nsalloc_long_systemid_in_ext);\n  tcase_add_test(tc_nsalloc, test_nsalloc_prefixed_element);\n  tcase_add_test(tc_nsalloc, test_nsalloc_setContext_zombie);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Use-After-Free",
+                "reason": "Multiple candidates indicate improper memory management leading to use-after-free vulnerabilities, where pointers to freed memory are accessed, resulting in undefined behavior.",
+                "supporting_cve_ids": [
+                    "CVE-2021-4173",
+                    "CVE-2013-6401",
+                    "CVE-2022-1587"
+                ],
+                "representative_pattern": "해제된 메모리를 가리키는 포인터를 이후에 다시 읽거나 쓰거나 호출에 사용하는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-416"
+                ],
+                "representative_code_examples": [
+                    "free(ptr); printf(\"%s\", ptr);",
+                    "free(obj); obj->field = 1;",
+                    "delete p; p->run();"
+                ],
+                "common_indicators": [
+                    "free/delete 이후 동일 포인터 사용",
+                    "해제 후 NULL 처리 없음",
+                    "소유권 관리 불명확"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 39,
+        "full_code": "filemap(const tchar *name,\n        void (*processor)(const void *, size_t, const tchar *, void *arg),\n        void *arg) {\n  int fd;\n  size_t nbytes;\n  struct stat sb;\n  void *p;\n\n  fd = topen(name, O_RDONLY);\n  if (fd < 0) {\n    tperror(name);\n    return 0;\n  }\n  if (fstat(fd, &sb) < 0) {\n    tperror(name);\n    close(fd);\n    return 0;\n  }\n  if (! S_ISREG(sb.st_mode)) {\n    close(fd);\n    fprintf(stderr, \"%\" XML_FMT_STR \": not a regular file\\n\", name);\n    return 0;\n  }\n  if (sb.st_size > XML_MAX_CHUNK_LEN) {\n    close(fd);\n    return 2; /* Cannot be passed to XML_Parse in one go */\n  }\n\n  nbytes = sb.st_size;\n  /* mmap fails for zero length files */\n  if (nbytes == 0) {\n    static const char c = '\\0';\n    processor(&c, 0, name, arg);\n    close(fd);\n    return 1;\n  }\n  p = mmap(NULL, nbytes, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, (off_t)0);\n  if (p == (void *)-1) {\n    tperror(name);\n    close(fd);\n    return 0;\n  }\n  processor(p, nbytes, name, arg);\n  munmap((void *)p, nbytes);\n  close(fd);\n  return 1;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate issues with insufficient validation of input lengths and fixed-size buffers, leading to potential overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2023-27590",
+                    "CVE-2016-10071",
+                    "CVE-2019-1010305"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 40,
+        "full_code": "processStream(const XML_Char *filename, XML_Parser parser) {\n  /* passing NULL for filename means read input from stdin */\n  int fd = 0; /* 0 is the fileno for stdin */\n\n  if (filename != NULL) {\n    fd = topen(filename, O_BINARY | O_RDONLY);\n    if (fd < 0) {\n      tperror(filename);\n      return 0;\n    }\n  }\n  for (;;) {\n    EXPAT_read_count_t nread;\n    char *buf = (char *)XML_GetBuffer(parser, g_read_size_bytes);\n    if (! buf) {\n      if (filename != NULL)\n        close(fd);\n      ftprintf(stderr, T(\"%s: out of memory\\n\"),\n               filename != NULL ? filename : T(\"xmlwf\"));\n      return 0;\n    }\n    nread = EXPAT_read(fd, buf, (EXPAT_read_req_t)g_read_size_bytes);\n    if (nread < 0) {\n      tperror(filename != NULL ? filename : T(\"STDIN\"));\n      if (filename != NULL)\n        close(fd);\n      return 0;\n    }\n    if (XML_ParseBuffer(parser, (int)nread, nread == 0) == XML_STATUS_ERROR) {\n      reportError(parser, filename != NULL ? filename : T(\"STDIN\"));\n      if (filename != NULL)\n        close(fd);\n      return 0;\n    }\n    if (nread == 0) {\n      if (filename != NULL)\n        close(fd);\n      break;\n    }\n  }\n  return 1;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of input sizes and memory allocation, leading to potential buffer overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2017-1000494",
+                    "CVE-2021-20230",
+                    "CVE-2017-14502"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 41,
+        "full_code": "reportError(XML_Parser parser, const XML_Char *filename) {\n  enum XML_Error code = XML_GetErrorCode(parser);\n  const XML_Char *message = XML_ErrorString(code);\n  if (message)\n    ftprintf(stdout,\n             T(\"%s\") T(\":%\") T(XML_FMT_INT_MOD) T(\"u\") T(\":%\")\n                 T(XML_FMT_INT_MOD) T(\"u\") T(\": %s\\n\"),\n             filename, XML_GetCurrentLineNumber(parser),\n             XML_GetCurrentColumnNumber(parser), message);\n  else\n    ftprintf(stderr, T(\"%s: (unknown message %u)\\n\"), filename,\n             (unsigned int)code);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of buffer sizes and lack of validation when writing data to buffers, leading to potential overflows.",
+                "supporting_cve_ids": [
+                    "CVE-2021-27815",
+                    "CVE-2022-33099",
+                    "CVE-2023-2837"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 42,
+        "full_code": "endDoctypeDecl(void *userData) {\n  XmlwfUserData *data = (XmlwfUserData *)userData;\n  NotationList **notations;\n  int notationCount = 0;\n  NotationList *p;\n  int i;\n\n  /* How many notations do we have? */\n  for (p = data->notationListHead; p != NULL; p = p->next)\n    notationCount++;\n  if (notationCount == 0) {\n    /* Nothing to report */\n    goto cleanUp;\n  }\n\n  notations = malloc(notationCount * sizeof(NotationList *));\n  if (notations == NULL) {\n    fprintf(stderr, \"Unable to sort notations\");\n    goto cleanUp;\n  }\n\n  for (p = data->notationListHead, i = 0; i < notationCount; p = p->next, i++) {\n    notations[i] = p;\n  }\n  qsort(notations, notationCount, sizeof(NotationList *), notationCmp);\n\n  /* Output the DOCTYPE header */\n  fputts(T(\"<!DOCTYPE \"), data->fp);\n  fputts(data->currentDoctypeName, data->fp);\n  fputts(T(\" [\\n\"), data->fp);\n\n  /* Now the NOTATIONs */\n  for (i = 0; i < notationCount; i++) {\n    fputts(T(\"<!NOTATION \"), data->fp);\n    fputts(notations[i]->notationName, data->fp);\n    if (notations[i]->publicId != NULL) {\n      fputts(T(\" PUBLIC '\"), data->fp);\n      fputts(notations[i]->publicId, data->fp);\n      puttc(T('\\''), data->fp);\n      if (notations[i]->systemId != NULL) {\n        puttc(T(' '), data->fp);\n        puttc(T('\\''), data->fp);\n        fputts(notations[i]->systemId, data->fp);\n        puttc(T('\\''), data->fp);\n      }\n    } else if (notations[i]->systemId != NULL) {\n      fputts(T(\" SYSTEM '\"), data->fp);\n      fputts(notations[i]->systemId, data->fp);\n      puttc(T('\\''), data->fp);\n    }\n    puttc(T('>'), data->fp);\n    puttc(T('\\n'), data->fp);\n  }\n\n  /* Finally end the DOCTYPE */\n  fputts(T(\"]>\\n\"), data->fp);\n\n  free(notations);\n\ncleanUp:\n  freeNotations(data);\n  free((void *)data->currentDoctypeName);\n  data->currentDoctypeName = NULL;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate improper handling of memory allocation and access, leading to potential buffer overflows when data exceeds allocated sizes.",
+                "supporting_cve_ids": [
+                    "CVE-2014-9621",
+                    "CVE-2020-1919",
+                    "CVE-2022-34035"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 43,
+        "full_code": "tmain(int argc, XML_Char **argv) {\n  int i, j;\n  const XML_Char *outputDir = NULL;\n  const XML_Char *encoding = NULL;\n  unsigned processFlags = XML_MAP_FILE;\n  int windowsCodePages = 0;\n  int outputType = 0;\n  int useNamespaces = 0;\n  int requireStandalone = 0;\n  int requiresNotations = 0;\n  int continueOnError = 0;\n\n  float attackMaximumAmplification = -1.0f; /* signaling \"not set\" */\n  unsigned long long attackThresholdBytes = 0;\n  XML_Bool attackThresholdGiven = XML_FALSE;\n\n  XML_Bool disableDeferral = XML_FALSE;\n\n  int exitCode = XMLWF_EXIT_SUCCESS;\n  enum XML_ParamEntityParsing paramEntityParsing\n      = XML_PARAM_ENTITY_PARSING_NEVER;\n  int useStdin = 0;\n  XmlwfUserData userData = {NULL, NULL, NULL};\n\n#ifdef _MSC_VER\n  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);\n#endif\n\n  i = 1;\n  j = 0;\n  while (i < argc) {\n    if (j == 0) {\n      if (argv[i][0] != T('-'))\n        break;\n      if (argv[i][1] == T('-')) {\n        if (argv[i][2] == T('\\0')) {\n          i++;\n          break;\n        } else if (tcscmp(argv[i] + 2, T(\"help\")) == 0) {\n          usage(argv[0], XMLWF_EXIT_SUCCESS);\n          // usage called exit(..), never gets here\n        } else if (tcscmp(argv[i] + 2, T(\"version\")) == 0) {\n          showVersion(argv[0]);\n          return XMLWF_EXIT_SUCCESS;\n        }\n      }\n      j++;\n    }\n    switch (argv[i][j]) {\n    case T('r'):\n      processFlags &= ~XML_MAP_FILE;\n      j++;\n      break;\n    case T('s'):\n      requireStandalone = 1;\n      j++;\n      break;\n    case T('n'):\n      useNamespaces = 1;\n      j++;\n      break;\n    case T('p'):\n      paramEntityParsing = XML_PARAM_ENTITY_PARSING_ALWAYS;\n      /* fall through */\n    case T('x'):\n      processFlags |= XML_EXTERNAL_ENTITIES;\n      j++;\n      break;\n    case T('w'):\n      windowsCodePages = 1;\n      j++;\n      break;\n    case T('m'):\n      outputType = 'm';\n      j++;\n      break;\n    case T('c'):\n      outputType = 'c';\n      useNamespaces = 0;\n      j++;\n      break;\n    case T('t'):\n      outputType = 't';\n      j++;\n      break;\n    case T('N'):\n      requiresNotations = 1;\n      j++;\n      break;\n    case T('d'):\n      XMLWF_SHIFT_ARG_INTO(outputDir, argc, argv, i, j);\n      break;\n    case T('e'):\n      XMLWF_SHIFT_ARG_INTO(encoding, argc, argv, i, j);\n      break;\n    case T('h'):\n      usage(argv[0], XMLWF_EXIT_SUCCESS);\n      // usage called exit(..), never gets here\n    case T('v'):\n      showVersion(argv[0]);\n      return XMLWF_EXIT_SUCCESS;\n    case T('g'): {\n      const XML_Char *valueText = NULL;\n      XMLWF_SHIFT_ARG_INTO(valueText, argc, argv, i, j);\n\n      errno = 0;\n      XML_Char *afterValueText = (XML_Char *)valueText;\n      const long long read_size_bytes_candidate\n          = tcstoull(valueText, &afterValueText, 10);\n      if ((errno != 0) || (afterValueText[0] != T('\\0'))\n          || (read_size_bytes_candidate < 1)\n          || (read_size_bytes_candidate > (INT_MAX / 2 + 1))) {\n        // This prevents tperror(..) from reporting misleading \"[..]: Success\"\n        errno = ERANGE;\n        tperror(T(\"invalid buffer size\") T(\n            \" (needs an integer from 1 to INT_MAX/2+1 i.e. 1,073,741,824 on most platforms)\"));\n        exit(XMLWF_EXIT_USAGE_ERROR);\n      }\n      g_read_size_bytes = (int)read_size_bytes_candidate;\n      break;\n    }\n    case T('k'):\n      continueOnError = 1;\n      j++;\n      break;\n    case T('a'): {\n      const XML_Char *valueText = NULL;\n      XMLWF_SHIFT_ARG_INTO(valueText, argc, argv, i, j);\n\n      errno = 0;\n      XML_Char *afterValueText = NULL;\n      attackMaximumAmplification = tcstof(valueText, &afterValueText);\n      if ((errno != 0) || (afterValueText[0] != T('\\0'))\n          || isnan(attackMaximumAmplification)\n          || (attackMaximumAmplification < 1.0f)) {\n        // This prevents tperror(..) from reporting misleading \"[..]: Success\"\n        errno = ERANGE;\n        tperror(T(\"invalid amplification limit\") T(\n            \" (needs a floating point number greater or equal than 1.0)\"));\n        exit(XMLWF_EXIT_USAGE_ERROR);\n      }\n#if XML_GE == 0\n      ftprintf(stderr,\n               T(\"Warning: Given amplification limit ignored\")\n                   T(\", xmlwf has been compiled without DTD/GE support.\\n\"));\n#endif\n      break;\n    }\n    case T('b'): {\n      const XML_Char *valueText = NULL;\n      XMLWF_SHIFT_ARG_INTO(valueText, argc, argv, i, j);\n\n      errno = 0;\n      XML_Char *afterValueText = (XML_Char *)valueText;\n      attackThresholdBytes = tcstoull(valueText, &afterValueText, 10);\n      if ((errno != 0) || (afterValueText[0] != T('\\0'))) {\n        // This prevents tperror(..) from reporting misleading \"[..]: Success\"\n        errno = ERANGE;\n        tperror(T(\"invalid ignore threshold\")\n                    T(\" (needs an integer from 0 to 2^64-1)\"));\n        exit(XMLWF_EXIT_USAGE_ERROR);\n      }\n      attackThresholdGiven = XML_TRUE;\n#if XML_GE == 0\n      ftprintf(stderr,\n               T(\"Warning: Given attack threshold ignored\")\n                   T(\", xmlwf has been compiled without DTD/GE support.\\n\"));\n#endif\n      break;\n    }\n    case T('q'): {\n      disableDeferral = XML_TRUE;\n      j++;\n      break;\n    }\n    case T('\\0'):\n      if (j > 1) {\n        i++;\n        j = 0;\n        break;\n      }\n      /* fall through */\n    default:\n      usage(argv[0], XMLWF_EXIT_USAGE_ERROR);\n      // usage called exit(..), never gets here\n    }\n  }\n  if (i == argc) {\n    useStdin = 1;\n    processFlags &= ~XML_MAP_FILE;\n    i--;\n  }\n  for (; i < argc; i++) {\n    XML_Char *outName = 0;\n    int result;\n    XML_Parser parser;\n    if (useNamespaces)\n      parser = XML_ParserCreateNS(encoding, NSSEP);\n    else\n      parser = XML_ParserCreate(encoding);\n\n    if (! parser) {\n      tperror(T(\"Could not instantiate parser\"));\n      exit(XMLWF_EXIT_INTERNAL_ERROR);\n    }\n\n    if (attackMaximumAmplification != -1.0f) {\n#if XML_GE == 1\n      XML_SetBillionLaughsAttackProtectionMaximumAmplification(\n          parser, attackMaximumAmplification);\n      XML_SetAllocTrackerMaximumAmplification(parser,\n                                              attackMaximumAmplification);\n#endif\n    }\n    if (attackThresholdGiven) {\n#if XML_GE == 1\n      XML_SetBillionLaughsAttackProtectionActivationThreshold(\n          parser, attackThresholdBytes);\n      XML_SetAllocTrackerActivationThreshold(parser, attackThresholdBytes);\n#else\n      (void)attackThresholdBytes; // silence -Wunused-but-set-variable\n#endif\n    }\n\n    if (disableDeferral) {\n      const XML_Bool success = XML_SetReparseDeferralEnabled(parser, XML_FALSE);\n      if (! success) {\n        // This prevents tperror(..) from reporting misleading \"[..]: Success\"\n        errno = EINVAL;\n        tperror(T(\"Failed to disable reparse deferral\"));\n        exit(XMLWF_EXIT_INTERNAL_ERROR);\n      }\n    }\n\n    if (requireStandalone)\n      XML_SetNotStandaloneHandler(parser, notStandalone);\n    XML_SetParamEntityParsing(parser, paramEntityParsing);\n    if (outputType == 't') {\n      /* This is for doing timings; this gives a more realistic estimate of\n         the parsing time. */\n      outputDir = 0;\n      XML_SetElementHandler(parser, nopStartElement, nopEndElement);\n      XML_SetCharacterDataHandler(parser, nopCharacterData);\n      XML_SetProcessingInstructionHandler(parser, nopProcessingInstruction);\n    } else if (outputDir) {\n      const XML_Char *delim = T(\"/\");\n      const XML_Char *file = useStdin ? T(\"STDIN\") : argv[i];\n      if (! useStdin) {\n        /* Jump after last (back)slash */\n        const XML_Char *lastDelim = tcsrchr(file, delim[0]);\n        if (lastDelim)\n          file = lastDelim + 1;\n#if defined(_WIN32)\n        else {\n          const XML_Char *winDelim = T(\"\\\\\");\n          lastDelim = tcsrchr(file, winDelim[0]);\n          if (lastDelim) {\n            file = lastDelim + 1;\n            delim = winDelim;\n          }\n        }\n#endif\n      }\n      outName = (XML_Char *)malloc((tcslen(outputDir) + tcslen(file) + 2)\n                                   * sizeof(XML_Char));\n      if (! outName) {\n        tperror(T(\"Could not allocate memory\"));\n        exit(XMLWF_EXIT_INTERNAL_ERROR);\n      }\n      tcscpy(outName, outputDir);\n      tcscat(outName, delim);\n      tcscat(outName, file);\n      userData.fp = tfopen(outName, T(\"wb\"));\n      if (! userData.fp) {\n        tperror(outName);\n        exitCode = XMLWF_EXIT_OUTPUT_ERROR;\n        free(outName);\n        XML_ParserFree(parser);\n        if (continueOnError) {\n          continue;\n        } else {\n          break;\n        }\n      }\n      setvbuf(userData.fp, NULL, _IOFBF, 16384);\n#ifdef XML_UNICODE\n      puttc(0xFEFF, userData.fp);\n#endif\n      XML_SetUserData(parser, &userData);\n      switch (outputType) {\n      case 'm':\n        XML_UseParserAsHandlerArg(parser);\n        XML_SetElementHandler(parser, metaStartElement, metaEndElement);\n        XML_SetProcessingInstructionHandler(parser, metaProcessingInstruction);\n        XML_SetCommentHandler(parser, metaComment);\n        XML_SetCdataSectionHandler(parser, metaStartCdataSection,\n                                   metaEndCdataSection);\n        XML_SetCharacterDataHandler(parser, metaCharacterData);\n        XML_SetDoctypeDeclHandler(parser, metaStartDoctypeDecl,\n                                  metaEndDoctypeDecl);\n        XML_SetEntityDeclHandler(parser, metaEntityDecl);\n        XML_SetNotationDeclHandler(parser, metaNotationDecl);\n        XML_SetNamespaceDeclHandler(parser, metaStartNamespaceDecl,\n                                    metaEndNamespaceDecl);\n        metaStartDocument(parser);\n        break;\n      case 'c':\n        XML_UseParserAsHandlerArg(parser);\n        XML_SetDefaultHandler(parser, markup);\n        XML_SetElementHandler(parser, defaultStartElement, defaultEndElement);\n        XML_SetCharacterDataHandler(parser, defaultCharacterData);\n        XML_SetProcessingInstructionHandler(parser,\n                                            defaultProcessingInstruction);\n        break;\n      default:\n        if (useNamespaces)\n          XML_SetElementHandler(parser, startElementNS, endElementNS);\n        else\n          XML_SetElementHandler(parser, startElement, endElement);\n        XML_SetCharacterDataHandler(parser, characterData);\n#ifndef W3C14N\n        XML_SetProcessingInstructionHandler(parser, processingInstruction);\n        if (requiresNotations) {\n          XML_SetDoctypeDeclHandler(parser, startDoctypeDecl, endDoctypeDecl);\n          XML_SetNotationDeclHandler(parser, notationDecl);\n        }\n#endif /* not W3C14N */\n        break;\n      }\n    }\n    if (windowsCodePages)\n      XML_SetUnknownEncodingHandler(parser, unknownEncoding, 0);\n    result = XML_ProcessFile(parser, useStdin ? NULL : argv[i], processFlags);\n    if (outputDir) {\n      if (outputType == 'm')\n        metaEndDocument(parser);\n      fclose(userData.fp);\n      if (! result) {\n        tremove(outName);\n      }\n      free(outName);\n    }\n    XML_ParserFree(parser);\n    if (! result) {\n      exitCode = XMLWF_EXIT_NOT_WELLFORMED;\n      cleanupUserData(&userData);\n      if (! continueOnError) {\n        break;\n      }\n    }\n  }\n  return exitCode;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate issues with improper handling of user input and fixed-size buffers, leading to potential memory corruption and arbitrary code execution.",
+                "supporting_cve_ids": [
+                    "CVE-2015-3905",
+                    "CVE-2020-5210",
+                    "CVE-2024-40130"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 44,
+        "full_code": "#if defined(__GNUC__)\n__attribute__((noreturn))\n#endif\nstatic void\nusage(const XML_Char *prog, int rc) {\n  ftprintf(\n      stderr,\n      /* Generated with:\n       * $ xmlwf/xmlwf_helpgen.sh\n       * To update, change xmlwf/xmlwf_helpgen.py, then paste the output of\n       * xmlwf/xmlwf_helpgen.sh in here.\n       */\n      /* clang-format off */\n      T(\"usage:\\n\")\n      T(\"  %s [OPTIONS] [FILE ...]\\n\")\n      T(\"  %s -h|--help\\n\")\n      T(\"  %s -v|--version\\n\")\n      T(\"\\n\")\n      T(\"xmlwf - Determines if an XML document is well-formed\\n\")\n      T(\"\\n\")\n      T(\"positional arguments:\\n\")\n      T(\"  FILE           file to process (default: STDIN)\\n\")\n      T(\"\\n\")\n      T(\"input control arguments:\\n\")\n      T(\"  -s             print an error if the document is not [s]tandalone\\n\")\n      T(\"  -n             enable [n]amespace processing\\n\")\n      T(\"  -p             enable processing of external DTDs and [p]arameter entities\\n\")\n      T(\"  -x             enable processing of e[x]ternal entities\\n\")\n      T(\"                 (CAREFUL! This makes xmlwf vulnerable to external entity attacks (XXE).)\\n\")\n      T(\"  -e ENCODING    override any in-document [e]ncoding declaration\\n\")\n      T(\"  -w             enable support for [W]indows code pages\\n\")\n      T(\"  -r             disable memory-mapping and use [r]ead calls instead\\n\")\n      T(\"  -g BYTES       buffer size to request per call pair to XML_[G]etBuffer and read (default: 8 KiB)\\n\")\n      T(\"  -k             when processing multiple files, [k]eep processing after first file with error\\n\")\n      T(\"\\n\")\n      T(\"output control arguments:\\n\")\n      T(\"  -d DIRECTORY   output [d]estination directory\\n\")\n      T(\"  -c             write a [c]opy of input XML, not canonical XML\\n\")\n      T(\"  -m             write [m]eta XML, not canonical XML\\n\")\n      T(\"  -t             write no XML output for [t]iming of plain parsing\\n\")\n      T(\"  -N             enable adding doctype and [n]otation declarations\\n\")\n      T(\"\\n\")\n      T(\"amplification attack protection (e.g. billion laughs):\\n\")\n      T(\"  NOTE: If you ever need to increase these values for non-attack payload, please file a bug report.\\n\")\n      T(\"\\n\")\n      T(\"  -a FACTOR      set maximum tolerated [a]mplification factor (default: 100.0)\\n\")\n      T(\"  -b BYTES       set number of output [b]ytes needed to activate (default: 8 MiB/64 MiB)\\n\")\n      T(\"\\n\")\n      T(\"reparse deferral:\\n\")\n      T(\"  -q             disable reparse deferral, and allow [q]uadratic parse runtime with large tokens\\n\")\n      T(\"\\n\")\n      T(\"info arguments:\\n\")\n      T(\"  -h, --help     show this [h]elp message and exit\\n\")\n      T(\"  -v, --version  show program's [v]ersion number and exit\\n\")\n      T(\"\\n\")\n      T(\"environment variables:\\n\")\n      T(\"  EXPAT_ACCOUNTING_DEBUG=(0|1|2|3)\\n\")\n      T(\"                 Control verbosity of accounting debugging (default: 0)\\n\")\n      T(\"  EXPAT_ENTITY_DEBUG=(0|1)\\n\")\n      T(\"                 Control verbosity of entity debugging (default: 0)\\n\")\n      T(\"  EXPAT_ENTROPY_DEBUG=(0|1)\\n\")\n      T(\"                 Control verbosity of entropy debugging (default: 0)\\n\")\n      T(\"  EXPAT_MALLOC_DEBUG=(0|1|2)\\n\")\n      T(\"                 Control verbosity of allocation tracker (default: 0)\\n\")\n      T(\"\\n\")\n      T(\"exit status:\\n\")\n      T(\"  0              the input files are well-formed and the output (if requested) was written successfully\\n\")\n      T(\"  1              could not allocate data structures, signals a serious problem with execution environment\\n\")\n      T(\"  2              one or more input files were not well-formed\\n\")\n      T(\"  3              could not create an output file\\n\")\n      T(\"  4              command-line argument error\\n\")\n      T(\"\\n\")\n      T(\"xmlwf of libexpat is software libre, licensed under the MIT license.\\n\")\n      T(\"Please report bugs at https://github.com/libexpat/libexpat/issues -- thank you!\\n\")\n      , /* clang-format on */\n      prog, prog, prog);\n  exit(rc);\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "Multiple candidates indicate issues with insufficient validation of user input leading to potential buffer overflows, which can result in memory corruption and arbitrary code execution.",
+                "supporting_cve_ids": [
+                    "CVE-2016-10009",
+                    "CVE-2022-0156",
+                    "CVE-2018-5784"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    },
+    {
+        "id": 45,
+        "full_code": "xcsdup(const XML_Char *s) {\n  XML_Char *result;\n  int count = 0;\n  size_t numBytes;\n\n  /* Get the length of the string, including terminator */\n  while (s[count++] != 0) {\n    /* Do nothing */\n  }\n  numBytes = count * sizeof(XML_Char);\n  result = malloc(numBytes);\n  if (result == NULL)\n    return NULL;\n  memcpy(result, s, numBytes);\n  return result;\n}\n",
+        "top_vulnerabilities": [
+            {
+                "name": "Buffer Overflow",
+                "reason": "The function `xcsdup` involves memory allocation and copying of strings, which can lead to buffer overflow vulnerabilities if the input string exceeds the allocated memory size.",
+                "supporting_cve_ids": [
+                    "CVE-2016-2315",
+                    "CVE-2020-1918",
+                    "CVE-2020-1919"
+                ],
+                "representative_pattern": "고정 크기 버퍼에 입력 길이 또는 복사 크기 검증 없이 데이터를 복사하거나 써서 경계를 넘기는 패턴",
+                "memory_corruption_category": null,
+                "cwe_ids": [
+                    "CWE-120",
+                    "CWE-121",
+                    "CWE-122"
+                ],
+                "representative_code_examples": [
+                    "char buf[16]; strcpy(buf, input);",
+                    "char dst[32]; memcpy(dst, src, user_len);",
+                    "char name[8]; sprintf(name, \"%s\", user_input);"
+                ],
+                "common_indicators": [
+                    "고정 길이 배열 사용",
+                    "길이 체크 없는 strcpy/memcpy/sprintf 계열",
+                    "입력 길이 신뢰",
+                    "반복문 경계 검증 누락"
+                ]
+            }
+        ]
+    }
+]
